@@ -65,6 +65,8 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
                 console.log('🔍 DEBUG - Imagen placeholder detectada, Cloudinary no configurado');
                 // Mostrar mensaje informativo pero permitir continuar
                 setError('⚠️ Cloudinary no está configurado. Se usará una imagen placeholder temporal.');
+                // No continuar con la subida si es placeholder
+                return;
             }
 
             onImageUpload(data.url);
@@ -78,6 +80,23 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
 
     const handleRemoveImage = () => {
         onImageRemove();
+    };
+
+    const testCloudinaryConfig = async () => {
+        try {
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/cloudinary-status`);
+            const data = await response.json();
+            console.log('🔍 DEBUG - Estado de Cloudinary:', data);
+
+            if (data.cloudinary_configured) {
+                setError('✅ Cloudinary está configurado correctamente');
+            } else {
+                setError('❌ Cloudinary no está configurado. Verifica las variables de entorno.');
+            }
+        } catch (error) {
+            console.error('Error verificando Cloudinary:', error);
+            setError('Error verificando configuración de Cloudinary');
+        }
     };
 
     return (
@@ -152,6 +171,18 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
                 <div className="form-text">
                     <i className="fas fa-info-circle me-1"></i>
                     Formatos permitidos: JPG, PNG, GIF. Tamaño máximo: 5MB
+                </div>
+
+                <div className="mt-2">
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-outline-info"
+                        onClick={testCloudinaryConfig}
+                        disabled={disabled}
+                    >
+                        <i className="fas fa-cog me-1"></i>
+                        Verificar Cloudinary
+                    </button>
                 </div>
             </div>
         </div>

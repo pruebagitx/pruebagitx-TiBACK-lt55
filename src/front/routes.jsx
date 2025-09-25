@@ -32,6 +32,7 @@ import { VerComentarios } from "./pages/VerComentarios";
 import ComentariosTicket from "./pages/ComentariosTicket";
 import RecomendacionVista from "./components/RecomendacionVista";
 import RecomendacionesGuardadas from "./pages/RecomendacionesGuardadas";
+import RecomendacionesSimilares from "./pages/RecomendacionesSimilares";
 import ChatSupervisorAnalista from "./pages/ChatSupervisorAnalista";
 import ChatAnalistaCliente from "./pages/ChatAnalistaCliente";
 
@@ -226,6 +227,11 @@ export const router = createBrowserRouter(
       <Route path="/ticket/:ticketId/recomendaciones-ia" element={
         <ProtectedRoute allowedRoles={["analista", "supervisor", "administrador", "cliente"]}>
           <RecomendacionesGuardadas />
+        </ProtectedRoute>
+      } />
+      <Route path="/ticket/:ticketId/recomendaciones-similares" element={
+        <ProtectedRoute allowedRoles={["analista", "supervisor", "administrador", "cliente"]}>
+          <RecomendacionesSimilares />
         </ProtectedRoute>
       } />
       <Route path="/ticket/:ticketId/chat-supervisor-analista" element={

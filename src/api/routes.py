@@ -25,15 +25,28 @@ CORS(api)
 
 # Configurar Cloudinary usando CLOUDINARY_URL
 cloudinary_url = os.getenv('CLOUDINARY_URL')
+cloudinary_cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME')
+cloudinary_api_key = os.getenv('CLOUDINARY_API_KEY')
+cloudinary_api_secret = os.getenv('CLOUDINARY_API_SECRET')
+
+print(f"🔍 DEBUG - Configuración inicial de Cloudinary:")
+print(f"🔍 DEBUG - CLOUDINARY_URL: {bool(cloudinary_url)}")
+print(f"🔍 DEBUG - CLOUDINARY_CLOUD_NAME: {cloudinary_cloud_name}")
+print(f"🔍 DEBUG - CLOUDINARY_API_KEY: {bool(cloudinary_api_key)}")
+print(f"🔍 DEBUG - CLOUDINARY_API_SECRET: {bool(cloudinary_api_secret)}")
+
 if cloudinary_url:
     cloudinary.config(cloudinary_url=cloudinary_url)
-else:
-    # Fallback a variables individuales si CLOUDINARY_URL no está disponible
+    print("🔍 DEBUG - Cloudinary configurado con CLOUDINARY_URL")
+elif cloudinary_cloud_name and cloudinary_api_key and cloudinary_api_secret:
     cloudinary.config(
-        cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
-        api_key=os.getenv('CLOUDINARY_API_KEY'),
-        api_secret=os.getenv('CLOUDINARY_API_SECRET')
+        cloud_name=cloudinary_cloud_name,
+        api_key=cloudinary_api_key,
+        api_secret=cloudinary_api_secret
     )
+    print("🔍 DEBUG - Cloudinary configurado con variables individuales")
+else:
+    print("🔍 DEBUG - Cloudinary no configurado en el inicio")
 
 # Función para obtener la instancia de socketio
 def get_socketio():
@@ -52,6 +65,28 @@ def handle_hello():
     }
 
     return jsonify(response_body), 200
+
+
+@api.route('/cloudinary-status', methods=['GET'])
+def cloudinary_status():
+    """Verificar el estado de la configuración de Cloudinary"""
+    cloudinary_url = os.getenv('CLOUDINARY_URL')
+    cloudinary_cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME')
+    cloudinary_api_key = os.getenv('CLOUDINARY_API_KEY')
+    cloudinary_api_secret = os.getenv('CLOUDINARY_API_SECRET')
+    
+    cloudinary_configured = (
+        cloudinary_url or 
+        (cloudinary_cloud_name and cloudinary_api_key and cloudinary_api_secret)
+    )
+    
+    return jsonify({
+        "cloudinary_configured": cloudinary_configured,
+        "cloudinary_url": bool(cloudinary_url),
+        "cloudinary_cloud_name": cloudinary_cloud_name,
+        "cloudinary_api_key": bool(cloudinary_api_key),
+        "cloudinary_api_secret": bool(cloudinary_api_secret)
+    }), 200
 
 
 @api.route('/clientes', methods=['GET'])
@@ -757,6 +792,23 @@ def upload_image():
             cloudinary_url or 
             (cloudinary_cloud_name and cloudinary_api_key and cloudinary_api_secret)
         )
+        
+        # Si no está configurado, intentar reconfigurar Cloudinary
+        if not cloudinary_configured:
+            print("🔍 DEBUG - Cloudinary no configurado, intentando reconfigurar...")
+            # Intentar reconfigurar con las variables disponibles
+            if cloudinary_url:
+                cloudinary.config(cloudinary_url=cloudinary_url)
+                cloudinary_configured = True
+                print("🔍 DEBUG - Cloudinary reconfigurado con CLOUDINARY_URL")
+            elif cloudinary_cloud_name and cloudinary_api_key and cloudinary_api_secret:
+                cloudinary.config(
+                    cloud_name=cloudinary_cloud_name,
+                    api_key=cloudinary_api_key,
+                    api_secret=cloudinary_api_secret
+                )
+                cloudinary_configured = True
+                print("🔍 DEBUG - Cloudinary reconfigurado con variables individuales")
         
         if not cloudinary_configured:
             # Fallback: devolver una URL de imagen placeholder
@@ -1812,6 +1864,73 @@ def asignar_ticket(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"message": f"Error al asignar ticket: {str(e)}"}), 500
+
+
+@api.route('/tickets/<int:ticket_id>/recomendaciones-similares', methods=['GET'])
+@require_auth
+def obtener_tickets_similares(ticket_id):
+    """Obtener tickets similares basados en título y descripción"""
+    try:
+        # Obtener el ticket actual
+        ticket_actual = Ticket.query.get(ticket_id)
+        if not ticket_actual:
+            return jsonify({"message": "Ticket no encontrado"}), 404
+        
+        # Obtener todos los tickets cerrados y solucionados
+        tickets_cerrados = Ticket.query.filter(
+            Ticket.estado.in_(['cerrado', 'cerrado_por_supervisor']),
+            Ticket.id != ticket_id
+        ).all()
+        
+        if not tickets_cerrados:
+            return jsonify({
+                "tickets_similares": [],
+                "total_encontrados": 0,
+                "ticket_actual": ticket_actual.serialize()
+            }), 200
+        
+        # Algoritmo simple de similitud basado en palabras clave
+        def calcular_similitud(titulo1, descripcion1, titulo2, descripcion2):
+            # Convertir a minúsculas y dividir en palabras
+            palabras1 = set((titulo1 + " " + descripcion1).lower().split())
+            palabras2 = set((titulo2 + " " + descripcion2).lower().split())
+            
+            # Calcular intersección de palabras
+            interseccion = palabras1.intersection(palabras2)
+            union = palabras1.union(palabras2)
+            
+            # Calcular similitud de Jaccard
+            if len(union) == 0:
+                return 0
+            return len(interseccion) / len(union)
+        
+        # Calcular similitud para cada ticket cerrado
+        tickets_con_similitud = []
+        for ticket in tickets_cerrados:
+            similitud = calcular_similitud(
+                ticket_actual.titulo, ticket_actual.descripcion,
+                ticket.titulo, ticket.descripcion
+            )
+            
+            if similitud > 0.1:  # Umbral mínimo de similitud
+                ticket_data = ticket.serialize()
+                ticket_data['similitud'] = round(similitud, 3)
+                tickets_con_similitud.append(ticket_data)
+        
+        # Ordenar por similitud descendente
+        tickets_con_similitud.sort(key=lambda x: x['similitud'], reverse=True)
+        
+        # Limitar a los 5 más similares
+        tickets_similares = tickets_con_similitud[:5]
+        
+        return jsonify({
+            "tickets_similares": tickets_similares,
+            "total_encontrados": len(tickets_similares),
+            "ticket_actual": ticket_actual.serialize()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"message": f"Error al obtener tickets similares: {str(e)}"}), 500
 
 
 @api.route('/tickets/<int:ticket_id>/recomendacion-ia', methods=['POST'])
