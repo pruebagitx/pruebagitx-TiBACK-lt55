@@ -140,28 +140,30 @@ export function ClientePage() {
     // Unirse automáticamente a los rooms de tickets del cliente
     useEffect(() => {
         if (store.websocket.socket && tickets.length > 0) {
+            // Solo unirse a rooms de tickets que no estén ya unidos
+            const joinedRooms = new Set();
             tickets.forEach(ticket => {
-                joinTicketRoom(store.websocket.socket, ticket.id);
+                if (!joinedRooms.has(ticket.id)) {
+                    joinTicketRoom(store.websocket.socket, ticket.id);
+                    joinedRooms.add(ticket.id);
+                }
             });
         }
-    }, [store.websocket.socket, tickets]);
+    }, [store.websocket.socket, tickets.length]); // Solo cuando cambia la cantidad de tickets
 
     // Actualizar tickets cuando lleguen notificaciones WebSocket
     useEffect(() => {
         if (store.websocket.notifications.length > 0) {
             const lastNotification = store.websocket.notifications[store.websocket.notifications.length - 1];
-            console.log('🔔 CLIENTE - Notificación recibida:', lastNotification);
 
             // Manejo específico para tickets eliminados - sincronización inmediata
             if (lastNotification.tipo === 'eliminado' || lastNotification.tipo === 'ticket_eliminado') {
-                console.log('🗑️ CLIENTE - TICKET ELIMINADO DETECTADO:', lastNotification);
 
                 // Remover inmediatamente de la lista de tickets
                 if (lastNotification.ticket_id) {
                     setTickets(prev => {
                         const ticketRemovido = prev.find(t => t.id === lastNotification.ticket_id);
                         if (ticketRemovido) {
-                            console.log('🗑️ CLIENTE - Ticket eliminado removido de lista:', ticketRemovido.titulo);
                         }
                         return prev.filter(ticket => ticket.id !== lastNotification.ticket_id);
                     });
@@ -178,12 +180,10 @@ export function ClientePage() {
 
             // Actualización ULTRA RÁPIDA para todos los eventos críticos
             if (lastNotification.tipo === 'asignado' || lastNotification.tipo === 'estado_cambiado' || lastNotification.tipo === 'iniciado' || lastNotification.tipo === 'escalado' || lastNotification.tipo === 'creado') {
-                console.log('⚡ CLIENTE - ACTUALIZACIÓN INMEDIATA:', lastNotification.tipo);
                 // Los datos ya están en el store por el WebSocket - actualización instantánea
             }
 
             // Sincronización ULTRA RÁPIDA con servidor para TODOS los eventos
-            console.log('⚡ CLIENTE - SINCRONIZACIÓN INMEDIATA:', lastNotification.tipo);
             actualizarTickets();
         }
     }, [store.websocket.notifications]);

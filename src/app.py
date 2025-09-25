@@ -98,10 +98,8 @@ def handle_leave_ticket(data):
 @socketio.on('join_chat_supervisor_analista')
 def handle_join_chat_supervisor_analista(data):
     """Unirse al room de chat supervisor-analista"""
-    print(f'🔍 DEBUG: join_chat_supervisor_analista recibido:', data)
     ticket_id = data.get('ticket_id')
     if not ticket_id:
-        print('❌ ERROR: ticket_id requerido')
         emit('error', {'message': 'ticket_id requerido'})
         return
     
@@ -126,10 +124,8 @@ def handle_leave_chat_supervisor_analista(data):
 @socketio.on('join_chat_analista_cliente')
 def handle_join_chat_analista_cliente(data):
     """Unirse al room de chat analista-cliente"""
-    print(f'🔍 DEBUG: join_chat_analista_cliente recibido:', data)
     ticket_id = data.get('ticket_id')
     if not ticket_id:
-        print('❌ ERROR: ticket_id requerido')
         emit('error', {'message': 'ticket_id requerido'})
         return
     

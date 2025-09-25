@@ -377,31 +377,49 @@ export const authActions = {
       // Verificar si ya hay una conexión activa
       const currentSocket = dispatch.getState?.()?.websocket?.socket;
       if (currentSocket && currentSocket.connected) {
-        console.log('WebSocket ya conectado, reutilizando conexión');
         return currentSocket;
       }
+
+      // Cerrar conexión anterior si existe pero no está conectada
+      if (currentSocket && !currentSocket.connected) {
+        currentSocket.disconnect();
+      }
+
+      // Verificar si ya hay una conexión en proceso
+      const isConnecting = dispatch.getState?.()?.websocket?.connecting;
+      if (isConnecting) {
+        return null;
+      }
+
+      // Verificar si ya hay una conexión pendiente
+      if (window.websocketConnecting) {
+        return null;
+      }
+
+      // Marcar como conectando globalmente
+      window.websocketConnecting = true;
+      dispatch({ type: 'websocket_connecting' });
 
       const socket = io(backendUrl, {
         transports: ['websocket', 'polling'],
         auth: {
           token: token
         },
-        forceNew: true // Forzar nueva conexión
+        forceNew: false // Reutilizar conexión existente si está disponible
       });
 
       socket.on('connect', () => {
-        console.log('WebSocket conectado');
+        window.websocketConnecting = false;
         dispatch({ type: 'websocket_connected', payload: socket });
       });
 
       socket.on('disconnect', () => {
-        console.log('WebSocket desconectado');
+        window.websocketConnecting = false;
         dispatch({ type: 'websocket_disconnected' });
       });
 
       // Eventos de tickets
       socket.on('nuevo_ticket', (data) => {
-        console.log('⚡ NUEVO TICKET RECIBIDO:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         // Para administradores, agregar el ticket completo al store
         if (data.ticket) {
@@ -421,7 +439,6 @@ export const authActions = {
       });
 
       socket.on('nuevo_ticket_disponible', (data) => {
-        console.log('⚡ NUEVO TICKET DISPONIBLE PARA ASIGNACIÓN:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         // Convertir datos de notificación a formato de ticket
         const ticketData = {
@@ -436,7 +453,6 @@ export const authActions = {
       });
 
       socket.on('ticket_actualizado', (data) => {
-        console.log('⚡ TICKET ACTUALIZADO:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         // Si tiene ticket completo, usarlo; si no, convertir datos de notificación
         if (data.ticket) {
@@ -455,7 +471,6 @@ export const authActions = {
       });
 
       socket.on('ticket_asignado', (data) => {
-        console.log('⚡ TICKET ASIGNADO:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         // Si tiene ticket completo, usarlo; si no, convertir datos de notificación
         if (data.ticket) {
@@ -474,79 +489,65 @@ export const authActions = {
       });
 
       socket.on('nuevo_comentario', (data) => {
-        console.log('💬 NUEVO COMENTARIO EN TICKET:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         dispatch({ type: 'comentarios_add', payload: data.comentario });
       });
 
       socket.on('ticket_eliminado', (data) => {
-        console.log('🗑️ TICKET ELIMINADO:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         dispatch({ type: 'tickets_remove', payload: data.ticket_id });
       });
 
       // Eventos de confirmación de rooms
       socket.on('joined_ticket', (data) => {
-        console.log('✅ UNIDO AL ROOM DEL TICKET:', data);
       });
 
       socket.on('left_ticket', (data) => {
-        console.log('❌ SALIDO DEL ROOM DEL TICKET:', data);
       });
 
       // Eventos de confirmación de chats específicos
       socket.on('joined_chat_supervisor_analista', (data) => {
-        console.log('✅ UNIDO AL CHAT SUPERVISOR-ANALISTA:', data);
       });
 
       socket.on('left_chat_supervisor_analista', (data) => {
-        console.log('❌ SALIDO DEL CHAT SUPERVISOR-ANALISTA:', data);
       });
 
       socket.on('joined_chat_analista_cliente', (data) => {
-        console.log('✅ UNIDO AL CHAT ANALISTA-CLIENTE:', data);
       });
 
       socket.on('left_chat_analista_cliente', (data) => {
-        console.log('❌ SALIDO DEL CHAT ANALISTA-CLIENTE:', data);
       });
 
       // Eventos de analistas
       socket.on('analista_creado', (data) => {
-        console.log('📥 ANALISTA CREADO RECIBIDO:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         dispatch({ type: 'analistas_add', payload: data.analista });
       });
 
       socket.on('analista_eliminado', (data) => {
-        console.log('🗑️ ANALISTA ELIMINADO RECIBIDO:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         dispatch({ type: 'analistas_remove', payload: data.analista_id });
       });
 
       socket.on('solicitud_reapertura', (data) => {
-        console.log('🔄 SOLICITUD DE REAPERTURA RECIBIDA:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         // No actualizar tickets aquí, solo es una notificación
       });
 
       // Evento de ticket escalado
       socket.on('ticket_escalado', (data) => {
-        console.log('📈 TICKET ESCALADO RECIBIDO:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         // No actualizar tickets aquí, solo es una notificación
       });
 
       // Evento de ticket reabierto
       socket.on('ticket_reabierto', (data) => {
-        console.log('🔄 TICKET REABIERTO RECIBIDO:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         // No actualizar tickets aquí, solo es una notificación
       });
 
       // Evento de ticket cerrado
       socket.on('ticket_cerrado', (data) => {
-        console.log('✅ TICKET CERRADO RECIBIDO:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         // Para tickets cerrados, actualizar el estado pero no agregar a la lista activa
         if (data.ticket_id) {
@@ -565,14 +566,12 @@ export const authActions = {
 
       // Evento de ticket asignado específicamente a mí (analista)
       socket.on('ticket_asignado_a_mi', (data) => {
-        console.log('🎯 TICKET ASIGNADO A MÍ:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         dispatch({ type: 'tickets_upsert', payload: data });
       });
 
       // Evento específico para actualizaciones de CRUD de administradores
       socket.on('ticket_crud_update', (data) => {
-        console.log('📊 CRUD UPDATE RECIBIDO:', data);
         dispatch({ type: 'websocket_notification', payload: data });
         if (data.ticket) {
           dispatch({ type: 'tickets_upsert', payload: data.ticket });
@@ -582,6 +581,8 @@ export const authActions = {
       return socket;
     } catch (error) {
       console.error('Error conectando WebSocket:', error);
+      window.websocketConnecting = false;
+      dispatch({ type: 'websocket_disconnected' });
       return null;
     }
   },
@@ -615,48 +616,38 @@ export const authActions = {
   joinTicketRoom: (socket, ticketId) => {
     if (socket && ticketId) {
       socket.emit('join_ticket', { ticket_id: ticketId });
-      console.log(`🔗 Uniéndose al room del ticket: room_ticket_${ticketId}`);
     }
   },
 
   leaveTicketRoom: (socket, ticketId) => {
     if (socket && ticketId) {
       socket.emit('leave_ticket', { ticket_id: ticketId });
-      console.log(`🔌 Saliendo del room del ticket: room_ticket_${ticketId}`);
     }
   },
 
   joinChatSupervisorAnalista: (socket, ticketId) => {
     if (socket && ticketId) {
-      console.log(`🔍 DEBUG: joinChatSupervisorAnalista - socket:`, !!socket, 'ticketId:', ticketId);
       socket.emit('join_chat_supervisor_analista', { ticket_id: ticketId });
-      console.log(`🔗 Uniéndose al chat supervisor-analista: chat_supervisor_analista_${ticketId}`);
     } else {
-      console.log(`❌ DEBUG: joinChatSupervisorAnalista falló - socket:`, !!socket, 'ticketId:', ticketId);
     }
   },
 
   leaveChatSupervisorAnalista: (socket, ticketId) => {
     if (socket && ticketId) {
       socket.emit('leave_chat_supervisor_analista', { ticket_id: ticketId });
-      console.log(`🔌 Saliendo del chat supervisor-analista: chat_supervisor_analista_${ticketId}`);
     }
   },
 
   joinChatAnalistaCliente: (socket, ticketId) => {
     if (socket && ticketId) {
-      console.log(`🔍 DEBUG: joinChatAnalistaCliente - socket:`, !!socket, 'ticketId:', ticketId);
       socket.emit('join_chat_analista_cliente', { ticket_id: ticketId });
-      console.log(`🔗 Uniéndose al chat analista-cliente: chat_analista_cliente_${ticketId}`);
     } else {
-      console.log(`❌ DEBUG: joinChatAnalistaCliente falló - socket:`, !!socket, 'ticketId:', ticketId);
     }
   },
 
   leaveChatAnalistaCliente: (socket, ticketId) => {
     if (socket && ticketId) {
       socket.emit('leave_chat_analista_cliente', { ticket_id: ticketId });
-      console.log(`🔌 Saliendo del chat analista-cliente: chat_analista_cliente_${ticketId}`);
     }
   }
 };  
@@ -712,13 +703,23 @@ export default function storeReducer(store, action = {}) {
       };
 
     // WebSocket cases
+    case 'websocket_connecting':
+      return {
+        ...store,
+        websocket: {
+          ...store.websocket,
+          connecting: true
+        }
+      };
+
     case 'websocket_connected':
       return {
         ...store,
         websocket: {
           ...store.websocket,
           socket: action.payload,
-          connected: true
+          connected: true,
+          connecting: false
         }
       };
 
@@ -728,7 +729,8 @@ export default function storeReducer(store, action = {}) {
         websocket: {
           ...store.websocket,
           socket: null,
-          connected: false
+          connected: false,
+          connecting: false
         }
       };
 

@@ -30,8 +30,6 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
 
         try {
             // Debug: Verificar token
-            console.log('🔍 DEBUG - Token disponible:', !!store.auth.token);
-            console.log('🔍 DEBUG - URL backend:', import.meta.env.VITE_BACKEND_URL);
 
             if (!store.auth.token) {
                 throw new Error('No hay token de autenticación disponible');
@@ -41,7 +39,6 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
             formData.append('image', file);
 
             const url = `${import.meta.env.VITE_BACKEND_URL}/api/upload-image`;
-            console.log('🔍 DEBUG - URL completa:', url);
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -51,21 +48,16 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
                 body: formData
             });
 
-            console.log('🔍 DEBUG - Status response:', response.status);
-            console.log('🔍 DEBUG - Response ok:', response.ok);
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.log('🔍 DEBUG - Error response:', errorText);
                 throw new Error(`Error ${response.status}: ${errorText}`);
             }
 
             const data = await response.json();
-            console.log('🔍 DEBUG - Response data:', data);
 
             // Verificar si es una imagen placeholder
-            if (data.url && data.url.includes('placeholder.com')) {
-                console.log('🔍 DEBUG - Imagen placeholder detectada, Cloudinary no configurado');
+            if (data.url && data.url.includes('data:image/svg+xml')) {
                 // Mostrar mensaje informativo pero permitir continuar
                 setError('⚠️ Cloudinary no está configurado. Se usará una imagen placeholder temporal.');
                 // No continuar con la subida si es placeholder
@@ -74,7 +66,6 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
 
             onImageUpload(data.url);
         } catch (error) {
-            console.error('🔍 DEBUG - Error completo:', error);
             setError('Error subiendo imagen: ' + error.message);
         } finally {
             setUploading(false);
@@ -449,7 +440,6 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
         const handleMessage = (event) => {
             if (event.data === 'capture-now') {
                 // La captura ya se está ejecutando automáticamente
-                console.log('Captura iniciada automáticamente');
             }
         };
 
@@ -484,18 +474,15 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
             }
 
             const data = await response.json();
-            console.log('🔍 DEBUG - Response data:', data);
 
             // Verificar si es una imagen placeholder
-            if (data.url && data.url.includes('placeholder.com')) {
-                console.log('🔍 DEBUG - Imagen placeholder detectada, Cloudinary no configurado');
+            if (data.url && data.url.includes('data:image/svg+xml')) {
                 setError('⚠️ Cloudinary no está configurado. Se usará una imagen placeholder temporal.');
                 return;
             }
 
             onImageUpload(data.url);
         } catch (error) {
-            console.error('🔍 DEBUG - Error completo:', error);
             setError('Error subiendo imagen: ' + error.message);
         } finally {
             setUploading(false);
@@ -506,7 +493,6 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
         try {
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/cloudinary-status`);
             const data = await response.json();
-            console.log('🔍 DEBUG - Estado de Cloudinary:', data);
 
             if (data.cloudinary_configured) {
                 setError('✅ Cloudinary está configurado correctamente');

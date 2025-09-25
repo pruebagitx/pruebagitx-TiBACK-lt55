@@ -140,7 +140,7 @@ export function AnalistaPage() {
 
     // Conectar WebSocket cuando el usuario esté autenticado
     useEffect(() => {
-        if (store.auth.isAuthenticated && store.auth.token && !store.websocket.connected) {
+        if (store.auth.isAuthenticated && store.auth.token && !store.websocket.connected && !store.websocket.connecting) {
             const socket = connectWebSocket(store.auth.token);
             if (socket) {
                 const userId = tokenUtils.getUserId(store.auth.token);
@@ -155,7 +155,7 @@ export function AnalistaPage() {
                 disconnectWebSocket(store.websocket.socket);
             }
         };
-    }, [store.auth.isAuthenticated, store.auth.token]);
+    }, [store.auth.isAuthenticated, store.auth.token, store.websocket.connected, store.websocket.connecting]);
 
     // Actualizar tickets cuando lleguen notificaciones WebSocket (optimizado)
     useEffect(() => {
@@ -164,14 +164,12 @@ export function AnalistaPage() {
 
             // Manejo específico para tickets eliminados - sincronización inmediata
             if (lastNotification.tipo === 'eliminado' || lastNotification.tipo === 'ticket_eliminado') {
-                console.log('🗑️ ANALISTA - TICKET ELIMINADO DETECTADO:', lastNotification);
 
                 // Remover inmediatamente de la lista de tickets
                 if (lastNotification.ticket_id) {
                     setTickets(prev => {
                         const ticketRemovido = prev.find(t => t.id === lastNotification.ticket_id);
                         if (ticketRemovido) {
-                            console.log('🗑️ ANALISTA - Ticket eliminado removido de lista:', ticketRemovido.titulo);
                         }
                         return prev.filter(ticket => ticket.id !== lastNotification.ticket_id);
                     });
@@ -184,12 +182,10 @@ export function AnalistaPage() {
             if (eventosRelevantes.includes(lastNotification.tipo)) {
                 // Para escalaciones, actualizar inmediatamente
                 if (lastNotification.tipo === 'escalado' || lastNotification.tipo === 'asignado' || lastNotification.tipo === 'iniciado') {
-                    console.log('⚡ ANALISTA - ACTUALIZACIÓN INMEDIATA:', lastNotification.tipo);
                     actualizarTickets();
                 } else {
                     // Debounce mínimo para otros eventos
                     const timeoutId = setTimeout(() => {
-                        console.log('🔄 ANALISTA - Actualización con debounce mínimo');
                         actualizarTickets();
                     }, 500); // 0.5 segundos de debounce mínimo
 
@@ -639,7 +635,7 @@ export function AnalistaPage() {
                                                     <td>
                                                         <div className="d-flex align-items-center">
                                                             <span className="me-2">#{ticket.id}</span>
-                                                            {ticket.url_imagen ? (
+                                                            {ticket.url_imagen && !ticket.url_imagen.includes('placeholder.com') && !ticket.url_imagen.includes('data:image/svg+xml') ? (
                                                                 <img
                                                                     src={ticket.url_imagen}
                                                                     alt="Imagen del ticket"

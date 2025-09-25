@@ -119,20 +119,17 @@ export function SupervisorPage() {
 
     // Función específica para manejar tickets cerrados
     const manejarTicketCerrado = (ticketId) => {
-        console.log('🔒 SUPERVISOR - Manejando ticket cerrado:', ticketId);
 
         // Remover inmediatamente de la lista de tickets activos
         setTickets(prev => {
             const ticketRemovido = prev.find(t => t.id === ticketId);
             if (ticketRemovido) {
-                console.log('🗑️ SUPERVISOR - Ticket removido de lista activa:', ticketRemovido.titulo);
             }
             return prev.filter(ticket => ticket.id !== ticketId);
         });
 
         // Si está viendo la lista de cerrados, actualizar inmediatamente
         if (showCerrados) {
-            console.log('📋 SUPERVISOR - Actualizando lista de cerrados...');
             cargarTicketsCerrados();
         }
     };
@@ -224,7 +221,6 @@ export function SupervisorPage() {
 
                 if (analistasResponse.ok) {
                     const analistasData = await analistasResponse.json();
-                    console.log('Analistas cargados:', analistasData);
                     setAnalistas(analistasData);
                 } else {
                     console.error('Error al cargar analistas:', analistasResponse.status, analistasResponse.statusText);
@@ -283,25 +279,19 @@ export function SupervisorPage() {
     useEffect(() => {
         if (store.websocket.notifications.length > 0) {
             const lastNotification = store.websocket.notifications[store.websocket.notifications.length - 1];
-            console.log('🔔 SUPERVISOR - Notificación recibida:', lastNotification);
 
             // Actualización inmediata para eventos específicos (sin esperar)
             if (lastNotification.tipo === 'asignado' || lastNotification.tipo === 'estado_cambiado' || lastNotification.tipo === 'iniciado' || lastNotification.tipo === 'escalado') {
-                console.log('⚡ SUPERVISOR - Actualización inmediata por notificación:', lastNotification.tipo);
                 // Los datos ya están en el store por el WebSocket - actualización instantánea
             }
 
             // Actualización específica para analistas
             if (lastNotification.tipo === 'analista_creado') {
-                console.log('⚡ SUPERVISOR - Actualizando lista de analistas por notificación:', lastNotification.tipo);
-                console.log('📊 SUPERVISOR - Datos del analista recibidos:', lastNotification.analista);
-                console.log('📊 SUPERVISOR - Lista actual de analistas antes:', analistas.length);
 
                 // Actualizar estado local inmediatamente si hay datos del analista
                 if (lastNotification.analista) {
                     setAnalistas(prev => {
                         const newList = [...prev, lastNotification.analista];
-                        console.log('📊 SUPERVISOR - Nueva lista de analistas:', newList.length);
                         return newList;
                     });
                 }

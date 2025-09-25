@@ -6,6 +6,7 @@ import requests
 import json
 import cloudinary
 import cloudinary.uploader
+from google.cloud import vision
 from flask import Flask, request, jsonify, url_for, Blueprint
 from api.models import db, User, Cliente, Analista, Supervisor, Comentarios, Asignacion, Administrador, Ticket, Gestion
 from api.utils import generate_sitemap, APIException
@@ -21,7 +22,7 @@ from datetime import datetime
 api = Blueprint('api', __name__)
 
 # Allow CORS requests to this API
-CORS(api)
+CORS(api, origins="*", allow_headers=["Content-Type", "Authorization"], methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # Configurar Cloudinary usando CLOUDINARY_URL
 cloudinary_url = os.getenv('CLOUDINARY_URL')
@@ -29,32 +30,54 @@ cloudinary_cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME')
 cloudinary_api_key = os.getenv('CLOUDINARY_API_KEY')
 cloudinary_api_secret = os.getenv('CLOUDINARY_API_SECRET')
 
-print(f"🔍 DEBUG - Configuración inicial de Cloudinary:")
-print(f"🔍 DEBUG - CLOUDINARY_URL: {bool(cloudinary_url)}")
-print(f"🔍 DEBUG - CLOUDINARY_CLOUD_NAME: {cloudinary_cloud_name}")
-print(f"🔍 DEBUG - CLOUDINARY_API_KEY: {bool(cloudinary_api_key)}")
-print(f"🔍 DEBUG - CLOUDINARY_API_SECRET: {bool(cloudinary_api_secret)}")
 
 if cloudinary_url:
     cloudinary.config(cloudinary_url=cloudinary_url)
-    print("🔍 DEBUG - Cloudinary configurado con CLOUDINARY_URL")
 elif cloudinary_cloud_name and cloudinary_api_key and cloudinary_api_secret:
     cloudinary.config(
         cloud_name=cloudinary_cloud_name,
         api_key=cloudinary_api_key,
         api_secret=cloudinary_api_secret
     )
-    print("🔍 DEBUG - Cloudinary configurado con variables individuales")
-else:
-    print("🔍 DEBUG - Cloudinary no configurado en el inicio")
 
 # Función para obtener la instancia de socketio
 def get_socketio():
     try:
         from app import get_socketio as get_socketio_from_app
-        return get_socketio_from_app()
+        socketio_instance = get_socketio_from_app()
+        return socketio_instance
     except ImportError:
         return None
+    except Exception as e:
+        # Log del error pero no interrumpir la funcionalidad
+        return None
+
+# Función helper para emitir eventos WebSocket de manera segura
+def emit_websocket_event(event_name, data, room=None):
+    """Emite un evento WebSocket de manera segura, sin interrumpir la funcionalidad si falla"""
+    try:
+        socketio = get_socketio()
+        if socketio:
+            if room:
+                socketio.emit(event_name, data, room=room)
+            else:
+                socketio.emit(event_name, data)
+    except Exception as e:
+        # WebSocket no disponible o error, continuar sin notificación
+        pass
+
+# Funciones helper para manejo de errores
+def handle_database_error(e, operation="operación"):
+    """Maneja errores de base de datos de manera consistente"""
+    db.session.rollback()
+    if isinstance(e, IntegrityError):
+        return jsonify({"message": "Error de integridad en la base de datos"}), 400
+    else:
+        return jsonify({"message": f"Error en {operation}: {str(e)}"}), 500
+
+def handle_general_error(e, operation="operación"):
+    """Maneja errores generales de manera consistente"""
+    return jsonify({"message": f"Error en {operation}: {str(e)}"}), 500
 
 
 @api.route('/hello', methods=['POST', 'GET'])
@@ -65,6 +88,11 @@ def handle_hello():
     }
 
     return jsonify(response_body), 200
+
+# Manejar solicitudes OPTIONS para CORS
+@api.route('/<path:path>', methods=['OPTIONS'])
+def handle_options(path):
+    return '', 200
 
 
 @api.route('/cloudinary-status', methods=['GET'])
@@ -212,7 +240,6 @@ def create_analista():
                     'timestamp': datetime.now().isoformat()
                 }, room='administradores')
                 
-                print(f"📤 WebSocket enviado a supervisores y administradores: analista creado")
             except Exception as e:
                 print(f"Error enviando WebSocket: {e}")
         
@@ -293,7 +320,6 @@ def delete_analista(id):
                 socketio.emit('analista_eliminado', eliminacion_data, room='supervisores')
                 socketio.emit('analista_eliminado', eliminacion_data, room='administradores')
                 
-                print(f"📤 ANALISTA ELIMINADO NOTIFICADO A TODOS LOS ROLES: {eliminacion_data}")
                     
             except Exception as e:
                 print(f"Error enviando WebSocket: {e}")
@@ -458,7 +484,6 @@ def create_comentario():
                     'timestamp': datetime.now().isoformat()
                 }, room=ticket_room)
                 
-                print(f"📤 Comentario enviado al room del ticket: {ticket_room}")
                     
             except Exception as e:
                 print(f"Error enviando WebSocket: {e}")
@@ -738,7 +763,6 @@ def create_ticket():
                 # Notificar a administradores para actualizar CRUD de tickets
                 socketio.emit('nuevo_ticket', ticket_data, room='administradores')
                 
-                print(f"📤 NUEVO TICKET NOTIFICADO: {ticket_data}")
             except Exception as e:
                 print(f"Error enviando WebSocket de nuevo ticket: {e}")
         
@@ -781,11 +805,6 @@ def upload_image():
         cloudinary_api_key = os.getenv('CLOUDINARY_API_KEY')
         cloudinary_api_secret = os.getenv('CLOUDINARY_API_SECRET')
         
-        print(f"🔍 DEBUG - Variables de entorno:")
-        print(f"🔍 DEBUG - CLOUDINARY_URL: {bool(cloudinary_url)}")
-        print(f"🔍 DEBUG - CLOUDINARY_CLOUD_NAME: {cloudinary_cloud_name}")
-        print(f"🔍 DEBUG - CLOUDINARY_API_KEY: {bool(cloudinary_api_key)}")
-        print(f"🔍 DEBUG - CLOUDINARY_API_SECRET: {bool(cloudinary_api_secret)}")
         
         # Verificar si Cloudinary está configurado (al menos una forma)
         cloudinary_configured = (
@@ -795,12 +814,10 @@ def upload_image():
         
         # Si no está configurado, intentar reconfigurar Cloudinary
         if not cloudinary_configured:
-            print("🔍 DEBUG - Cloudinary no configurado, intentando reconfigurar...")
             # Intentar reconfigurar con las variables disponibles
             if cloudinary_url:
                 cloudinary.config(cloudinary_url=cloudinary_url)
                 cloudinary_configured = True
-                print("🔍 DEBUG - Cloudinary reconfigurado con CLOUDINARY_URL")
             elif cloudinary_cloud_name and cloudinary_api_key and cloudinary_api_secret:
                 cloudinary.config(
                     cloud_name=cloudinary_cloud_name,
@@ -808,13 +825,11 @@ def upload_image():
                     api_secret=cloudinary_api_secret
                 )
                 cloudinary_configured = True
-                print("🔍 DEBUG - Cloudinary reconfigurado con variables individuales")
         
         if not cloudinary_configured:
             # Fallback: devolver una URL de imagen placeholder
-            print("🔍 DEBUG - Cloudinary no configurado, usando placeholder")
             return jsonify({
-                "url": "https://via.placeholder.com/300x200/cccccc/666666?text=Imagen+no+disponible",
+                "url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlbiBubyBkaXNwb25pYmxlPC90ZXh0Pjwvc3ZnPg==",
                 "public_id": "placeholder"
             }), 200
         
@@ -825,7 +840,6 @@ def upload_image():
         if file.filename == '':
             return jsonify({"message": "No se seleccionó archivo"}), 400
         
-        print(f"🔍 DEBUG - Subiendo imagen: {file.filename}")
         
         # Subir imagen a Cloudinary
         upload_result = cloudinary.uploader.upload(
@@ -834,7 +848,6 @@ def upload_image():
             resource_type="image"
         )
         
-        print(f"🔍 DEBUG - Upload exitoso: {upload_result['secure_url']}")
         
         return jsonify({
             "url": upload_result['secure_url'],
@@ -842,10 +855,9 @@ def upload_image():
         }), 200
         
     except Exception as e:
-        print(f"🔍 DEBUG - Error en upload: {str(e)}")
         # Fallback en caso de error: devolver placeholder
         return jsonify({
-            "url": "https://via.placeholder.com/300x200/cccccc/666666?text=Error+subiendo+imagen",
+            "url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVycm9yIHN1YmllbmRvIGltYWdlbjwvdGV4dD48L3N2Zz4=",
             "public_id": "error_placeholder"
         }), 200
 
@@ -889,7 +901,6 @@ def update_ticket(id):
                     'timestamp': datetime.now().isoformat()
                 }, room=ticket_room)
                 
-                print(f"📤 Ticket actualizado enviado al room: {ticket_room}")
                     
             except Exception as e:
                 print(f"Error enviando WebSocket: {e}")
@@ -974,7 +985,6 @@ def delete_ticket(id):
                 ticket_room = f'room_ticket_{id}'
                 socketio.emit('ticket_eliminado', eliminacion_data, room=ticket_room)
                 
-                print(f"📤 TICKET ELIMINADO NOTIFICADO A TODOS LOS ROLES: {eliminacion_data}")
                     
             except Exception as e:
                 print(f"Error enviando WebSocket: {e}")
@@ -1078,18 +1088,15 @@ def eliminar_gestion(id):
 def register():
     """Registrar nuevo cliente con JWT - Soporte para registro en dos pasos"""
     body = request.get_json(silent=True) or {}
-    print(f"📝 REGISTER - Datos recibidos: {body}")
     
     # Verificar si el email ya existe
     existing_cliente = Cliente.query.filter_by(email=body['email']).first()
     if existing_cliente:
-        print(f"❌ REGISTER - Email ya existe: {body['email']}")
         return jsonify({"message": "Email ya registrado"}), 400
     
     try:
         # Si es un cliente con datos básicos (registro en dos pasos)
         if body.get('role') == 'cliente' and body.get('nombre') == 'Pendiente':
-            print(f"✅ REGISTER - Creando cliente básico para: {body['email']}")
             # Crear cliente básico solo con email y contraseña
             cliente_data = {
                 'nombre': 'Pendiente',
@@ -1104,7 +1111,6 @@ def register():
             db.session.add(cliente)
             db.session.commit()
             
-            print(f"✅ REGISTER - Cliente básico creado exitosamente: {cliente.id}")
             return jsonify({
                 "message": "Cliente básico creado. Completa tu información.",
                 "success": True
@@ -1143,7 +1149,6 @@ def register():
             }), 201
         
     except Exception as e:
-        print(f"❌ REGISTER - Error al registrar: {str(e)}")
         db.session.rollback()
         return jsonify({"message": f"Error al registrar: {str(e)}"}), 500
 
@@ -1286,7 +1291,9 @@ def get_analista_tickets():
     """Obtener tickets asignados al analista autenticado (excluyendo tickets escalados)"""
     try:
         user = get_user_from_token()
-        if not user or user['role'] != 'analista':
+        if not user:
+            return jsonify({"message": "Token inválido o expirado"}), 401
+        if user['role'] not in ['analista', 'administrador']:
             return jsonify({"message": "Acceso denegado"}), 403
         
         # Obtener asignaciones del analista
@@ -1343,7 +1350,8 @@ def get_analista_tickets():
         return jsonify([t.serialize() for t in tickets_filtrados]), 200
         
     except Exception as e:
-        return jsonify({"message": f"Error al obtener tickets: {str(e)}"}), 500
+        # Log del error para debugging
+        return handle_general_error(e, "obtener tickets del analista")
 
 
 @api.route('/tickets/supervisor', methods=['GET'])
@@ -1824,14 +1832,17 @@ def asignar_ticket(id):
         socketio = get_socketio()
         if socketio:
             try:
-                # Crear datos de asignación
+                # Crear datos de asignación con estructura consistente
                 asignacion_data = {
+                    'id': ticket.id,
                     'ticket_id': ticket.id,
-                    'ticket_estado': ticket.estado,
-                    'ticket_titulo': ticket.titulo,
-                    'ticket_prioridad': ticket.prioridad,
-                    'cliente_id': ticket.id_cliente,
-                    'analista_id': id_analista,
+                    'estado': ticket.estado,
+                    'titulo': ticket.titulo,
+                    'prioridad': ticket.prioridad,
+                    'descripcion': ticket.descripcion,
+                    'fecha_creacion': ticket.fecha_creacion.isoformat() if ticket.fecha_creacion else None,
+                    'id_cliente': ticket.id_cliente,
+                    'id_analista': id_analista,
                     'analista_nombre': f"{analista.nombre} {analista.apellido}",
                     'tipo': 'asignado',
                     'accion': "reasignado" if es_reasignacion else "asignado",
@@ -1959,7 +1970,6 @@ def generar_recomendacion_ia(ticket_id):
         
         # Obtener API key de OpenAI
         api_key = os.getenv('API_KEY_IA')
-        print(f"DEBUG: API_KEY_IA = {api_key}")  # Debug log
         
         # Si no hay API key válida, generar recomendación básica
         if not api_key or api_key.strip() == '' or api_key == 'clave api':
@@ -2192,11 +2202,9 @@ def enviar_mensaje_supervisor_analista():
         
         # Emitir evento WebSocket
         socketio = get_socketio()
-        print(f"🔍 DEBUG: socketio = {socketio}")
         if socketio:
             # Room específico para chat supervisor-analista
             chat_room = f'chat_supervisor_analista_{ticket_id}'
-            print(f"🔍 DEBUG: Enviando a room {chat_room}")
             
             socketio.emit('nuevo_mensaje_chat_supervisor_analista', {
                 'ticket_id': ticket_id,
@@ -2211,7 +2219,6 @@ def enviar_mensaje_supervisor_analista():
             
             # También notificar al room general del ticket para otros eventos
             general_room = f'room_ticket_{ticket_id}'
-            print(f"🔍 DEBUG: Enviando a room general {general_room}")
             socketio.emit('nuevo_mensaje_chat', {
                 'ticket_id': ticket_id,
                 'tipo': 'chat_supervisor_analista',
@@ -2224,7 +2231,8 @@ def enviar_mensaje_supervisor_analista():
                 'fecha': datetime.now().isoformat()
             }, room=general_room)
         else:
-            print("❌ ERROR: socketio es None, no se puede enviar evento WebSocket")
+            # WebSocket no disponible, continuar sin notificación
+            pass
         
         return jsonify({
             "message": "Mensaje enviado exitosamente",
@@ -2516,11 +2524,9 @@ def enviar_mensaje_analista_cliente():
         
         # Emitir evento WebSocket
         socketio = get_socketio()
-        print(f"🔍 DEBUG: socketio = {socketio}")
         if socketio:
             # Room específico para chat analista-cliente
             chat_room = f'chat_analista_cliente_{ticket_id}'
-            print(f"🔍 DEBUG: Enviando a room {chat_room}")
             
             socketio.emit('nuevo_mensaje_chat_analista_cliente', {
                 'ticket_id': ticket_id,
@@ -2535,7 +2541,6 @@ def enviar_mensaje_analista_cliente():
             
             # También notificar al room general del ticket para otros eventos
             general_room = f'room_ticket_{ticket_id}'
-            print(f"🔍 DEBUG: Enviando a room general {general_room}")
             socketio.emit('nuevo_mensaje_chat', {
                 'ticket_id': ticket_id,
                 'tipo': 'chat_analista_cliente',
@@ -2548,7 +2553,8 @@ def enviar_mensaje_analista_cliente():
                 'fecha': datetime.now().isoformat()
             }, room=general_room)
         else:
-            print("❌ ERROR: socketio es None, no se puede enviar evento WebSocket")
+            # WebSocket no disponible, continuar sin notificación
+            pass
         
         return jsonify({
             "message": "Mensaje enviado exitosamente",
@@ -2559,187 +2565,3 @@ def enviar_mensaje_analista_cliente():
         db.session.rollback()
         return jsonify({"message": f"Error al enviar mensaje: {str(e)}"}), 500
 
-
-# ==================== RUTAS DE CLOUD VISION API ====================
-
-@api.route('/analyze-image', methods=['POST'])
-@require_auth
-def analyze_image():
-    """Analizar imagen usando Google Cloud Vision API"""
-    try:
-        # Verificar que se proporcionó una imagen
-        if 'image' not in request.files:
-            return jsonify({"message": "No se encontró archivo de imagen"}), 400
-        
-        file = request.files['image']
-        if file.filename == '':
-            return jsonify({"message": "No se seleccionó archivo"}), 400
-        
-        # Obtener datos del formulario
-        ticket_id = request.form.get('ticket_id')
-        use_ticket_context = request.form.get('use_ticket_context', 'true').lower() == 'true'
-        ticket_title = request.form.get('ticket_title', '')
-        ticket_description = request.form.get('ticket_description', '')
-        additional_details = request.form.get('additional_details', '')
-        
-        # Verificar configuración de Cloud Vision API
-        cloud_vision_api_key = os.getenv('CLOUD_VISION_API')
-        if not cloud_vision_api_key:
-            return jsonify({
-                "message": "Cloud Vision API no configurada",
-                "error": "CLOUD_VISION_API no está definida en las variables de entorno"
-            }), 500
-        
-        # Configurar cliente de Vision API
-        try:
-            client = vision.ImageAnnotatorClient()
-        except Exception as e:
-            return jsonify({
-                "message": "Error configurando Cloud Vision API",
-                "error": str(e)
-            }), 500
-        
-        # Leer contenido de la imagen
-        image_content = file.read()
-        image = vision.Image(content=image_content)
-        
-        # Construir el prompt detallado según el contexto
-        context_description = ""
-        if use_ticket_context and ticket_title and ticket_description:
-            context_description = f"La descripción del problema es la siguiente: '{ticket_description}'. El título del ticket es: '{ticket_title}'."
-        elif additional_details:
-            context_description = f"El usuario ha proporcionado los siguientes detalles adicionales: '{additional_details}'."
-        
-        # Realizar análisis con múltiples características
-        features = [
-            vision.Feature(type_=vision.Feature.Type.LABEL_DETECTION),
-            vision.Feature(type_=vision.Feature.Type.TEXT_DETECTION),
-            vision.Feature(type_=vision.Feature.Type.OBJECT_LOCALIZATION),
-            vision.Feature(type_=vision.Feature.Type.IMAGE_PROPERTIES)
-        ]
-        
-        # Realizar análisis
-        response = client.annotate_image({
-            'image': image,
-            'features': features
-        })
-        
-        # Procesar resultados
-        labels = []
-        if response.label_annotations:
-            labels = [
-                {
-                    'description': label.description,
-                    'score': label.score,
-                    'mid': label.mid
-                }
-                for label in response.label_annotations
-            ]
-        
-        text_detections = []
-        if response.text_annotations:
-            text_detections = [
-                {
-                    'description': text.description,
-                    'locale': text.locale,
-                    'bounding_poly': [
-                        {
-                            'x': vertex.x,
-                            'y': vertex.y
-                        }
-                        for vertex in text.bounding_poly.vertices
-                    ] if text.bounding_poly else []
-                }
-                for text in response.text_annotations
-            ]
-        
-        objects = []
-        if response.localized_object_annotations:
-            objects = [
-                {
-                    'name': obj.name,
-                    'score': obj.score,
-                    'bounding_poly': [
-                        {
-                            'x': vertex.x,
-                            'y': vertex.y
-                        }
-                        for vertex in obj.bounding_poly.normalized_vertices
-                    ]
-                }
-                for obj in response.localized_object_annotations
-            ]
-        
-        image_properties = {}
-        if response.image_properties_annotation:
-            if response.image_properties_annotation.dominant_colors:
-                image_properties['dominant_colors'] = [
-                    {
-                        'color': {
-                            'red': color.color.red,
-                            'green': color.color.green,
-                            'blue': color.color.blue
-                        },
-                        'score': color.score,
-                        'pixel_fraction': color.pixel_fraction
-                    }
-                    for color in response.image_properties_annotation.dominant_colors.colors
-                ]
-        
-        # Generar análisis detallado
-        analysis_parts = []
-        
-        # Análisis general basado en etiquetas
-        if labels:
-            high_confidence_labels = [label for label in labels if label['score'] > 0.7]
-            if high_confidence_labels:
-                analysis_parts.append(f"Elementos principales detectados: {', '.join([label['description'] for label in high_confidence_labels])}")
-        
-        # Análisis de texto
-        if text_detections:
-            main_text = text_detections[0]['description'] if text_detections else ""
-            if main_text:
-                analysis_parts.append(f"Texto detectado en la imagen: {main_text}")
-        
-        # Análisis de objetos específicos
-        if objects:
-            high_confidence_objects = [obj for obj in objects if obj['score'] > 0.7]
-            if high_confidence_objects:
-                analysis_parts.append(f"Objetos identificados: {', '.join([obj['name'] for obj in high_confidence_objects])}")
-        
-        # Análisis de colores
-        if image_properties.get('dominant_colors'):
-            dominant_color = image_properties['dominant_colors'][0]
-            color_info = f"Color dominante: RGB({dominant_color['color']['red']}, {dominant_color['color']['green']}, {dominant_color['color']['blue']})"
-            analysis_parts.append(color_info)
-        
-        # Construir análisis final
-        base_analysis = " ".join(analysis_parts) if analysis_parts else "No se pudieron identificar elementos específicos en la imagen."
-        
-        # Agregar contexto del problema
-        if context_description:
-            final_analysis = f"Análisis de imagen con contexto: {context_description}\n\nAnálisis visual: {base_analysis}"
-        else:
-            final_analysis = f"Análisis visual: {base_analysis}"
-        
-        # Preparar respuesta
-        result = {
-            "analysis": final_analysis,
-            "labels": labels,
-            "text": text_detections,
-            "objects": objects,
-            "image_properties": image_properties,
-            "context_used": use_ticket_context,
-            "ticket_id": ticket_id
-        }
-        
-        return jsonify({
-            "message": "Análisis completado exitosamente",
-            "result": result
-        }), 200
-        
-    except Exception as e:
-        print(f"Error en análisis de imagen: {str(e)}")
-        return jsonify({
-            "message": f"Error al analizar la imagen: {str(e)}"
-        }), 500
