@@ -4,24 +4,24 @@ import useGlobalReducer from '../../hooks/useGlobalReducer';
 
 // Utilidades de token seguras
 const tokenUtils = {
-  decodeToken: (token) => {
-    try {
-      if (!token) return null;
-      const parts = token.split('.');
-      if (parts.length !== 3) return null;
-      return JSON.parse(atob(parts[1]));
-    } catch (error) {
-      return null;
+    decodeToken: (token) => {
+        try {
+            if (!token) return null;
+            const parts = token.split('.');
+            if (parts.length !== 3) return null;
+            return JSON.parse(atob(parts[1]));
+        } catch (error) {
+            return null;
+        }
+    },
+    getUserId: (token) => {
+        const payload = tokenUtils.decodeToken(token);
+        return payload ? payload.user_id : null;
+    },
+    getRole: (token) => {
+        const payload = tokenUtils.decodeToken(token);
+        return payload ? payload.role : null;
     }
-  },
-  getUserId: (token) => {
-    const payload = tokenUtils.decodeToken(token);
-    return payload ? payload.user_id : null;
-  },
-  getRole: (token) => {
-    const payload = tokenUtils.decodeToken(token);
-    return payload ? payload.role : null;
-  }
 };
 
 export function SupervisorPage() {
@@ -45,6 +45,7 @@ export function SupervisorPage() {
         password: '',
         confirmPassword: ''
     });
+    const [ticketsConRecomendaciones, setTicketsConRecomendaciones] = useState(new Set());
 
     // Función helper para actualizar tickets sin recargar la página
     const actualizarTickets = async () => {
@@ -119,7 +120,7 @@ export function SupervisorPage() {
     // Función específica para manejar tickets cerrados
     const manejarTicketCerrado = (ticketId) => {
         console.log('🔒 SUPERVISOR - Manejando ticket cerrado:', ticketId);
-        
+
         // Remover inmediatamente de la lista de tickets activos
         setTickets(prev => {
             const ticketRemovido = prev.find(t => t.id === ticketId);
@@ -128,7 +129,7 @@ export function SupervisorPage() {
             }
             return prev.filter(ticket => ticket.id !== ticketId);
         });
-        
+
         // Si está viendo la lista de cerrados, actualizar inmediatamente
         if (showCerrados) {
             console.log('📋 SUPERVISOR - Actualizando lista de cerrados...');
@@ -161,7 +162,7 @@ export function SupervisorPage() {
             try {
                 const token = store.auth.token;
                 const userId = tokenUtils.getUserId(token);
-                
+
                 if (userId) {
                     const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/supervisores/${userId}`, {
                         headers: {
@@ -169,7 +170,7 @@ export function SupervisorPage() {
                             'Content-Type': 'application/json'
                         }
                     });
-                    
+
                     if (response.ok) {
                         const data = await response.json();
                         setUserData(data);
@@ -240,24 +241,62 @@ export function SupervisorPage() {
         cargarDatos();
     }, [store.auth.token]);
 
+    // Verificar recomendaciones para todos los tickets
+    useEffect(() => {
+        if (tickets.length > 0) {
+            verificarRecomendaciones();
+        }
+    }, [tickets]);
+
+    const verificarRecomendaciones = async () => {
+        try {
+            const token = store.auth.token;
+            const recomendacionesPromises = tickets.map(async (ticket) => {
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticket.id}/recomendaciones-similares`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    return { ticketId: ticket.id, tieneRecomendaciones: data.total_encontrados > 0 };
+                }
+                return { ticketId: ticket.id, tieneRecomendaciones: false };
+            });
+
+            const resultados = await Promise.all(recomendacionesPromises);
+            const ticketsConRecomendacionesSet = new Set();
+            resultados.forEach(({ ticketId, tieneRecomendaciones }) => {
+                if (tieneRecomendaciones) {
+                    ticketsConRecomendacionesSet.add(ticketId);
+                }
+            });
+            setTicketsConRecomendaciones(ticketsConRecomendacionesSet);
+        } catch (error) {
+            console.error('Error verificando recomendaciones:', error);
+        }
+    };
+
     // Actualizar tickets cuando lleguen notificaciones WebSocket
     useEffect(() => {
         if (store.websocket.notifications.length > 0) {
             const lastNotification = store.websocket.notifications[store.websocket.notifications.length - 1];
             console.log('🔔 SUPERVISOR - Notificación recibida:', lastNotification);
-            
+
             // Actualización inmediata para eventos específicos (sin esperar)
             if (lastNotification.tipo === 'asignado' || lastNotification.tipo === 'estado_cambiado' || lastNotification.tipo === 'iniciado' || lastNotification.tipo === 'escalado') {
                 console.log('⚡ SUPERVISOR - Actualización inmediata por notificación:', lastNotification.tipo);
                 // Los datos ya están en el store por el WebSocket - actualización instantánea
             }
-            
+
             // Actualización específica para analistas
             if (lastNotification.tipo === 'analista_creado') {
                 console.log('⚡ SUPERVISOR - Actualizando lista de analistas por notificación:', lastNotification.tipo);
                 console.log('📊 SUPERVISOR - Datos del analista recibidos:', lastNotification.analista);
                 console.log('📊 SUPERVISOR - Lista actual de analistas antes:', analistas.length);
-                
+
                 // Actualizar estado local inmediatamente si hay datos del analista
                 if (lastNotification.analista) {
                     setAnalistas(prev => {
@@ -269,13 +308,13 @@ export function SupervisorPage() {
                 // También hacer actualización completa para asegurar consistencia
                 actualizarAnalistas();
             }
-            
+
             // Actualización específica para analistas eliminados
             if (lastNotification.tipo === 'analista_eliminado') {
                 console.log('🗑️ SUPERVISOR - Analista eliminado detectado:', lastNotification);
                 console.log('📊 SUPERVISOR - ID del analista eliminado:', lastNotification.analista_id);
                 console.log('📊 SUPERVISOR - Lista actual de analistas antes:', analistas.length);
-                
+
                 // Remover inmediatamente de la lista local
                 if (lastNotification.analista_id) {
                     setAnalistas(prev => {
@@ -291,28 +330,28 @@ export function SupervisorPage() {
                 // También hacer actualización completa para asegurar consistencia
                 actualizarAnalistas();
             }
-            
+
             // Sincronización ULTRA RÁPIDA para eventos críticos
             if (lastNotification.tipo === 'escalado' || lastNotification.tipo === 'asignado' || lastNotification.tipo === 'solicitud_reapertura' || lastNotification.tipo === 'creado' || lastNotification.tipo === 'cerrado') {
                 console.log('⚡ SUPERVISOR - SINCRONIZACIÓN INMEDIATA:', lastNotification.tipo);
                 // Actualización inmediata sin debounce para eventos críticos
                 actualizarTodasLasTablas();
             }
-            
+
             // Manejo específico para tickets cerrados - sincronización inmediata
             if (lastNotification.tipo === 'cerrado' || lastNotification.tipo === 'ticket_cerrado') {
                 console.log('🔒 SUPERVISOR - TICKET CERRADO DETECTADO:', lastNotification);
-                
+
                 // Usar la función específica para manejar tickets cerrados
                 if (lastNotification.ticket_id) {
                     manejarTicketCerrado(lastNotification.ticket_id);
                 }
             }
-            
+
             // Manejo específico para tickets eliminados - sincronización inmediata
             if (lastNotification.tipo === 'eliminado' || lastNotification.tipo === 'ticket_eliminado') {
                 console.log('🗑️ SUPERVISOR - TICKET ELIMINADO DETECTADO:', lastNotification);
-                
+
                 // Remover inmediatamente de la lista de tickets activos
                 if (lastNotification.ticket_id) {
                     setTickets(prev => {
@@ -322,7 +361,7 @@ export function SupervisorPage() {
                         }
                         return prev.filter(ticket => ticket.id !== lastNotification.ticket_id);
                     });
-                    
+
                     // También remover de la lista de cerrados si está visible
                     if (showCerrados) {
                         setTicketsCerrados(prev => {
@@ -342,19 +381,19 @@ export function SupervisorPage() {
         try {
             console.log(`⚡ ASIGNANDO TICKET ${ticketId} A ANALISTA ${analistaId} INMEDIATAMENTE`);
             const token = store.auth.token;
-            
+
             // Buscar el ticket para determinar si es una reasignación
             const ticket = tickets.find(t => t.id === ticketId);
             const esReasignacion = ticket && ticket.asignacion_actual && ticket.asignacion_actual.id_analista;
-            
+
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/asignar`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ 
-                    id_analista: analistaId, 
+                body: JSON.stringify({
+                    id_analista: analistaId,
                     es_reasignacion: esReasignacion
                 })
             });
@@ -420,7 +459,7 @@ export function SupervisorPage() {
                 body: JSON.stringify({ id_ticket: ticketId, texto })
             });
             if (!response.ok) throw new Error('Error al agregar comentario');
-            
+
             // Actualizar tickets sin recargar la página
             await actualizarTodasLasTablas();
         } catch (err) {
@@ -458,7 +497,7 @@ export function SupervisorPage() {
             setUpdatingInfo(true);
             const token = store.auth.token;
             const userId = tokenUtils.getUserId(token);
-            
+
             // Preparar datos para actualizar
             const updateData = {
                 nombre: infoData.nombre,
@@ -471,7 +510,7 @@ export function SupervisorPage() {
             if (infoData.password) {
                 updateData.contraseña_hash = infoData.password;
             }
-            
+
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/supervisores/${userId}`, {
                 method: 'PUT',
                 headers: {
@@ -494,7 +533,7 @@ export function SupervisorPage() {
                 email: infoData.email,
                 area_responsable: infoData.area_responsable
             }));
-            
+
             alert('Información actualizada exitosamente');
             setShowInfoForm(false);
             setError('');
@@ -533,18 +572,18 @@ export function SupervisorPage() {
         const fechaActual = new Date();
         const fechaCreacion = new Date(ticket.fecha_creacion);
         const diasDiferencia = Math.floor((fechaActual - fechaCreacion) / (1000 * 60 * 60 * 24));
-        
+
         // Ordenar tickets por fecha de creación (más antiguos primero)
-        const ticketsOrdenados = [...allTickets].sort((a, b) => 
+        const ticketsOrdenados = [...allTickets].sort((a, b) =>
             new Date(a.fecha_creacion) - new Date(b.fecha_creacion)
         );
-        
-        const esTicketMasViejo = ticketsOrdenados.length > 0 && 
+
+        const esTicketMasViejo = ticketsOrdenados.length > 0 &&
             ticketsOrdenados[0].id === ticket.id;
-        
+
         const prioridadAlta = ticket.prioridad.toLowerCase() === 'alta';
         const esTicketViejo = diasDiferencia >= 3; // Consideramos viejo si tiene 3+ días
-        
+
         // Lógica del semáforo
         if (prioridadAlta && esTicketMasViejo) {
             return 'table-danger'; // Rojo: Prioridad alta y ticket más viejo
@@ -560,8 +599,8 @@ export function SupervisorPage() {
         if (!ticket.comentarios || !Array.isArray(ticket.comentarios)) {
             return false;
         }
-        
-        return ticket.comentarios.some(comentario => 
+
+        return ticket.comentarios.some(comentario =>
             comentario.texto === "Cliente solicita reapertura del ticket" &&
             comentario.autor?.rol === "cliente"
         );
@@ -796,204 +835,213 @@ export function SupervisorPage() {
                                                 .sort((a, b) => {
                                                     const colorA = getSemaforoColor(a, tickets);
                                                     const colorB = getSemaforoColor(b, tickets);
-                                                    
+
                                                     // Orden: Rojo (table-danger) -> Naranja (table-warning) -> Verde (table-success)
                                                     const order = { 'table-danger': 0, 'table-warning': 1, 'table-success': 2 };
                                                     return order[colorA] - order[colorB];
                                                 })
                                                 .map((ticket) => (
-                                                <tr key={ticket.id} className={getSemaforoColor(ticket, tickets)}>
-                                                    <td className="text-center">
-                                                        <div className="d-flex justify-content-center">
-                                                            <div 
-                                                                className="rounded-circle d-flex align-items-center justify-content-center"
-                                                                style={{ 
-                                                                    width: '20px', 
-                                                                    height: '20px',
-                                                                    backgroundColor: getSemaforoColor(ticket, tickets) === 'table-danger' ? '#dc3545' : 
-                                                                                   getSemaforoColor(ticket, tickets) === 'table-warning' ? '#ffc107' : '#28a745'
-                                                                }}
-                                                                title={
-                                                                    getSemaforoColor(ticket, tickets) === 'table-danger' ? '🔴 Rojo: Prioridad alta y ticket más viejo' :
-                                                                    getSemaforoColor(ticket, tickets) === 'table-warning' ? '🟠 Naranja: Prioridad alta o ticket viejo' :
-                                                                    '🟢 Verde: Prioridad media/baja y ticket reciente'
-                                                                }
-                                                            >
-                                                                <i className="fas fa-circle" style={{ fontSize: '8px', color: 'white' }}></i>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="d-flex align-items-center">
-                                                            <span className="me-2">#{ticket.id}</span>
-                                                            {ticket.url_imagen ? (
-                                                                <img 
-                                                                    src={ticket.url_imagen} 
-                                                                    alt="Imagen del ticket" 
-                                                                    className="img-thumbnail"
-                                                                    style={{ width: '30px', height: '30px', objectFit: 'cover' }}
-                                                                />
-                                                            ) : (
-                                                                <span className="text-muted">
-                                                                    <i className="fas fa-image" style={{ fontSize: '12px' }}></i>
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        {ticket.cliente?.nombre} {ticket.cliente?.apellido}
-                                                    </td>
-                                                    <td>
-                                                        <div>
-                                                            <strong>{ticket.titulo}</strong>
-                                                            <br />
-                                                            <small className="text-muted">
-                                                                {ticket.descripcion.length > 50
-                                                                    ? `${ticket.descripcion.substring(0, 50)}...`
-                                                                    : ticket.descripcion
-                                                                }
-                                                            </small>
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <span className={getEstadoColor(ticket.estado)}>
-                                                            {ticket.estado}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        <span className={getPrioridadColor(ticket.prioridad)}>
-                                                            {ticket.prioridad}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        {ticket.asignacion_actual?.analista ? 
-                                                            `${ticket.asignacion_actual.analista.nombre} ${ticket.asignacion_actual.analista.apellido}` :
-                                                            'Sin asignar'
-                                                        }
-                                                    </td>
-                                                    <td>
-                                                        {new Date(ticket.fecha_creacion).toLocaleDateString()}
-                                                    </td>
-                                                    <td>
-                                                        <div className="btn-group" role="group">
-                                                            {ticket.estado.toLowerCase() === 'creado' && (
-                                                                <select
-                                                                    className="form-select form-select-sm"
-                                                                    onChange={(e) => {
-                                                                        if (e.target.value) {
-                                                                            asignarTicket(ticket.id, e.target.value);
-                                                                        }
+                                                    <tr key={ticket.id} className={getSemaforoColor(ticket, tickets)}>
+                                                        <td className="text-center">
+                                                            <div className="d-flex justify-content-center">
+                                                                <div
+                                                                    className="rounded-circle d-flex align-items-center justify-content-center"
+                                                                    style={{
+                                                                        width: '20px',
+                                                                        height: '20px',
+                                                                        backgroundColor: getSemaforoColor(ticket, tickets) === 'table-danger' ? '#dc3545' :
+                                                                            getSemaforoColor(ticket, tickets) === 'table-warning' ? '#ffc107' : '#28a745'
                                                                     }}
-                                                                    defaultValue=""
+                                                                    title={
+                                                                        getSemaforoColor(ticket, tickets) === 'table-danger' ? '🔴 Rojo: Prioridad alta y ticket más viejo' :
+                                                                            getSemaforoColor(ticket, tickets) === 'table-warning' ? '🟠 Naranja: Prioridad alta o ticket viejo' :
+                                                                                '🟢 Verde: Prioridad media/baja y ticket reciente'
+                                                                    }
                                                                 >
-                                                                    <option value="">
-                                                                        {analistas.length > 0 ? 'Asignar a...' : 'No hay analistas disponibles'}
-                                                                    </option>
-                                                                    {analistas.map(analista => (
-                                                                        <option key={analista.id} value={analista.id}>
-                                                                            {analista.nombre} {analista.apellido} - {analista.especialidad}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                            )}
-                                                            {ticket.estado.toLowerCase() === 'en_espera' && !ticket.asignacion_actual && (
-                                                                <span className="badge bg-warning" title="Ticket escalado por un analista">
-                                                                    <i className="fas fa-arrow-up"></i> Escalado
-                                                                </span>
-                                                            )}
-                                                            {ticket.estado.toLowerCase() === 'en_espera' && ticket.asignacion_actual && (
-                                                                <span className="badge bg-success">
-                                                                    <i className="fas fa-user-check"></i> Asignado
-                                                                </span>
-                                                            )}
-                                                            {ticket.estado.toLowerCase() === 'solucionado' && tieneSolicitudReapertura(ticket) && (
-                                                                <div className="d-flex gap-1">
-                                                                    <button
-                                                                        className="btn btn-success btn-sm"
-                                                                        onClick={() => cambiarEstadoTicket(ticket.id, 'cerrado')}
-                                                                        title="Cerrar ticket"
-                                                                    >
-                                                                        <i className="fas fa-check"></i> Cerrar
-                                                                    </button>
-                                                                    <button
-                                                                        className="btn btn-danger btn-sm"
-                                                                        onClick={() => cambiarEstadoTicket(ticket.id, 'reabierto')}
-                                                                        title="Reabrir ticket"
-                                                                    >
-                                                                        <i className="fas fa-redo"></i> Reabrir
-                                                                    </button>
+                                                                    <i className="fas fa-circle" style={{ fontSize: '8px', color: 'white' }}></i>
                                                                 </div>
-                                                            )}
-                                                            {ticket.estado.toLowerCase() === 'solucionado' && !tieneSolicitudReapertura(ticket) && (
-                                                                <span className="badge bg-success">
-                                                                    <i className="fas fa-check-circle"></i> Solucionado
-                                                                </span>
-                                                            )}
-                                                            {ticket.estado.toLowerCase() === 'reabierto' && (
-                                                                <select
-                                                                    className="form-select form-select-sm"
-                                                                    onChange={(e) => {
-                                                                        if (e.target.value) {
-                                                                            asignarTicket(ticket.id, e.target.value);
-                                                                        }
-                                                                    }}
-                                                                    defaultValue=""
-                                                                >
-                                                                    <option value="">
-                                                                        {analistas.length > 0 ? 'Reasignar a...' : 'No hay analistas disponibles'}
-                                                                    </option>
-                                                                    {analistas.map(analista => (
-                                                                        <option key={analista.id} value={analista.id}>
-                                                                            {analista.nombre} {analista.apellido} - {analista.especialidad}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className="d-flex align-items-center">
+                                                                <span className="me-2">#{ticket.id}</span>
+                                                                {ticket.url_imagen ? (
+                                                                    <img
+                                                                        src={ticket.url_imagen}
+                                                                        alt="Imagen del ticket"
+                                                                        className="img-thumbnail"
+                                                                        style={{ width: '30px', height: '30px', objectFit: 'cover' }}
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-muted">
+                                                                        <i className="fas fa-image" style={{ fontSize: '12px' }}></i>
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            {ticket.cliente?.nombre} {ticket.cliente?.apellido}
+                                                        </td>
+                                                        <td>
+                                                            <div>
+                                                                <strong>{ticket.titulo}</strong>
+                                                                <br />
+                                                                <small className="text-muted">
+                                                                    {ticket.descripcion.length > 50
+                                                                        ? `${ticket.descripcion.substring(0, 50)}...`
+                                                                        : ticket.descripcion
+                                                                    }
+                                                                </small>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <span className={getEstadoColor(ticket.estado)}>
+                                                                {ticket.estado}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span className={getPrioridadColor(ticket.prioridad)}>
+                                                                {ticket.prioridad}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            {ticket.asignacion_actual?.analista ?
+                                                                `${ticket.asignacion_actual.analista.nombre} ${ticket.asignacion_actual.analista.apellido}` :
+                                                                'Sin asignar'
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            {new Date(ticket.fecha_creacion).toLocaleDateString()}
+                                                        </td>
+                                                        <td>
+                                                            <div className="btn-group" role="group">
+                                                                {ticket.estado.toLowerCase() === 'creado' && (
+                                                                    <select
+                                                                        className="form-select form-select-sm"
+                                                                        onChange={(e) => {
+                                                                            if (e.target.value) {
+                                                                                asignarTicket(ticket.id, e.target.value);
+                                                                            }
+                                                                        }}
+                                                                        defaultValue=""
+                                                                    >
+                                                                        <option value="">
+                                                                            {analistas.length > 0 ? 'Asignar a...' : 'No hay analistas disponibles'}
                                                                         </option>
-                                                                    ))}
-                                                                </select>
-                                                            )}
-                                                            {ticket.estado.toLowerCase() === 'en_espera' && !ticket.asignacion_actual && (
-                                                                <select
-                                                                    className="form-select form-select-sm"
-                                                                    onChange={(e) => {
-                                                                        if (e.target.value) {
-                                                                            asignarTicket(ticket.id, e.target.value);
-                                                                        }
-                                                                    }}
-                                                                    defaultValue=""
-                                                                >
-                                                                    <option value="">
-                                                                         Reasignar a...
-                                                                    </option>
-                                                                    {analistas.map(analista => (
-                                                                        <option key={analista.id} value={analista.id}>
-                                                                            {analista.nombre} {analista.apellido} - {analista.especialidad}
+                                                                        {analistas.map(analista => (
+                                                                            <option key={analista.id} value={analista.id}>
+                                                                                {analista.nombre} {analista.apellido} - {analista.especialidad}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                )}
+                                                                {ticket.estado.toLowerCase() === 'en_espera' && !ticket.asignacion_actual && (
+                                                                    <span className="badge bg-warning" title="Ticket escalado por un analista">
+                                                                        <i className="fas fa-arrow-up"></i> Escalado
+                                                                    </span>
+                                                                )}
+                                                                {ticket.estado.toLowerCase() === 'en_espera' && ticket.asignacion_actual && (
+                                                                    <span className="badge bg-success">
+                                                                        <i className="fas fa-user-check"></i> Asignado
+                                                                    </span>
+                                                                )}
+                                                                {ticket.estado.toLowerCase() === 'solucionado' && tieneSolicitudReapertura(ticket) && (
+                                                                    <div className="d-flex gap-1">
+                                                                        <button
+                                                                            className="btn btn-success btn-sm"
+                                                                            onClick={() => cambiarEstadoTicket(ticket.id, 'cerrado')}
+                                                                            title="Cerrar ticket"
+                                                                        >
+                                                                            <i className="fas fa-check"></i> Cerrar
+                                                                        </button>
+                                                                        <button
+                                                                            className="btn btn-danger btn-sm"
+                                                                            onClick={() => cambiarEstadoTicket(ticket.id, 'reabierto')}
+                                                                            title="Reabrir ticket"
+                                                                        >
+                                                                            <i className="fas fa-redo"></i> Reabrir
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                                {ticket.estado.toLowerCase() === 'solucionado' && !tieneSolicitudReapertura(ticket) && (
+                                                                    <span className="badge bg-success">
+                                                                        <i className="fas fa-check-circle"></i> Solucionado
+                                                                    </span>
+                                                                )}
+                                                                {ticket.estado.toLowerCase() === 'reabierto' && (
+                                                                    <select
+                                                                        className="form-select form-select-sm"
+                                                                        onChange={(e) => {
+                                                                            if (e.target.value) {
+                                                                                asignarTicket(ticket.id, e.target.value);
+                                                                            }
+                                                                        }}
+                                                                        defaultValue=""
+                                                                    >
+                                                                        <option value="">
+                                                                            {analistas.length > 0 ? 'Reasignar a...' : 'No hay analistas disponibles'}
                                                                         </option>
-                                                                    ))}
-                                                                </select>
-                                                            )}
-                                                            <Link
-                                                                to={`/ticket/${ticket.id}/comentarios`}
-                                                                className="btn btn-info btn-sm"
-                                                                title="Ver y agregar comentarios"
-                                                            >
-                                                                <i className="fas fa-comments"></i> Comentar
-                                                            </Link>
-                                                            <button
-                                                                className="btn btn-warning btn-sm"
-                                                                onClick={() => generarRecomendacion(ticket)}
-                                                                title="Generar recomendación con IA"
-                                                            >
-                                                                <i className="fas fa-robot"></i> IA
-                                                            </button>
-                                                            <Link
-                                                                to={`/ticket/${ticket.id}/chat-supervisor-analista`}
-                                                                className="btn btn-secondary btn-sm"
-                                                                title="Chat con analista"
-                                                            >
-                                                                <i className="fas fa-comments"></i> Chat
-                                                            </Link>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                                                        {analistas.map(analista => (
+                                                                            <option key={analista.id} value={analista.id}>
+                                                                                {analista.nombre} {analista.apellido} - {analista.especialidad}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                )}
+                                                                {ticket.estado.toLowerCase() === 'en_espera' && !ticket.asignacion_actual && (
+                                                                    <select
+                                                                        className="form-select form-select-sm"
+                                                                        onChange={(e) => {
+                                                                            if (e.target.value) {
+                                                                                asignarTicket(ticket.id, e.target.value);
+                                                                            }
+                                                                        }}
+                                                                        defaultValue=""
+                                                                    >
+                                                                        <option value="">
+                                                                            Reasignar a...
+                                                                        </option>
+                                                                        {analistas.map(analista => (
+                                                                            <option key={analista.id} value={analista.id}>
+                                                                                {analista.nombre} {analista.apellido} - {analista.especialidad}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                )}
+                                                                <Link
+                                                                    to={`/ticket/${ticket.id}/comentarios`}
+                                                                    className="btn btn-info btn-sm"
+                                                                    title="Ver y agregar comentarios"
+                                                                >
+                                                                    <i className="fas fa-comments"></i> Comentar
+                                                                </Link>
+                                                                <button
+                                                                    className="btn btn-warning btn-sm"
+                                                                    onClick={() => generarRecomendacion(ticket)}
+                                                                    title="Generar recomendación con IA"
+                                                                >
+                                                                    <i className="fas fa-robot"></i> IA
+                                                                </button>
+                                                                {ticketsConRecomendaciones.has(ticket.id) && (
+                                                                    <Link
+                                                                        to={`/ticket/${ticket.id}/recomendaciones-similares`}
+                                                                        className="btn btn-success btn-sm"
+                                                                        title="Ver tickets similares resueltos"
+                                                                    >
+                                                                        <i className="fas fa-thumbs-up"></i>
+                                                                    </Link>
+                                                                )}
+                                                                <Link
+                                                                    to={`/ticket/${ticket.id}/chat-supervisor-analista`}
+                                                                    className="btn btn-secondary btn-sm"
+                                                                    title="Chat con analista"
+                                                                >
+                                                                    <i className="fas fa-comments"></i> Chat
+                                                                </Link>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
                                         </tbody>
                                     </table>
                                 </div>
@@ -1068,9 +1116,9 @@ export function SupervisorPage() {
                                                             <div className="d-flex align-items-center">
                                                                 <span className="me-2">#{ticket.id}</span>
                                                                 {ticket.url_imagen ? (
-                                                                    <img 
-                                                                        src={ticket.url_imagen} 
-                                                                        alt="Imagen del ticket" 
+                                                                    <img
+                                                                        src={ticket.url_imagen}
+                                                                        alt="Imagen del ticket"
                                                                         className="img-thumbnail"
                                                                         style={{ width: '30px', height: '30px', objectFit: 'cover' }}
                                                                     />
@@ -1107,7 +1155,7 @@ export function SupervisorPage() {
                                                             </span>
                                                         </td>
                                                         <td>
-                                                            {ticket.asignacion_actual?.analista ? 
+                                                            {ticket.asignacion_actual?.analista ?
                                                                 `${ticket.asignacion_actual.analista.nombre} ${ticket.asignacion_actual.analista.apellido}` :
                                                                 'Sin asignar'
                                                             }

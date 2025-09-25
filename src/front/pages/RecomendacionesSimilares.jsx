@@ -59,7 +59,40 @@ const RecomendacionesSimilares = () => {
 
                 if (response.ok) {
                     const comentarios = await response.json();
-                    return { ticketId: ticket.id, comentarios };
+
+                    // Filtrar comentarios: solo mostrar comentarios de usuarios y recomendaciones de IA
+                    // NO mostrar historial del ticket (transacciones automáticas)
+                    const comentariosFiltrados = comentarios.filter(comentario => {
+                        const texto = comentario.texto.toLowerCase();
+
+                        // Excluir transacciones automáticas del historial del ticket
+                        const esTransaccionAutomatica =
+                            texto.includes('ticket asignado') ||
+                            texto.includes('ticket reasignado') ||
+                            texto.includes('ticket solucionado') ||
+                            texto.includes('ticket escalado') ||
+                            texto.includes('ticket iniciado') ||
+                            texto.includes('ticket reabierto') ||
+                            texto.includes('cliente solicita reapertura') ||
+                            texto.includes('ticket cerrado por cliente') ||
+                            texto.includes('ticket cerrado por supervisor') ||
+                            texto.includes('ticket reabierto por cliente') ||
+                            texto.includes('ticket reabierto por supervisor');
+
+                        // Incluir solo comentarios de usuarios y recomendaciones de IA
+                        const esComentarioUsuario = comentario.autor &&
+                            (comentario.autor.rol === 'cliente' ||
+                                comentario.autor.rol === 'analista' ||
+                                comentario.autor.rol === 'supervisor');
+
+                        const esRecomendacionIA = texto.includes('recomendación') ||
+                            texto.includes('diagnóstico') ||
+                            texto.includes('pasos de solución');
+
+                        return !esTransaccionAutomatica && (esComentarioUsuario || esRecomendacionIA);
+                    });
+
+                    return { ticketId: ticket.id, comentarios: comentariosFiltrados };
                 }
                 return { ticketId: ticket.id, comentarios: [] };
             });
@@ -164,6 +197,8 @@ const RecomendacionesSimilares = () => {
                         </div>
                     )}
 
+                    
+
                     {ticketsSimilares.length === 0 ? (
                         <div className="text-center py-5">
                             <i className="fas fa-search fa-3x text-muted mb-3"></i>
@@ -253,35 +288,56 @@ const RecomendacionesSimilares = () => {
                                                         >
                                                             <div className="accordion-body">
                                                                 <div className="comentarios-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                                                    {comentariosPorTicket[ticket.id].map((comentario, index) => (
-                                                                        <div key={index} className="mb-3">
-                                                                            <div className="d-flex align-items-start">
-                                                                                <div className="flex-shrink-0 me-3">
-                                                                                    <i className={`${getRoleIcon(comentario.autor?.rol)} ${getRoleColor(comentario.autor?.rol)}`}></i>
-                                                                                </div>
-                                                                                <div className="flex-grow-1">
-                                                                                    <div className="card">
-                                                                                        <div className="card-header d-flex justify-content-between align-items-center py-2">
-                                                                                            <div>
-                                                                                                <strong className={getRoleColor(comentario.autor?.rol)}>
-                                                                                                    {comentario.autor?.nombre || 'Sistema'}
-                                                                                                </strong>
-                                                                                                <small className="text-muted ms-2">
-                                                                                                    ({comentario.autor?.rol || 'sistema'})
+                                                                    {comentariosPorTicket[ticket.id].map((comentario, index) => {
+                                                                        const esRecomendacionIA = comentario.texto.toLowerCase().includes('recomendación') ||
+                                                                            comentario.texto.toLowerCase().includes('diagnóstico') ||
+                                                                            comentario.texto.toLowerCase().includes('pasos de solución');
+
+                                                                        return (
+                                                                            <div key={index} className="mb-3">
+                                                                                <div className="d-flex align-items-start">
+                                                                                    <div className="flex-shrink-0 me-3">
+                                                                                        {esRecomendacionIA ? (
+                                                                                            <i className="fas fa-robot text-warning"></i>
+                                                                                        ) : (
+                                                                                            <i className={`${getRoleIcon(comentario.autor?.rol)} ${getRoleColor(comentario.autor?.rol)}`}></i>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div className="flex-grow-1">
+                                                                                        <div className={`card ${esRecomendacionIA ? 'border-warning' : ''}`}>
+                                                                                            <div className={`card-header d-flex justify-content-between align-items-center py-2 ${esRecomendacionIA ? 'bg-warning bg-opacity-10' : ''}`}>
+                                                                                                <div>
+                                                                                                    {esRecomendacionIA ? (
+                                                                                                        <div>
+                                                                                                            <strong className="text-warning">
+                                                                                                                <i className="fas fa-robot me-1"></i>
+                                                                                                                Recomendación de IA
+                                                                                                            </strong>
+                                                                                                        </div>
+                                                                                                    ) : (
+                                                                                                        <div>
+                                                                                                            <strong className={getRoleColor(comentario.autor?.rol)}>
+                                                                                                                {comentario.autor?.nombre || 'Sistema'}
+                                                                                                            </strong>
+                                                                                                            <small className="text-muted ms-2">
+                                                                                                                ({comentario.autor?.rol || 'sistema'})
+                                                                                                            </small>
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                                <small className="text-muted">
+                                                                                                    {formatFecha(comentario.fecha_comentario)}
                                                                                                 </small>
                                                                                             </div>
-                                                                                            <small className="text-muted">
-                                                                                                {formatFecha(comentario.fecha_comentario)}
-                                                                                            </small>
-                                                                                        </div>
-                                                                                        <div className="card-body py-2">
-                                                                                            <p className="mb-0">{comentario.texto}</p>
+                                                                                            <div className="card-body py-2">
+                                                                                                <p className="mb-0">{comentario.texto}</p>
+                                                                                            </div>
                                                                                         </div>
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
-                                                                    ))}
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                         </div>

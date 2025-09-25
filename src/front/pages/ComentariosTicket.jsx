@@ -14,7 +14,6 @@ const ComentariosTicket = () => {
     const [mostrarHistorial, setMostrarHistorial] = useState(false);
     const [historialTicket, setHistorialTicket] = useState([]);
     const [sincronizando, setSincronizando] = useState(false);
-    const [tieneRecomendaciones, setTieneRecomendaciones] = useState(false);
 
     // Detectar si es un ticket cerrado basándose en la URL
     const esTicketCerrado = window.location.pathname.includes('/comentarios-cerrado');
@@ -35,7 +34,6 @@ const ComentariosTicket = () => {
 
     useEffect(() => {
         cargarDatos();
-        verificarRecomendaciones();
     }, [ticketId]);
 
     // Función para manejar la transcripción
@@ -151,25 +149,6 @@ const ComentariosTicket = () => {
         }
     }, [ticketId, store.websocket.socket, store.websocket.connected, joinTicketRoom, leaveTicketRoom]);
 
-    const verificarRecomendaciones = async () => {
-        try {
-            const token = store.auth.token;
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/recomendaciones-similares`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setTieneRecomendaciones(data.total_encontrados > 0);
-            }
-        } catch (error) {
-            console.error('Error verificando recomendaciones:', error);
-            setTieneRecomendaciones(false);
-        }
-    };
 
     const cargarDatos = async (showLoading = true) => {
         try {
@@ -315,16 +294,6 @@ const ComentariosTicket = () => {
                                     <i className="fas fa-robot me-1"></i>
                                     Ver recomendaciones guardadas IA
                                 </button>
-                                {tieneRecomendaciones && (
-                                    <button
-                                        className="btn btn-success btn-sm"
-                                        onClick={() => navigate(`/ticket/${ticketId}/recomendaciones-similares`)}
-                                        title="Ver tickets similares resueltos"
-                                    >
-                                        <i className="fas fa-thumbs-up me-1"></i>
-                                        Recomendaciones
-                                    </button>
-                                )}
                             </div>
                             {sincronizando && (
                                 <div className="ms-3">
