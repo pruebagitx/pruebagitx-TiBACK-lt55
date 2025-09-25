@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import useGlobalReducer from '../hooks/useGlobalReducer';
 
 const RecomendacionesSimilares = () => {
@@ -13,39 +13,39 @@ const RecomendacionesSimilares = () => {
     const [comentariosPorTicket, setComentariosPorTicket] = useState({});
 
     useEffect(() => {
-        cargarRecomendaciones();
-    }, [ticketId]);
+        const cargarRecomendaciones = async () => {
+            try {
+                setLoading(true);
+                const token = store.auth.token;
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/recomendaciones-similares`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-    const cargarRecomendaciones = async () => {
-        try {
-            setLoading(true);
-            const token = store.auth.token;
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/recomendaciones-similares`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+                if (!response.ok) {
+                    throw new Error('Error al cargar recomendaciones');
                 }
-            });
 
-            if (!response.ok) {
-                throw new Error('Error al cargar recomendaciones');
+                const data = await response.json();
+                setTicketsSimilares(data.tickets_similares);
+                setTicketActual(data.ticket_actual);
+
+                // Cargar comentarios para cada ticket
+                if (data.tickets_similares.length > 0) {
+                    await cargarComentariosTickets(data.tickets_similares);
+                }
+            } catch (err) {
+                console.error('Error cargando recomendaciones:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
             }
+        };
 
-            const data = await response.json();
-            setTicketsSimilares(data.tickets_similares || []);
-            setTicketActual(data.ticket_actual);
-
-            // Cargar comentarios para cada ticket similar
-            if (data.tickets_similares && data.tickets_similares.length > 0) {
-                await cargarComentariosTickets(data.tickets_similares);
-            }
-        } catch (error) {
-            console.error('Error cargando recomendaciones:', error);
-            setError('Error al cargar las recomendaciones');
-        } finally {
-            setLoading(false);
-        }
-    };
+        cargarRecomendaciones();
+    }, [ticketId, store.auth.token]);
 
     const cargarComentariosTickets = async (tickets) => {
         try {
@@ -197,8 +197,6 @@ const RecomendacionesSimilares = () => {
                         </div>
                     )}
 
-                    
-
                     {ticketsSimilares.length === 0 ? (
                         <div className="text-center py-5">
                             <i className="fas fa-search fa-3x text-muted mb-3"></i>
@@ -264,87 +262,108 @@ const RecomendacionesSimilares = () => {
                                             )}
                                         </div>
 
-                                        {comentariosPorTicket[ticket.id] && comentariosPorTicket[ticket.id].length > 0 && (
-                                            <div className="card-footer">
-                                                <div className="accordion" id={`accordion-${ticket.id}`}>
-                                                    <div className="accordion-item">
-                                                        <h2 className="accordion-header" id={`heading-${ticket.id}`}>
-                                                            <button
-                                                                className="accordion-button collapsed"
-                                                                type="button"
-                                                                data-bs-toggle="collapse"
-                                                                data-bs-target={`#collapse-${ticket.id}`}
-                                                                aria-expanded="false"
-                                                                aria-controls={`collapse-${ticket.id}`}
-                                                            >
-                                                                <i className="fas fa-comments me-2"></i>
-                                                                Ver Comentarios ({comentariosPorTicket[ticket.id].length})
-                                                            </button>
-                                                        </h2>
-                                                        <div
-                                                            id={`collapse-${ticket.id}`}
-                                                            className="accordion-collapse collapse"
-                                                            aria-labelledby={`heading-${ticket.id}`}
-                                                        >
-                                                            <div className="accordion-body">
-                                                                <div className="comentarios-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                                                    {comentariosPorTicket[ticket.id].map((comentario, index) => {
-                                                                        const esRecomendacionIA = comentario.texto.toLowerCase().includes('recomendación') ||
-                                                                            comentario.texto.toLowerCase().includes('diagnóstico') ||
-                                                                            comentario.texto.toLowerCase().includes('pasos de solución');
+                                        <div className="card-footer">
+                                            <div className="d-flex justify-content-between align-items-center">
+                                                <div className="flex-grow-1 me-3">
+                                                    {comentariosPorTicket[ticket.id] && comentariosPorTicket[ticket.id].length > 0 ? (
+                                                        <div className="accordion" id={`accordion-${ticket.id}`}>
+                                                            <div className="accordion-item">
+                                                                <h2 className="accordion-header" id={`heading-${ticket.id}`}>
+                                                                    <button
+                                                                        className="accordion-button collapsed"
+                                                                        type="button"
+                                                                        data-bs-toggle="collapse"
+                                                                        data-bs-target={`#collapse-${ticket.id}`}
+                                                                        aria-expanded="false"
+                                                                        aria-controls={`collapse-${ticket.id}`}
+                                                                    >
+                                                                        <i className="fas fa-comments me-2"></i>
+                                                                        Ver Comentarios ({comentariosPorTicket[ticket.id].length})
+                                                                    </button>
+                                                                </h2>
+                                                                <div
+                                                                    id={`collapse-${ticket.id}`}
+                                                                    className="accordion-collapse collapse"
+                                                                    aria-labelledby={`heading-${ticket.id}`}
+                                                                >
+                                                                    <div className="accordion-body">
+                                                                        <div className="comentarios-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                                                            {comentariosPorTicket[ticket.id].map((comentario, index) => {
+                                                                                const esRecomendacionIA = comentario.texto.toLowerCase().includes('recomendación') ||
+                                                                                    comentario.texto.toLowerCase().includes('diagnóstico') ||
+                                                                                    comentario.texto.toLowerCase().includes('pasos de solución');
 
-                                                                        return (
-                                                                            <div key={index} className="mb-3">
-                                                                                <div className="d-flex align-items-start">
-                                                                                    <div className="flex-shrink-0 me-3">
-                                                                                        {esRecomendacionIA ? (
-                                                                                            <i className="fas fa-robot text-warning"></i>
-                                                                                        ) : (
-                                                                                            <i className={`${getRoleIcon(comentario.autor?.rol)} ${getRoleColor(comentario.autor?.rol)}`}></i>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div className="flex-grow-1">
-                                                                                        <div className={`card ${esRecomendacionIA ? 'border-warning' : ''}`}>
-                                                                                            <div className={`card-header d-flex justify-content-between align-items-center py-2 ${esRecomendacionIA ? 'bg-warning bg-opacity-10' : ''}`}>
-                                                                                                <div>
-                                                                                                    {esRecomendacionIA ? (
-                                                                                                        <div>
-                                                                                                            <strong className="text-warning">
-                                                                                                                <i className="fas fa-robot me-1"></i>
-                                                                                                                Recomendación de IA
-                                                                                                            </strong>
-                                                                                                        </div>
-                                                                                                    ) : (
-                                                                                                        <div>
-                                                                                                            <strong className={getRoleColor(comentario.autor?.rol)}>
-                                                                                                                {comentario.autor?.nombre || 'Sistema'}
-                                                                                                            </strong>
-                                                                                                            <small className="text-muted ms-2">
-                                                                                                                ({comentario.autor?.rol || 'sistema'})
-                                                                                                            </small>
-                                                                                                        </div>
-                                                                                                    )}
-                                                                                                </div>
-                                                                                                <small className="text-muted">
-                                                                                                    {formatFecha(comentario.fecha_comentario)}
-                                                                                                </small>
+                                                                                return (
+                                                                                    <div key={index} className="mb-3">
+                                                                                        <div className="d-flex align-items-start">
+                                                                                            <div className="flex-shrink-0 me-3">
+                                                                                                {esRecomendacionIA ? (
+                                                                                                    <i className="fas fa-robot text-warning"></i>
+                                                                                                ) : (
+                                                                                                    <i className={`${getRoleIcon(comentario.autor?.rol)} ${getRoleColor(comentario.autor?.rol)}`}></i>
+                                                                                                )}
                                                                                             </div>
-                                                                                            <div className="card-body py-2">
-                                                                                                <p className="mb-0">{comentario.texto}</p>
+                                                                                            <div className="flex-grow-1">
+                                                                                                <div className={`card ${esRecomendacionIA ? 'border-warning' : ''}`}>
+                                                                                                    <div className={`card-header d-flex justify-content-between align-items-center py-2 ${esRecomendacionIA ? 'bg-warning bg-opacity-10' : ''}`}>
+                                                                                                        <div>
+                                                                                                            {esRecomendacionIA ? (
+                                                                                                                <div>
+                                                                                                                    <strong className="text-warning">
+                                                                                                                        <i className="fas fa-robot me-1"></i>
+                                                                                                                        Recomendación de IA
+                                                                                                                    </strong>
+                                                                                                                </div>
+                                                                                                            ) : (
+                                                                                                                <div>
+                                                                                                                    <strong className={getRoleColor(comentario.autor?.rol)}>
+                                                                                                                        {comentario.autor?.nombre || 'Sistema'}
+                                                                                                                    </strong>
+                                                                                                                    <small className="text-muted ms-2">
+                                                                                                                        ({comentario.autor?.rol || 'sistema'})
+                                                                                                                    </small>
+                                                                                                                </div>
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                        <small className="text-muted">
+                                                                                                            {formatFecha(comentario.fecha_comentario)}
+                                                                                                        </small>
+                                                                                                    </div>
+                                                                                                    <div className="card-body py-2">
+                                                                                                        <p className="mb-0">{comentario.texto}</p>
+                                                                                                    </div>
+                                                                                                </div>
                                                                                             </div>
                                                                                         </div>
                                                                                     </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    ) : (
+                                                        <div className="d-flex align-items-center">
+                                                            <span className="text-muted">
+                                                                <i className="fas fa-comments me-2"></i>
+                                                                Sin comentarios disponibles
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
+
+                                                <Link
+                                                    to={`/ticket/${ticket.id}/recomendaciones-ia`}
+                                                    className="btn btn-warning btn-sm"
+                                                    style={{ minWidth: '140px', flexShrink: 0 }}
+                                                    title="Ver recomendaciones guardadas de IA"
+                                                >
+                                                    <i className="fas fa-robot me-1"></i>
+                                                    Recomendaciones IA
+                                                </Link>
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
                             ))}
