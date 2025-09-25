@@ -30,12 +30,12 @@ const RecomendacionesGuardadas = () => {
             }
 
             const data = await response.json();
-            
+
             // Filtrar solo comentarios que son recomendaciones de IA
-            const recomendacionesIA = data.filter(comentario => 
+            const recomendacionesIA = data.filter(comentario =>
                 comentario.texto.includes('🤖 RECOMENDACIÓN DE IA GENERADA')
             ).sort((a, b) => new Date(b.fecha_comentario) - new Date(a.fecha_comentario));
-            
+
             setRecomendaciones(recomendacionesIA);
         } catch (err) {
             setError(err.message);
@@ -56,10 +56,10 @@ const RecomendacionesGuardadas = () => {
         };
 
         let currentSection = '';
-        
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
-            
+
             if (line.includes('📋 DIAGNÓSTICO:')) {
                 currentSection = 'diagnostico';
                 continue;
@@ -170,13 +170,22 @@ const RecomendacionesGuardadas = () => {
                                 Recomendaciones Guardadas IA - Ticket #{ticketId}
                             </h2>
                         </div>
-                        <button 
-                            className="btn btn-secondary"
-                            onClick={() => navigate(-1)}
-                        >
-                            <i className="fas fa-arrow-left me-2"></i>
-                            Volver
-                        </button>
+                        <div className="d-flex gap-2">
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => navigate(`/ticket/${ticketId}/identificar-imagen`)}
+                            >
+                                <i className="fas fa-robot me-2"></i>
+                                Analizar imagen del problema
+                            </button>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => navigate(-1)}
+                            >
+                                <i className="fas fa-arrow-left me-2"></i>
+                                Volver
+                            </button>
+                        </div>
                     </div>
 
                     {error && (
@@ -192,13 +201,22 @@ const RecomendacionesGuardadas = () => {
                                 <i className="fas fa-robot fa-3x text-muted mb-3"></i>
                                 <h5 className="text-muted">No hay recomendaciones guardadas</h5>
                                 <p className="text-muted">Las recomendaciones de IA guardadas aparecerán aquí</p>
-                                <button 
-                                    className="btn btn-primary"
-                                    onClick={() => navigate(`/ticket/${ticketId}/recomendacion-ia`)}
-                                >
-                                    <i className="fas fa-plus me-2"></i>
-                                    Generar Nueva Recomendación
-                                </button>
+                                <div className="d-flex gap-2 justify-content-center">
+                                    <button
+                                        className="btn btn-primary"
+                                        onClick={() => navigate(`/ticket/${ticketId}/recomendacion-ia`)}
+                                    >
+                                        <i className="fas fa-plus me-2"></i>
+                                        Generar Nueva Recomendación
+                                    </button>
+                                    <button
+                                        className="btn btn-success"
+                                        onClick={() => navigate(`/ticket/${ticketId}/identificar-imagen`)}
+                                    >
+                                        <i className="fas fa-robot me-2"></i>
+                                        Analizar imagen del problema
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ) : (
@@ -211,8 +229,8 @@ const RecomendacionesGuardadas = () => {
                                             <div className="card-header">
                                                 <div className="d-flex justify-content-between align-items-center">
                                                     <div className="d-flex align-items-center">
-                                                        <div className={`rounded-circle d-flex align-items-center justify-content-center ${getRoleColor(comentario.autor?.rol)}`} 
-                                                             style={{width: '40px', height: '40px', backgroundColor: '#f8f9fa'}}>
+                                                        <div className={`rounded-circle d-flex align-items-center justify-content-center ${getRoleColor(comentario.autor?.rol)}`}
+                                                            style={{ width: '40px', height: '40px', backgroundColor: '#f8f9fa' }}>
                                                             <i className={getRoleIcon(comentario.autor?.rol)}></i>
                                                         </div>
                                                         <div className="ms-3">

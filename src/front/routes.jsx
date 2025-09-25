@@ -35,6 +35,7 @@ import RecomendacionesGuardadas from "./pages/RecomendacionesGuardadas";
 import RecomendacionesSimilares from "./pages/RecomendacionesSimilares";
 import ChatSupervisorAnalista from "./pages/ChatSupervisorAnalista";
 import ChatAnalistaCliente from "./pages/ChatAnalistaCliente";
+import IdentificarImagen from "./pages/IdentificarImagen";
 
 import { Asignacion } from "./pages/Asignacion";
 import { AgregarAsignacion } from "./pages/AgregarAsignacion";
@@ -242,6 +243,11 @@ export const router = createBrowserRouter(
       <Route path="/ticket/:ticketId/chat-analista-cliente" element={
         <ProtectedRoute allowedRoles={["analista", "cliente"]}>
           <ChatAnalistaCliente />
+        </ProtectedRoute>
+      } />
+      <Route path="/ticket/:ticketId/identificar-imagen" element={
+        <ProtectedRoute allowedRoles={["analista", "supervisor", "administrador", "cliente"]}>
+          <IdentificarImagen />
         </ProtectedRoute>
       } />
 

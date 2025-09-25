@@ -2236,6 +2236,191 @@ def enviar_mensaje_supervisor_analista():
         return jsonify({"message": f"Error al enviar mensaje: {str(e)}"}), 500
 
 
+# ==================== RUTAS DE CLOUD VISION API ====================
+
+@api.route('/analyze-image', methods=['POST'])
+@require_auth
+def analyze_image():
+    """Analizar imagen usando Google Cloud Vision API"""
+    try:
+        # Verificar que se proporcionó una imagen
+        if 'image' not in request.files:
+            return jsonify({"message": "No se encontró archivo de imagen"}), 400
+        
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({"message": "No se seleccionó archivo"}), 400
+        
+        # Obtener datos del formulario
+        ticket_id = request.form.get('ticket_id')
+        use_ticket_context = request.form.get('use_ticket_context', 'true').lower() == 'true'
+        ticket_title = request.form.get('ticket_title', '')
+        ticket_description = request.form.get('ticket_description', '')
+        additional_details = request.form.get('additional_details', '')
+        
+        # Verificar configuración de Cloud Vision API
+        cloud_vision_api_key = os.getenv('CLOUD_VISION_API')
+        if not cloud_vision_api_key:
+            return jsonify({
+                "message": "Cloud Vision API no configurada",
+                "error": "CLOUD_VISION_API no está definida en las variables de entorno"
+            }), 500
+        
+        # Configurar cliente de Vision API
+        try:
+            client = vision.ImageAnnotatorClient()
+        except Exception as e:
+            return jsonify({
+                "message": "Error configurando Cloud Vision API",
+                "error": str(e)
+            }), 500
+        
+        # Leer contenido de la imagen
+        image_content = file.read()
+        image = vision.Image(content=image_content)
+        
+        # Construir el prompt detallado según el contexto
+        context_description = ""
+        if use_ticket_context and ticket_title and ticket_description:
+            context_description = f"La descripción del problema es la siguiente: '{ticket_description}'. El título del ticket es: '{ticket_title}'."
+        elif additional_details:
+            context_description = f"El usuario ha proporcionado los siguientes detalles adicionales: '{additional_details}'."
+        
+        # Realizar análisis con múltiples características
+        features = [
+            vision.Feature(type_=vision.Feature.Type.LABEL_DETECTION),
+            vision.Feature(type_=vision.Feature.Type.TEXT_DETECTION),
+            vision.Feature(type_=vision.Feature.Type.OBJECT_LOCALIZATION),
+            vision.Feature(type_=vision.Feature.Type.IMAGE_PROPERTIES)
+        ]
+        
+        # Realizar análisis
+        response = client.annotate_image({
+            'image': image,
+            'features': features
+        })
+        
+        # Procesar resultados
+        labels = []
+        if response.label_annotations:
+            labels = [
+                {
+                    'description': label.description,
+                    'score': label.score,
+                    'mid': label.mid
+                }
+                for label in response.label_annotations
+            ]
+        
+        text_detections = []
+        if response.text_annotations:
+            text_detections = [
+                {
+                    'description': text.description,
+                    'locale': text.locale,
+                    'bounding_poly': [
+                        {
+                            'x': vertex.x,
+                            'y': vertex.y
+                        }
+                        for vertex in text.bounding_poly.vertices
+                    ] if text.bounding_poly else []
+                }
+                for text in response.text_annotations
+            ]
+        
+        objects = []
+        if response.localized_object_annotations:
+            objects = [
+                {
+                    'name': obj.name,
+                    'score': obj.score,
+                    'bounding_poly': [
+                        {
+                            'x': vertex.x,
+                            'y': vertex.y
+                        }
+                        for vertex in obj.bounding_poly.normalized_vertices
+                    ]
+                }
+                for obj in response.localized_object_annotations
+            ]
+        
+        image_properties = {}
+        if response.image_properties_annotation:
+            if response.image_properties_annotation.dominant_colors:
+                image_properties['dominant_colors'] = [
+                    {
+                        'color': {
+                            'red': color.color.red,
+                            'green': color.color.green,
+                            'blue': color.color.blue
+                        },
+                        'score': color.score,
+                        'pixel_fraction': color.pixel_fraction
+                    }
+                    for color in response.image_properties_annotation.dominant_colors.colors
+                ]
+        
+        # Generar análisis detallado
+        analysis_parts = []
+        
+        # Análisis general basado en etiquetas
+        if labels:
+            high_confidence_labels = [label for label in labels if label['score'] > 0.7]
+            if high_confidence_labels:
+                analysis_parts.append(f"Elementos principales detectados: {', '.join([label['description'] for label in high_confidence_labels])}")
+        
+        # Análisis de texto
+        if text_detections:
+            main_text = text_detections[0]['description'] if text_detections else ""
+            if main_text:
+                analysis_parts.append(f"Texto detectado en la imagen: {main_text}")
+        
+        # Análisis de objetos específicos
+        if objects:
+            high_confidence_objects = [obj for obj in objects if obj['score'] > 0.7]
+            if high_confidence_objects:
+                analysis_parts.append(f"Objetos identificados: {', '.join([obj['name'] for obj in high_confidence_objects])}")
+        
+        # Análisis de colores
+        if image_properties.get('dominant_colors'):
+            dominant_color = image_properties['dominant_colors'][0]
+            color_info = f"Color dominante: RGB({dominant_color['color']['red']}, {dominant_color['color']['green']}, {dominant_color['color']['blue']})"
+            analysis_parts.append(color_info)
+        
+        # Construir análisis final
+        base_analysis = " ".join(analysis_parts) if analysis_parts else "No se pudieron identificar elementos específicos en la imagen."
+        
+        # Agregar contexto del problema
+        if context_description:
+            final_analysis = f"Análisis de imagen con contexto: {context_description}\n\nAnálisis visual: {base_analysis}"
+        else:
+            final_analysis = f"Análisis visual: {base_analysis}"
+        
+        # Preparar respuesta
+        result = {
+            "analysis": final_analysis,
+            "labels": labels,
+            "text": text_detections,
+            "objects": objects,
+            "image_properties": image_properties,
+            "context_used": use_ticket_context,
+            "ticket_id": ticket_id
+        }
+        
+        return jsonify({
+            "message": "Análisis completado exitosamente",
+            "result": result
+        }), 200
+        
+    except Exception as e:
+        print(f"Error en análisis de imagen: {str(e)}")
+        return jsonify({
+            "message": f"Error al analizar la imagen: {str(e)}"
+        }), 500
+
+
 @api.route('/tickets/<int:ticket_id>/chat-analista-cliente', methods=['GET'])
 @require_auth
 def obtener_chat_analista_cliente(ticket_id):
@@ -2373,3 +2558,188 @@ def enviar_mensaje_analista_cliente():
     except Exception as e:
         db.session.rollback()
         return jsonify({"message": f"Error al enviar mensaje: {str(e)}"}), 500
+
+
+# ==================== RUTAS DE CLOUD VISION API ====================
+
+@api.route('/analyze-image', methods=['POST'])
+@require_auth
+def analyze_image():
+    """Analizar imagen usando Google Cloud Vision API"""
+    try:
+        # Verificar que se proporcionó una imagen
+        if 'image' not in request.files:
+            return jsonify({"message": "No se encontró archivo de imagen"}), 400
+        
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({"message": "No se seleccionó archivo"}), 400
+        
+        # Obtener datos del formulario
+        ticket_id = request.form.get('ticket_id')
+        use_ticket_context = request.form.get('use_ticket_context', 'true').lower() == 'true'
+        ticket_title = request.form.get('ticket_title', '')
+        ticket_description = request.form.get('ticket_description', '')
+        additional_details = request.form.get('additional_details', '')
+        
+        # Verificar configuración de Cloud Vision API
+        cloud_vision_api_key = os.getenv('CLOUD_VISION_API')
+        if not cloud_vision_api_key:
+            return jsonify({
+                "message": "Cloud Vision API no configurada",
+                "error": "CLOUD_VISION_API no está definida en las variables de entorno"
+            }), 500
+        
+        # Configurar cliente de Vision API
+        try:
+            client = vision.ImageAnnotatorClient()
+        except Exception as e:
+            return jsonify({
+                "message": "Error configurando Cloud Vision API",
+                "error": str(e)
+            }), 500
+        
+        # Leer contenido de la imagen
+        image_content = file.read()
+        image = vision.Image(content=image_content)
+        
+        # Construir el prompt detallado según el contexto
+        context_description = ""
+        if use_ticket_context and ticket_title and ticket_description:
+            context_description = f"La descripción del problema es la siguiente: '{ticket_description}'. El título del ticket es: '{ticket_title}'."
+        elif additional_details:
+            context_description = f"El usuario ha proporcionado los siguientes detalles adicionales: '{additional_details}'."
+        
+        # Realizar análisis con múltiples características
+        features = [
+            vision.Feature(type_=vision.Feature.Type.LABEL_DETECTION),
+            vision.Feature(type_=vision.Feature.Type.TEXT_DETECTION),
+            vision.Feature(type_=vision.Feature.Type.OBJECT_LOCALIZATION),
+            vision.Feature(type_=vision.Feature.Type.IMAGE_PROPERTIES)
+        ]
+        
+        # Realizar análisis
+        response = client.annotate_image({
+            'image': image,
+            'features': features
+        })
+        
+        # Procesar resultados
+        labels = []
+        if response.label_annotations:
+            labels = [
+                {
+                    'description': label.description,
+                    'score': label.score,
+                    'mid': label.mid
+                }
+                for label in response.label_annotations
+            ]
+        
+        text_detections = []
+        if response.text_annotations:
+            text_detections = [
+                {
+                    'description': text.description,
+                    'locale': text.locale,
+                    'bounding_poly': [
+                        {
+                            'x': vertex.x,
+                            'y': vertex.y
+                        }
+                        for vertex in text.bounding_poly.vertices
+                    ] if text.bounding_poly else []
+                }
+                for text in response.text_annotations
+            ]
+        
+        objects = []
+        if response.localized_object_annotations:
+            objects = [
+                {
+                    'name': obj.name,
+                    'score': obj.score,
+                    'bounding_poly': [
+                        {
+                            'x': vertex.x,
+                            'y': vertex.y
+                        }
+                        for vertex in obj.bounding_poly.normalized_vertices
+                    ]
+                }
+                for obj in response.localized_object_annotations
+            ]
+        
+        image_properties = {}
+        if response.image_properties_annotation:
+            if response.image_properties_annotation.dominant_colors:
+                image_properties['dominant_colors'] = [
+                    {
+                        'color': {
+                            'red': color.color.red,
+                            'green': color.color.green,
+                            'blue': color.color.blue
+                        },
+                        'score': color.score,
+                        'pixel_fraction': color.pixel_fraction
+                    }
+                    for color in response.image_properties_annotation.dominant_colors.colors
+                ]
+        
+        # Generar análisis detallado
+        analysis_parts = []
+        
+        # Análisis general basado en etiquetas
+        if labels:
+            high_confidence_labels = [label for label in labels if label['score'] > 0.7]
+            if high_confidence_labels:
+                analysis_parts.append(f"Elementos principales detectados: {', '.join([label['description'] for label in high_confidence_labels])}")
+        
+        # Análisis de texto
+        if text_detections:
+            main_text = text_detections[0]['description'] if text_detections else ""
+            if main_text:
+                analysis_parts.append(f"Texto detectado en la imagen: {main_text}")
+        
+        # Análisis de objetos específicos
+        if objects:
+            high_confidence_objects = [obj for obj in objects if obj['score'] > 0.7]
+            if high_confidence_objects:
+                analysis_parts.append(f"Objetos identificados: {', '.join([obj['name'] for obj in high_confidence_objects])}")
+        
+        # Análisis de colores
+        if image_properties.get('dominant_colors'):
+            dominant_color = image_properties['dominant_colors'][0]
+            color_info = f"Color dominante: RGB({dominant_color['color']['red']}, {dominant_color['color']['green']}, {dominant_color['color']['blue']})"
+            analysis_parts.append(color_info)
+        
+        # Construir análisis final
+        base_analysis = " ".join(analysis_parts) if analysis_parts else "No se pudieron identificar elementos específicos en la imagen."
+        
+        # Agregar contexto del problema
+        if context_description:
+            final_analysis = f"Análisis de imagen con contexto: {context_description}\n\nAnálisis visual: {base_analysis}"
+        else:
+            final_analysis = f"Análisis visual: {base_analysis}"
+        
+        # Preparar respuesta
+        result = {
+            "analysis": final_analysis,
+            "labels": labels,
+            "text": text_detections,
+            "objects": objects,
+            "image_properties": image_properties,
+            "context_used": use_ticket_context,
+            "ticket_id": ticket_id
+        }
+        
+        return jsonify({
+            "message": "Análisis completado exitosamente",
+            "result": result
+        }), 200
+        
+    except Exception as e:
+        print(f"Error en análisis de imagen: {str(e)}")
+        return jsonify({
+            "message": f"Error al analizar la imagen: {str(e)}"
+        }), 500
