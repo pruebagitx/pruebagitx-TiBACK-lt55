@@ -92,7 +92,7 @@ const IdentificarImagen = () => {
                 formData.append('additional_details', additionalDetails);
             }
 
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/analyze-image`, {
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/analyze-image-fixed`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
