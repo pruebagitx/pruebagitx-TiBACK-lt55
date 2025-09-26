@@ -1284,6 +1284,32 @@ def get_cliente_tickets():
         return jsonify({"message": f"Error al obtener tickets: {str(e)}"}), 500
 
 
+@api.route('/tickets/analista/<int:id>', methods=['GET'])
+@require_role(['supervisor', 'administrador'])
+def get_analista_tickets_by_id(id):
+    """Obtener tickets de un analista específico por ID"""
+    try:
+        # Verificar que el analista existe
+        analista = db.session.get(Analista, id)
+        if not analista:
+            return jsonify({"message": "Analista no encontrado"}), 404
+        
+        # Obtener asignaciones del analista
+        asignaciones = Asignacion.query.filter_by(id_analista=id).all()
+        ticket_ids = [a.id_ticket for a in asignaciones]
+        
+        if not ticket_ids:
+            return jsonify([]), 200
+        
+        # Obtener todos los tickets asignados al analista
+        tickets = Ticket.query.filter(Ticket.id.in_(ticket_ids)).all()
+        
+        return jsonify([t.serialize() for t in tickets]), 200
+        
+    except Exception as e:
+        return handle_general_error(e, "obtener tickets del analista")
+
+
 @api.route('/tickets/analista', methods=['GET'])
 @require_role(['analista', 'administrador'])
 def get_analista_tickets():

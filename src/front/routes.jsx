@@ -36,6 +36,7 @@ import RecomendacionesSimilares from "./pages/RecomendacionesSimilares";
 import ChatSupervisorAnalista from "./pages/ChatSupervisorAnalista";
 import ChatAnalistaCliente from "./pages/ChatAnalistaCliente";
 import IdentificarImagen from "./pages/IdentificarImagen";
+import { DashboardCalidad } from "./pages/DashboardCalidad";
 
 import { Asignacion } from "./pages/Asignacion";
 import { AgregarAsignacion } from "./pages/AgregarAsignacion";
@@ -248,6 +249,11 @@ export const router = createBrowserRouter(
       <Route path="/ticket/:ticketId/identificar-imagen" element={
         <ProtectedRoute allowedRoles={["analista", "supervisor", "administrador", "cliente"]}>
           <IdentificarImagen />
+        </ProtectedRoute>
+      } />
+      <Route path="/dashboard-calidad" element={
+        <ProtectedRoute allowedRoles={["supervisor", "administrador"]}>
+          <DashboardCalidad />
         </ProtectedRoute>
       } />
 

@@ -640,6 +640,10 @@ export function SupervisorPage() {
                                     <i className="fas fa-user-edit me-1"></i>
                                     {showInfoForm ? 'Ocultar Información' : 'Actualizar Información'}
                                 </button>
+                                <Link to="/dashboard-calidad" className="btn btn-success">
+                                    <i className="fas fa-chart-line me-1"></i>
+                                    Rendimiento Analistas
+                                </Link>
                                 <Link to="/supervisores" className="btn btn-primary">Ir al CRUD</Link>
                                 <button
                                     className="btn btn-outline-danger"
