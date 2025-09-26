@@ -722,13 +722,37 @@ export function AnalistaPage() {
                                                             >
                                                                 <i className="fas fa-comments"></i> Comentar
                                                             </Link>
-                                                            <button
-                                                                className="btn btn-info btn-sm"
-                                                                onClick={() => generarRecomendacion(ticket)}
-                                                                title="Generar recomendación con IA"
-                                                            >
-                                                                <i className="fas fa-robot"></i> IA
-                                                            </button>
+                                                            <div className="btn-group" role="group">
+                                                                <button
+                                                                    className="btn btn-info btn-sm dropdown-toggle"
+                                                                    type="button"
+                                                                    data-bs-toggle="dropdown"
+                                                                    aria-expanded="false"
+                                                                    title="Opciones de IA"
+                                                                >
+                                                                    <i className="fas fa-robot"></i> IA
+                                                                </button>
+                                                                <ul className="dropdown-menu">
+                                                                    <li>
+                                                                        <button
+                                                                            className="dropdown-item"
+                                                                            onClick={() => generarRecomendacion(ticket)}
+                                                                        >
+                                                                            <i className="fas fa-lightbulb me-2"></i>
+                                                                            Generar Recomendación
+                                                                        </button>
+                                                                    </li>
+                                                                    <li>
+                                                                        <Link
+                                                                            to={`/ticket/${ticket.id}/identificar-imagen`}
+                                                                            className="dropdown-item"
+                                                                        >
+                                                                            <i className="fas fa-camera me-2"></i>
+                                                                            Analizar Imagen
+                                                                        </Link>
+                                                                    </li>
+                                                                </ul>
+                                                            </div>
                                                             {ticketsConRecomendaciones.has(ticket.id) && (
                                                                 <Link
                                                                     to={`/ticket/${ticket.id}/recomendaciones-similares`}

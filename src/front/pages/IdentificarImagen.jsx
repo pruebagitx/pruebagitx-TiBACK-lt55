@@ -10,7 +10,6 @@ const IdentificarImagen = () => {
     const [loading, setLoading] = useState(false);
     const [image, setImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
-    const [useTicketContext, setUseTicketContext] = useState(true);
     const [additionalDetails, setAdditionalDetails] = useState('');
     const [analysisResult, setAnalysisResult] = useState(null);
     const [error, setError] = useState(null);
@@ -66,7 +65,7 @@ const IdentificarImagen = () => {
             return;
         }
 
-        if (!useTicketContext && !additionalDetails.trim()) {
+        if (!additionalDetails.trim()) {
             setError('Por favor proporciona detalles adicionales sobre el problema');
             return;
         }
@@ -81,18 +80,18 @@ const IdentificarImagen = () => {
             const formData = new FormData();
             formData.append('image', image);
             formData.append('ticket_id', ticketId);
-            formData.append('use_ticket_context', useTicketContext);
+            formData.append('use_ticket_context', true); // Siempre usar contexto del ticket
 
-            if (useTicketContext && ticket) {
+            // Siempre incluir título y descripción del ticket
+            if (ticket) {
                 formData.append('ticket_title', ticket.titulo);
                 formData.append('ticket_description', ticket.descripcion);
             }
 
-            if (!useTicketContext) {
-                formData.append('additional_details', additionalDetails);
-            }
+            // Siempre incluir detalles adicionales
+            formData.append('additional_details', additionalDetails);
 
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/analyze-image-fixed`, {
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/analyze-image`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -170,50 +169,31 @@ const IdentificarImagen = () => {
                             {/* Configuración de contexto */}
                             <div className="mb-4">
                                 <h5>Configuración del Análisis</h5>
-                                <div className="form-check">
-                                    <input
-                                        className="form-check-input"
-                                        type="radio"
-                                        name="contextOption"
-                                        id="useTicketContext"
-                                        checked={useTicketContext}
-                                        onChange={() => setUseTicketContext(true)}
-                                    />
-                                    <label className="form-check-label" htmlFor="useTicketContext">
-                                        Usar título y descripción del ticket como referencia
-                                    </label>
-                                </div>
-                                <div className="form-check">
-                                    <input
-                                        className="form-check-input"
-                                        type="radio"
-                                        name="contextOption"
-                                        id="useCustomContext"
-                                        checked={!useTicketContext}
-                                        onChange={() => setUseTicketContext(false)}
-                                    />
-                                    <label className="form-check-label" htmlFor="useCustomContext">
-                                        Proporcionar detalles adicionales
-                                    </label>
+                                <div className="alert alert-info">
+                                    <i className="fas fa-info-circle me-2"></i>
+                                    <strong>Contexto del Ticket:</strong> Se utilizará automáticamente el título y descripción del ticket como referencia para el análisis.
                                 </div>
                             </div>
 
-                            {/* Detalles adicionales */}
-                            {!useTicketContext && (
-                                <div className="mb-4">
-                                    <label htmlFor="additionalDetails" className="form-label">
-                                        Detalles adicionales sobre el problema:
-                                    </label>
-                                    <textarea
-                                        className="form-control"
-                                        id="additionalDetails"
-                                        rows="4"
-                                        value={additionalDetails}
-                                        onChange={(e) => setAdditionalDetails(e.target.value)}
-                                        placeholder="Describe el problema que estás experimentando y qué esperas que la IA identifique en la imagen..."
-                                    />
+                            {/* Detalles adicionales - OBLIGATORIO */}
+                            <div className="mb-4">
+                                <label htmlFor="additionalDetails" className="form-label">
+                                    <strong>Proporcionar detalles adicionales *</strong>
+                                </label>
+                                <textarea
+                                    className="form-control"
+                                    id="additionalDetails"
+                                    rows="4"
+                                    value={additionalDetails}
+                                    onChange={(e) => setAdditionalDetails(e.target.value)}
+                                    placeholder="Describe el problema que estás experimentando y qué esperas que la IA identifique en la imagen..."
+                                    required
+                                />
+                                <div className="form-text">
+                                    <i className="fas fa-lightbulb me-1"></i>
+                                    Esta información junto con la imagen y el contexto del ticket forman el soporte para obtener buenas respuestas y solucionar el problema al cliente.
                                 </div>
-                            )}
+                            </div>
 
                             {/* Carga de imagen */}
                             <div className="mb-4">
@@ -244,7 +224,7 @@ const IdentificarImagen = () => {
                                 <button
                                     className="btn btn-primary"
                                     onClick={handleAnalyze}
-                                    disabled={loading || !image}
+                                    disabled={loading || !image || !additionalDetails.trim()}
                                 >
                                     {loading ? (
                                         <>

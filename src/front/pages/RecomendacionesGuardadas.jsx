@@ -172,13 +172,6 @@ const RecomendacionesGuardadas = () => {
                         </div>
                         <div className="d-flex gap-2">
                             <button
-                                className="btn btn-primary"
-                                onClick={() => navigate(`/ticket/${ticketId}/identificar-imagen`)}
-                            >
-                                <i className="fas fa-robot me-2"></i>
-                                Analizar imagen del problema
-                            </button>
-                            <button
                                 className="btn btn-secondary"
                                 onClick={() => navigate(-1)}
                             >
@@ -208,13 +201,6 @@ const RecomendacionesGuardadas = () => {
                                     >
                                         <i className="fas fa-plus me-2"></i>
                                         Generar Nueva Recomendación
-                                    </button>
-                                    <button
-                                        className="btn btn-success"
-                                        onClick={() => navigate(`/ticket/${ticketId}/identificar-imagen`)}
-                                    >
-                                        <i className="fas fa-robot me-2"></i>
-                                        Analizar imagen del problema
                                     </button>
                                 </div>
                             </div>

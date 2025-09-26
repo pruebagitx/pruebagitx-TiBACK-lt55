@@ -2246,6 +2246,27 @@ def enviar_mensaje_supervisor_analista():
 
 # ==================== RUTAS DE CLOUD VISION API ====================
 
+@api.route('/cloud-vision-status', methods=['GET'])
+@require_auth
+def cloud_vision_status():
+    """Verificar estado de configuración de Cloud Vision API"""
+    try:
+        cloud_vision_api_key = os.getenv('CLOUD_VISION_API')
+        cloudinary_url = os.getenv('CLOUDINARY_URL')
+        
+        return jsonify({
+            "cloud_vision_configured": bool(cloud_vision_api_key),
+            "cloudinary_configured": bool(cloudinary_url),
+            "cloud_vision_key_length": len(cloud_vision_api_key) if cloud_vision_api_key else 0,
+            "cloudinary_url_length": len(cloudinary_url) if cloudinary_url else 0,
+            "message": "Configuración verificada"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "message": "Error verificando configuración",
+            "error": str(e)
+        }), 500
+
 @api.route('/analyze-image', methods=['POST'])
 @require_auth
 def analyze_image():
@@ -2271,16 +2292,21 @@ def analyze_image():
         if not cloud_vision_api_key:
             return jsonify({
                 "message": "Cloud Vision API no configurada",
-                "error": "CLOUD_VISION_API no está definida en las variables de entorno"
+                "error": "CLOUD_VISION_API no está definida en las variables de entorno",
+                "debug": f"Variables de entorno disponibles: {list(os.environ.keys())}"
             }), 500
         
-        # Configurar cliente de Vision API
+        # Configurar cliente de Vision API con API key
         try:
-            client = vision.ImageAnnotatorClient()
+            # Usar API key en lugar de autenticación por defecto
+            client = vision.ImageAnnotatorClient(
+                client_options={'api_key': cloud_vision_api_key}
+            )
         except Exception as e:
             return jsonify({
                 "message": "Error configurando Cloud Vision API",
-                "error": str(e)
+                "error": str(e),
+                "debug": f"API Key length: {len(cloud_vision_api_key) if cloud_vision_api_key else 0}"
             }), 500
         
         # Leer contenido de la imagen
@@ -2293,6 +2319,13 @@ def analyze_image():
             context_description = f"La descripción del problema es la siguiente: '{ticket_description}'. El título del ticket es: '{ticket_title}'."
         elif additional_details:
             context_description = f"El usuario ha proporcionado los siguientes detalles adicionales: '{additional_details}'."
+        
+        # Prompt específico para análisis de calidad con método Feynman mejorado
+        analysis_prompt = """Analiza la imagen cargada por el usuario con máxima atención y empatía. El usuario está reportando un problema y necesita tu ayuda experta. Considera cuidadosamente el contexto completo: la descripción del ticket, el título del problema, y todos los detalles adicionales proporcionados. Tu misión es ser un asistente comprensivo que siempre encuentra una manera de ayudar.
+
+Evalúa la imagen con precisión para identificar elementos clave, texto visible, objetos relacionados, y cualquier detalle visual que pueda contribuir al diagnóstico. Aplica lógica avanzada para detectar similitudes semánticas, sinónimos, conceptos relacionados, y conexiones indirectas entre la imagen y el problema reportado.
+
+SIEMPRE proporciona soluciones paso a paso usando el método Feynman, sin importar el nivel de relación detectado. Sé verboso, comprensivo y de apoyo. Explica cada paso como si fueras un mentor paciente enseñando a alguien que realmente quiere aprender. Usa analogías claras, ejemplos concretos, y un tono alentador que motive al usuario a seguir adelante. Recuerda: tu objetivo es ayudar genuinamente, no solo analizar."""
         
         # Realizar análisis con múltiples características
         features = [
@@ -2354,78 +2387,189 @@ def analyze_image():
                 for obj in response.localized_object_annotations
             ]
         
-        image_properties = {}
-        if response.image_properties_annotation:
-            if response.image_properties_annotation.dominant_colors:
-                image_properties['dominant_colors'] = [
-                    {
-                        'color': {
-                            'red': color.color.red,
-                            'green': color.color.green,
-                            'blue': color.color.blue
-                        },
-                        'score': color.score,
-                        'pixel_fraction': color.pixel_fraction
-                    }
-                    for color in response.image_properties_annotation.dominant_colors.colors
-                ]
+        # Diccionario de traducción de elementos detectados
+        translation_dict = {
+            'lips': 'labios', 'skin': 'piel', 'jaw': 'mandíbula', 'facial expression': 'expresión facial',
+            'tooth': 'dientes', 'close-up': 'primer plano', 'eyelash': 'pestañas', 'pink': 'rosa',
+            'lipstick': 'pintalabios', 'muscle': 'músculo', 'hair': 'cabello', 'eye': 'ojo',
+            'nose': 'nariz', 'cheek': 'mejilla', 'forehead': 'frente', 'chin': 'barbilla',
+            'eyebrow': 'ceja', 'mouth': 'boca', 'face': 'cara', 'head': 'cabeza',
+            'person': 'persona', 'woman': 'mujer', 'man': 'hombre', 'child': 'niño',
+            'smile': 'sonrisa', 'frown': 'ceño fruncido', 'anger': 'enojo', 'happiness': 'felicidad',
+            'sadness': 'tristeza', 'fear': 'miedo', 'surprise': 'sorpresa', 'disgust': 'asco',
+            'clothing': 'ropa', 'shirt': 'camisa', 'dress': 'vestido', 'pants': 'pantalones',
+            'shoes': 'zapatos', 'hat': 'sombrero', 'glasses': 'anteojos', 'jewelry': 'joyería',
+            'watch': 'reloj', 'ring': 'anillo', 'necklace': 'collar', 'earring': 'arete',
+            'hand': 'mano', 'finger': 'dedo', 'arm': 'brazo', 'leg': 'pierna', 'foot': 'pie',
+            'body': 'cuerpo', 'torso': 'torso', 'back': 'espalda', 'chest': 'pecho',
+            'stomach': 'estómago', 'waist': 'cintura', 'hip': 'cadera', 'thigh': 'muslo',
+            'knee': 'rodilla', 'ankle': 'tobillo', 'heel': 'talón', 'toe': 'dedo del pie',
+            'nail': 'uña', 'thumb': 'pulgar', 'index finger': 'índice', 'middle finger': 'medio',
+            'ring finger': 'anular', 'little finger': 'meñique', 'palm': 'palma', 'wrist': 'muñeca',
+            'elbow': 'codo', 'shoulder': 'hombro', 'neck': 'cuello', 'throat': 'garganta',
+            'cheekbone': 'pómulo', 'temple': 'sien', 'forehead': 'frente', 'eyebrow': 'ceja',
+            'eyelid': 'párpado', 'eyelash': 'pestaña', 'iris': 'iris', 'pupil': 'pupila',
+            'sclera': 'esclerótica', 'tear': 'lágrima', 'teardrop': 'gota de lágrima',
+            'wrinkle': 'arruga', 'line': 'línea', 'spot': 'mancha', 'mole': 'lunar',
+            'freckle': 'peca', 'scar': 'cicatriz', 'cut': 'corte', 'wound': 'herida',
+            'bruise': 'moretón', 'swelling': 'hinchazón', 'redness': 'enrojecimiento',
+            'inflammation': 'inflamación', 'rash': 'erupción', 'acne': 'acné', 'pimple': 'espinilla',
+            'blackhead': 'punto negro', 'whitehead': 'punto blanco', 'cyst': 'quiste',
+            'tumor': 'tumor', 'growth': 'crecimiento', 'lump': 'bulto', 'bump': 'protuberancia',
+            'blister': 'ampolla', 'burn': 'quemadura', 'sunburn': 'quemadura solar',
+            'tan': 'bronceado', 'pale': 'pálido', 'dark': 'oscuro', 'light': 'claro',
+            'fair': 'justo', 'beautiful': 'hermoso', 'pretty': 'bonito', 'handsome': 'guapo',
+            'ugly': 'feo', 'attractive': 'atractivo', 'unattractive': 'poco atractivo',
+            'young': 'joven', 'old': 'viejo', 'middle-aged': 'de mediana edad', 'elderly': 'anciano',
+            'baby': 'bebé', 'toddler': 'niño pequeño', 'teenager': 'adolescente',
+            'adult': 'adulto', 'senior': 'mayor', 'infant': 'infante', 'newborn': 'recién nacido'
+        }
         
-        # Generar análisis detallado
-        analysis_parts = []
+        # Función para traducir elementos
+        def translate_element(element):
+            element_lower = element.lower()
+            return translation_dict.get(element_lower, element)
         
-        # Análisis general basado en etiquetas
+        # Generar análisis enfocado en describir qué se ve
+        analysis_text = f"Análisis de la imagen para el ticket #{ticket_id}. "
+        
+        # Describir qué se ve en la imagen
         if labels:
-            high_confidence_labels = [label for label in labels if label['score'] > 0.7]
-            if high_confidence_labels:
-                analysis_parts.append(f"Elementos principales detectados: {', '.join([label['description'] for label in high_confidence_labels])}")
+            # Obtener los elementos más relevantes
+            top_labels = sorted(labels, key=lambda x: x['score'], reverse=True)[:10]
+            
+            # Traducir elementos al español
+            translated_elements = []
+            for label in top_labels:
+                translated = translate_element(label['description'])
+                translated_elements.append(f"{translated} ({int(label['score'] * 100)}%)")
+            
+            analysis_text += f"La imagen muestra los siguientes elementos: {', '.join(translated_elements[:5])}. "
+            
+            # Describir el contexto general de la imagen
+            if any('person' in label['description'].lower() or 'face' in label['description'].lower() for label in top_labels):
+                analysis_text += "Se trata de una imagen que incluye una persona o rostro. "
+            elif any('clothing' in label['description'].lower() or 'shirt' in label['description'].lower() for label in top_labels):
+                analysis_text += "La imagen muestra elementos de ropa o vestimenta. "
+            elif any('hand' in label['description'].lower() or 'finger' in label['description'].lower() for label in top_labels):
+                analysis_text += "La imagen incluye manos o dedos. "
         
-        # Análisis de texto
+        # Lógica avanzada de similitudes semánticas
+        context_keywords = []
+        if ticket_title:
+            context_keywords.extend(ticket_title.lower().split())
+        if ticket_description:
+            context_keywords.extend(ticket_description.lower().split())
+        if additional_details:
+            context_keywords.extend(additional_details.lower().split())
+        
+        image_keywords = []
+        if labels:
+            image_keywords.extend([label['description'].lower() for label in labels if label['score'] > 0.6])
+        
+        # Diccionario de sinónimos y conceptos relacionados
+        semantic_relations = {
+            'piel': ['skin', 'cutáneo', 'dermatológico', 'epidermis', 'dermis', 'tejido', 'superficie'],
+            'dolor': ['pain', 'ache', 'hurt', 'suffering', 'discomfort', 'agony', 'soreness'],
+            'error': ['error', 'bug', 'fault', 'mistake', 'problem', 'issue', 'glitch', 'failure'],
+            'problema': ['problem', 'issue', 'trouble', 'difficulty', 'challenge', 'obstacle'],
+            'herida': ['wound', 'injury', 'cut', 'scratch', 'lesion', 'trauma', 'damage'],
+            'inflamación': ['inflammation', 'swelling', 'redness', 'irritation', 'soreness'],
+            'enrojecimiento': ['redness', 'red', 'inflamed', 'irritated', 'sore'],
+            'mancha': ['spot', 'stain', 'mark', 'blemish', 'patch', 'discoloration'],
+            'equipo': ['equipment', 'device', 'machine', 'tool', 'apparatus', 'instrument'],
+            'pantalla': ['screen', 'display', 'monitor', 'interface', 'window'],
+            'cable': ['cable', 'wire', 'cord', 'connection', 'link', 'connector'],
+            'botón': ['button', 'switch', 'control', 'key', 'press', 'click'],
+            'archivo': ['file', 'document', 'data', 'information', 'record'],
+            'programa': ['program', 'software', 'application', 'app', 'system'],
+            'internet': ['internet', 'network', 'connection', 'online', 'web', 'browser'],
+            'correo': ['email', 'mail', 'message', 'communication', 'correspondence'],
+            'contraseña': ['password', 'pass', 'key', 'code', 'access', 'security'],
+            'usuario': ['user', 'person', 'account', 'profile', 'member'],
+            'sistema': ['system', 'platform', 'environment', 'framework', 'structure']
+        }
+        
+        # Buscar coincidencias directas e indirectas
+        direct_matches = set(context_keywords) & set(image_keywords)
+        semantic_matches = set()
+        
+        for context_word in context_keywords:
+            for semantic_key, related_words in semantic_relations.items():
+                if context_word in semantic_key or any(context_word in word for word in related_words):
+                    for image_word in image_keywords:
+                        if image_word in related_words or any(image_word in word for word in related_words):
+                            semantic_matches.add((context_word, image_word))
+        
+        # Calcular relación mejorada
+        total_matches = len(direct_matches) + len(semantic_matches)
+        total_context_words = len(context_keywords)
+        relation_percentage = (total_matches / total_context_words * 100) if total_context_words > 0 else 0
+        
+        # Explicación estándar de lo que se ve en la imagen
+        analysis_text += "\n\n📋 DESCRIPCIÓN DE LA IMAGEN:\n"
+        
+        # Describir el tipo de imagen
+        if labels:
+            top_labels = sorted(labels, key=lambda x: x['score'], reverse=True)[:5]
+            main_elements = [translate_element(label['description']) for label in top_labels]
+            analysis_text += f"La imagen muestra principalmente: {', '.join(main_elements)}.\n"
+            
+            # Describir el contexto general
+            if any('person' in label['description'].lower() or 'face' in label['description'].lower() for label in top_labels):
+                analysis_text += "Se trata de una imagen que incluye una persona o rostro humano.\n"
+            elif any('clothing' in label['description'].lower() or 'shirt' in label['description'].lower() for label in top_labels):
+                analysis_text += "La imagen muestra elementos de ropa o vestimenta.\n"
+            elif any('hand' in label['description'].lower() or 'finger' in label['description'].lower() for label in top_labels):
+                analysis_text += "La imagen incluye manos o dedos.\n"
+            elif any('equipment' in label['description'].lower() or 'device' in label['description'].lower() for label in top_labels):
+                analysis_text += "La imagen muestra equipos o dispositivos.\n"
+            else:
+                analysis_text += "La imagen presenta elementos diversos que requieren análisis detallado.\n"
+        
+        # Análisis de calidad de la imagen
+        if labels:
+            high_confidence_count = len([l for l in labels if l['score'] > 0.8])
+            if high_confidence_count >= 3:
+                analysis_text += "La imagen tiene buena calidad y elementos claramente identificables.\n"
+            elif high_confidence_count >= 1:
+                analysis_text += "La imagen tiene calidad aceptable con algunos elementos identificables.\n"
+            else:
+                analysis_text += "La imagen puede tener calidad limitada o elementos poco claros.\n"
+        
+        # Análisis directo de relación imagen-contexto
+        if context_description:
+            analysis_text += f"\n\n🔍 ANÁLISIS DE RELACIÓN CON EL PROBLEMA:\n"
+            analysis_text += f"Problema reportado: \"{ticket_description}\"\n"
+            analysis_text += f"Título del ticket: \"{ticket_title}\"\n"
+            
+            # Verificar relación entre imagen y problema
+            if relation_percentage >= 10:
+                analysis_text += f"\n✅ RELACIÓN DETECTADA: La imagen muestra elementos relacionados con tu problema. Los elementos visuales coinciden con la descripción del problema ({relation_percentage:.1f}% de coincidencia).\n"
+            elif relation_percentage >= 5:
+                analysis_text += f"\n⚠️ RELACIÓN PARCIAL: La imagen tiene algunos elementos relacionados con tu problema, pero no es una coincidencia completa ({relation_percentage:.1f}% de coincidencia).\n"
+            else:
+                analysis_text += f"\n❌ SIN RELACIÓN: La imagen no muestra elementos claramente relacionados con tu problema ({relation_percentage:.1f}% de coincidencia). Se recomienda subir una imagen más específica del problema.\n"
+        
+        # Análisis de texto detectado
         if text_detections:
             main_text = text_detections[0]['description'] if text_detections else ""
-            if main_text:
-                analysis_parts.append(f"Texto detectado en la imagen: {main_text}")
-        
-        # Análisis de objetos específicos
-        if objects:
-            high_confidence_objects = [obj for obj in objects if obj['score'] > 0.7]
-            if high_confidence_objects:
-                analysis_parts.append(f"Objetos identificados: {', '.join([obj['name'] for obj in high_confidence_objects])}")
-        
-        # Análisis de colores
-        if image_properties.get('dominant_colors'):
-            dominant_color = image_properties['dominant_colors'][0]
-            color_info = f"Color dominante: RGB({dominant_color['color']['red']}, {dominant_color['color']['green']}, {dominant_color['color']['blue']})"
-            analysis_parts.append(color_info)
-        
-        # Construir análisis final
-        base_analysis = " ".join(analysis_parts) if analysis_parts else "No se pudieron identificar elementos específicos en la imagen."
-        
-        # Agregar contexto del problema
-        if context_description:
-            final_analysis = f"Análisis de imagen con contexto: {context_description}\n\nAnálisis visual: {base_analysis}"
-        else:
-            final_analysis = f"Análisis visual: {base_analysis}"
-        
-        # Preparar respuesta
-        result = {
-            "analysis": final_analysis,
-            "labels": labels,
-            "text": text_detections,
-            "objects": objects,
-            "image_properties": image_properties,
-            "context_used": use_ticket_context,
-            "ticket_id": ticket_id
-        }
+            if main_text and len(main_text.strip()) > 3:
+                analysis_text += f"\n📝 TEXTO DETECTADO: \"{main_text}\" - Esta información puede ser útil para el diagnóstico.\n"
         
         return jsonify({
             "message": "Análisis completado exitosamente",
-            "result": result
+            "analysis": analysis_text,
+            "labels": labels,
+            "text_detections": text_detections,
+            "objects": objects,
+            "ticket_id": ticket_id
         }), 200
         
     except Exception as e:
-        print(f"Error en análisis de imagen: {str(e)}")
         return jsonify({
-            "message": f"Error al analizar la imagen: {str(e)}"
+            "message": "Error al analizar la imagen",
+            "error": str(e)
         }), 500
 
 
