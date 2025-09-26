@@ -1,99 +1,29 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { GoogleMap, useJsApiLoader, HeatmapLayer, Marker, InfoWindow } from '@react-google-maps/api';
-
-// Mover libraries fuera del componente para evitar recreación
-const libraries = ['visualization'];
-
-// Suprimir warnings específicos de Google Maps API
-const suppressGoogleMapsWarnings = () => {
-    const originalConsoleWarn = console.warn;
-    console.warn = (...args) => {
-        const message = args.join(' ');
-        // Suprimir warnings específicos de Google Maps
-        if (
-            message.includes('google.maps.places.Autocomplete is not available to new customers') ||
-            message.includes('google.maps.Marker is deprecated') ||
-            message.includes('Please use google.maps.marker.AdvancedMarkerElement') ||
-            message.includes('Please use google.maps.places.PlaceAutocompleteElement')
-        ) {
-            return; // No mostrar estos warnings
-        }
-        originalConsoleWarn.apply(console, args);
-    };
-};
+import React, { useState, useEffect, useRef } from 'react';
+import { useGoogleMaps } from '../hooks/useGoogleMaps';
+import useGlobalReducer from '../hooks/useGlobalReducer';
 
 const HeatmapComponent = () => {
+    const mapRef = useRef(null);
+    const mapInstanceRef = useRef(null);
+    const markersRef = useRef([]);
     const [heatmapData, setHeatmapData] = useState([]);
     const [rawData, setRawData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedMarker, setSelectedMarker] = useState(null);
-    const [showMarkers, setShowMarkers] = useState(true);
-    const [mapCenter, setMapCenter] = useState({
-        lat: 4.6097, // Bogotá, Colombia como centro por defecto
-        lng: -74.0817
-    });
-    const mapRef = useRef(null);
+    const [showMarkers, setShowMarkers] = useState(false);
+    const [mapCenter, setMapCenter] = useState({ lat: 19.4326, lng: -99.1332 });
+    const { isLoaded, error: googleMapsError } = useGoogleMaps();
+    const { store } = useGlobalReducer();
 
-    const { isLoaded } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-        libraries: libraries
-    });
-
-    // Activar supresión de warnings al cargar el componente
-    useEffect(() => {
-        suppressGoogleMapsWarnings();
-    }, []);
-
-    // Configuración del mapa
-    const mapContainerStyle = {
-        width: '100%',
-        height: '600px'
-    };
-
-    const options = {
-        disableDefaultUI: false,
-        zoomControl: true,
-        streetViewControl: false,
-        mapTypeControl: true,
-        fullscreenControl: true,
-        styles: [
-            {
-                featureType: "poi",
-                elementType: "labels",
-                stylers: [{ visibility: "off" }]
-            }
-        ]
-    };
-
-    // Función para navegar a un punto específico
-    const goToLocation = useCallback((lat, lng, zoom = 15) => {
-        if (mapRef.current) {
-            mapRef.current.panTo({ lat, lng });
-            mapRef.current.setZoom(zoom);
-        }
-    }, []);
-
-    // Función para centrar en todos los puntos
-    const centerOnAllPoints = useCallback(() => {
-        if (rawData.length > 0 && mapRef.current) {
-            const bounds = new window.google.maps.LatLngBounds();
-            rawData.forEach(point => {
-                bounds.extend(new window.google.maps.LatLng(point.lat, point.lng));
-            });
-            mapRef.current.fitBounds(bounds);
-        }
-    }, [rawData]);
-
-    // Función para obtener datos del mapa de calor
-    const fetchHeatmapData = useCallback(async () => {
+    const fetchHeatmapData = async () => {
         try {
             setLoading(true);
-            const token = localStorage.getItem('administrador');
 
+            // Obtener token del store
+            const token = store.auth.token;
             if (!token) {
-                throw new Error('No hay token de autenticación');
+                throw new Error('Token de autorización no encontrado');
             }
 
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/heatmap-data`, {
@@ -106,265 +36,408 @@ const HeatmapComponent = () => {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Error del servidor:', errorText);
-                throw new Error(`Error ${response.status}: ${response.statusText} - ${errorText}`);
+                throw new Error(`Error ${response.status}: ${errorText}`);
             }
 
-            const result = await response.json();
+            const responseData = await response.json();
 
-            if (result.data && result.data.length > 0) {
-                // Guardar datos raw para marcadores
-                setRawData(result.data);
+            // El backend devuelve { message, data, total_points }
+            const data = responseData.data || [];
 
-                // Convertir datos para HeatmapLayer con pesos dinámicos
-                const heatmapPoints = result.data.map((point, index) => ({
-                    location: new window.google.maps.LatLng(point.lat, point.lng),
-                    weight: Math.max(0.5, Math.min(2.0, 1 + (index % 3) * 0.3)) // Peso variable para mejor visualización
-                }));
-                setHeatmapData(heatmapPoints);
-
-                // Calcular centro del mapa basado en los datos
-                if (result.data.length > 0) {
-                    const avgLat = result.data.reduce((sum, point) => sum + point.lat, 0) / result.data.length;
-                    const avgLng = result.data.reduce((sum, point) => sum + point.lng, 0) / result.data.length;
-                    setMapCenter({ lat: avgLat, lng: avgLng });
-                }
-            } else {
+            // Validar que data es un array
+            if (!Array.isArray(data)) {
+                console.warn('Datos recibidos no son un array:', data);
                 setRawData([]);
                 setHeatmapData([]);
+                setError('Formato de datos inválido');
+                return;
             }
+
+            setRawData(data);
+
+            // Procesar datos para el heatmap con pesos dinámicos
+            const processedData = data.map((item, index) => ({
+                location: new window.google.maps.LatLng(item.lat, item.lng),
+                weight: Math.max(1, Math.min(10, (index + 1) * 0.5)) // Peso dinámico basado en el índice
+            }));
+
+            setHeatmapData(processedData);
+            setError(null);
         } catch (err) {
-            console.error('Error al obtener datos del mapa de calor:', err);
+            console.error('Error fetching heatmap data:', err);
             setError(err.message);
         } finally {
             setLoading(false);
         }
-    }, []);
+    };
 
     useEffect(() => {
-        if (isLoaded) {
+        if (isLoaded && !googleMapsError) {
             fetchHeatmapData();
         }
-    }, [isLoaded, fetchHeatmapData]);
+    }, [isLoaded, googleMapsError]);
 
-    const onLoad = useCallback((map) => {
-        mapRef.current = map;
-        console.log('Mapa cargado');
-    }, []);
+    const initializeMap = () => {
+        if (!window.google || !window.google.maps || !mapRef.current) return;
 
-    const onUnmount = useCallback((map) => {
-        mapRef.current = null;
-        console.log('Mapa desmontado');
-    }, []);
+        const map = new window.google.maps.Map(mapRef.current, {
+            center: mapCenter,
+            zoom: 10,
+            mapTypeControl: true,
+            streetViewControl: true,
+            fullscreenControl: true,
+            zoomControl: true
+        });
+
+        // Guardar referencia del mapa
+        mapInstanceRef.current = map;
+
+        // Crear marcadores de calor (alternativa al HeatmapLayer deprecado)
+        if (heatmapData.length > 0) {
+            heatmapData.forEach((point, index) => {
+                // Crear marcador con tamaño basado en el peso
+                const size = Math.max(8, Math.min(20, point.weight * 2));
+                const opacity = Math.max(0.3, Math.min(0.9, point.weight / 10));
+
+                const marker = new window.google.maps.Marker({
+                    position: point.location,
+                    map: map,
+                    title: `Cliente ${index + 1}`,
+                    icon: {
+                        path: window.google.maps.SymbolPath.CIRCLE,
+                        fillColor: '#ff0000',
+                        fillOpacity: opacity,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                        scale: size
+                    },
+                    zIndex: 1000 + index
+                });
+
+                // Buscar el cliente correspondiente en rawData
+                const clientData = rawData.find(client =>
+                    Math.abs(client.lat - point.location.lat()) < 0.0001 &&
+                    Math.abs(client.lng - point.location.lng()) < 0.0001
+                );
+
+                // Crear InfoWindow con información del cliente
+                const infoWindow = new window.google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 12px; max-width: 300px; font-family: Arial, sans-serif;">
+                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #ff6b6b, #ff8e8e); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                                    <i class="fas fa-user" style="color: white; font-size: 16px;"></i>
+                                </div>
+                                <div>
+                                    <h6 style="margin: 0; color: #333; font-weight: bold; font-size: 14px;">
+                                        ${clientData ? `${clientData.nombre} ${clientData.apellido || ''}` : 'Cliente'}
+                                    </h6>
+                                    <p style="margin: 2px 0 0 0; color: #666; font-size: 12px;">
+                                        <i class="fas fa-envelope" style="margin-right: 4px;"></i>
+                                        ${clientData ? clientData.email : 'Email no disponible'}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div style="border-top: 1px solid #eee; padding-top: 8px;">
+                                <p style="margin: 4px 0; color: #555; font-size: 12px;">
+                                    <i class="fas fa-map-marker-alt" style="color: #ff6b6b; margin-right: 6px;"></i>
+                                    <strong>Dirección:</strong> ${clientData ? (clientData.direccion || 'No especificada') : 'No disponible'}
+                                </p>
+                                ${clientData && clientData.telefono ? `
+                                    <p style="margin: 4px 0; color: #555; font-size: 12px;">
+                                        <i class="fas fa-phone" style="color: #2196F3; margin-right: 6px;"></i>
+                                        <strong>Teléfono:</strong> ${clientData.telefono}
+                                    </p>
+                                ` : ''}
+                                <p style="margin: 4px 0; color: #555; font-size: 12px;">
+                                    <i class="fas fa-map-pin" style="color: #4CAF50; margin-right: 6px;"></i>
+                                    <strong>Coordenadas:</strong> ${point.location.lat().toFixed(6)}, ${point.location.lng().toFixed(6)}
+                                </p>
+                            </div>
+                            
+                            <div style="margin-top: 8px; padding: 6px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #ff6b6b;">
+                                <p style="margin: 0; color: #666; font-size: 11px; font-style: italic;">
+                                    <i class="fas fa-info-circle" style="margin-right: 4px;"></i>
+                                    Haz clic para ver más detalles y opciones de navegación
+                                </p>
+                            </div>
+                        </div>
+                    `
+                });
+
+                // Mostrar InfoWindow al hacer hover solo si los marcadores están habilitados
+                marker.addListener('mouseover', () => {
+                    if (showMarkers) {
+                        infoWindow.open(map, marker);
+                    }
+                });
+
+                // Ocultar InfoWindow al salir del hover
+                marker.addListener('mouseout', () => {
+                    infoWindow.close();
+                });
+            });
+        }
+
+        // Limpiar marcadores existentes
+        markersRef.current.forEach(marker => {
+            marker.setMap(null);
+        });
+        markersRef.current = [];
+
+        // Crear marcadores si están habilitados
+        if (showMarkers && rawData.length > 0) {
+            rawData.forEach((item, index) => {
+                const marker = new window.google.maps.Marker({
+                    position: { lat: item.lat, lng: item.lng },
+                    map: map,
+                    title: `${item.nombre} - ${item.email}`,
+                    icon: {
+                        path: window.google.maps.SymbolPath.CIRCLE,
+                        fillColor: '#ff0000',
+                        fillOpacity: 0.8,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                        scale: 8
+                    }
+                });
+
+                // Crear InfoWindow con información completa del cliente
+                const infoWindow = new window.google.maps.InfoWindow({
+                    content: `
+                        <div style="padding: 12px; max-width: 300px; font-family: Arial, sans-serif;">
+                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #ff6b6b, #ff8e8e); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                                    <i class="fas fa-user" style="color: white; font-size: 16px;"></i>
+                                </div>
+                                <div>
+                                    <h6 style="margin: 0; color: #333; font-weight: bold; font-size: 14px;">
+                                        ${item.nombre} ${item.apellido || ''}
+                                    </h6>
+                                    <p style="margin: 2px 0 0 0; color: #666; font-size: 12px;">
+                                        <i class="fas fa-envelope" style="margin-right: 4px;"></i>
+                                        ${item.email}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div style="border-top: 1px solid #eee; padding-top: 8px;">
+                                <p style="margin: 4px 0; color: #555; font-size: 12px;">
+                                    <i class="fas fa-map-marker-alt" style="color: #ff6b6b; margin-right: 6px;"></i>
+                                    <strong>Dirección:</strong> ${item.direccion || 'No especificada'}
+                                </p>
+                                <p style="margin: 4px 0; color: #555; font-size: 12px;">
+                                    <i class="fas fa-map-pin" style="color: #4CAF50; margin-right: 6px;"></i>
+                                    <strong>Coordenadas:</strong> ${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}
+                                </p>
+                                ${item.telefono ? `
+                                    <p style="margin: 4px 0; color: #555; font-size: 12px;">
+                                        <i class="fas fa-phone" style="color: #2196F3; margin-right: 6px;"></i>
+                                        <strong>Teléfono:</strong> ${item.telefono}
+                                    </p>
+                                ` : ''}
+                            </div>
+                            
+                            <div style="margin-top: 8px; padding: 6px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #ff6b6b;">
+                                <p style="margin: 0; color: #666; font-size: 11px; font-style: italic;">
+                                    <i class="fas fa-info-circle" style="margin-right: 4px;"></i>
+                                    Haz clic para ver más detalles y opciones de navegación
+                                </p>
+                            </div>
+                        </div>
+                    `
+                });
+
+                // Mostrar InfoWindow al hacer hover solo si los marcadores están habilitados
+                marker.addListener('mouseover', () => {
+                    if (showMarkers) {
+                        infoWindow.open(map, marker);
+                    }
+                });
+
+                // Ocultar InfoWindow al salir del hover
+                marker.addListener('mouseout', () => {
+                    infoWindow.close();
+                });
+
+                marker.addListener('click', () => {
+                    setSelectedMarker({
+                        id: index,
+                        data: item,
+                        marker: marker
+                    });
+                });
+
+                // Guardar referencia del marcador
+                markersRef.current.push(marker);
+            });
+        }
+    };
+
+    useEffect(() => {
+        if (isLoaded && !googleMapsError && heatmapData.length > 0) {
+            initializeMap();
+        }
+    }, [isLoaded, googleMapsError, heatmapData, showMarkers]);
+
+    const goToLocation = (lat, lng) => {
+        if (mapInstanceRef.current) {
+            mapInstanceRef.current.setCenter({ lat, lng });
+            mapInstanceRef.current.setZoom(15);
+        }
+    };
+
+    const centerOnAllPoints = () => {
+        if (rawData.length === 0 || !mapInstanceRef.current) return;
+
+        const bounds = new window.google.maps.LatLngBounds();
+        rawData.forEach(item => {
+            bounds.extend(new window.google.maps.LatLng(item.lat, item.lng));
+        });
+
+        mapInstanceRef.current.fitBounds(bounds);
+
+        // Ajustar el zoom si es necesario
+        const listener = window.google.maps.event.addListener(mapInstanceRef.current, 'bounds_changed', () => {
+            if (mapInstanceRef.current.getZoom() > 15) {
+                mapInstanceRef.current.setZoom(15);
+            }
+            window.google.maps.event.removeListener(listener);
+        });
+    };
 
     if (!isLoaded) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ height: '500px' }}>
-                <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Cargando mapa...</span>
+                <div className="text-center">
+                    <div className="spinner-border text-primary mb-3" role="status">
+                        <span className="visually-hidden">Cargando mapa...</span>
+                    </div>
+                    <p className="text-muted">Cargando Google Maps...</p>
                 </div>
             </div>
         );
     }
 
+    if (googleMapsError) {
+        return (
+            <div className="alert alert-danger" role="alert">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                Error al cargar Google Maps: {googleMapsError.message}
+            </div>
+        );
+    }
+
+    if (loading) {
+        return (
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '500px' }}>
+                <div className="text-center">
+                    <div className="spinner-border text-primary mb-3" role="status">
+                        <span className="visually-hidden">Cargando datos...</span>
+                    </div>
+                    <p className="text-muted">Cargando datos del mapa de calor...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="alert alert-danger" role="alert">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                Error al cargar el mapa de calor: {error}
+            </div>
+        );
+    }
+
     return (
-        <div className="card">
-            <div className="card-header">
+        <div className="heatmap-container">
+            <div className="d-flex justify-content-between align-items-center mb-3">
                 <h5 className="mb-0">
-                    <i className="fas fa-fire me-2"></i>
-                    Mapa de Calor - Distribución de Clientes
+                    <i className="fas fa-map-marker-alt me-2 text-danger"></i>
+                    Mapa de Distribución de Clientes
                 </h5>
+                <div className="btn-group" role="group">
+                    <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm"
+                        onClick={() => setShowMarkers(!showMarkers)}
+                    >
+                        <i className="fas fa-map-marker-alt me-1"></i>
+                        {showMarkers ? 'Ocultar' : 'Mostrar'} Marcadores
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-outline-success btn-sm"
+                        onClick={centerOnAllPoints}
+                    >
+                        <i className="fas fa-expand-arrows-alt me-1"></i>
+                        Ver Todos
+                    </button>
+                </div>
             </div>
-            <div className="card-body">
-                {loading && (
-                    <div className="d-flex justify-content-center align-items-center" style={{ height: '200px' }}>
-                        <div className="spinner-border text-primary" role="status">
-                            <span className="visually-hidden">Cargando datos...</span>
+
+            <div className="map-container" style={{ height: '500px', width: '100%', position: 'relative' }}>
+                <div
+                    ref={mapRef}
+                    style={{ height: '100%', width: '100%', borderRadius: '8px' }}
+                />
+            </div>
+
+            {selectedMarker && (
+                <div className="mt-3">
+                    <div className="card">
+                        <div className="card-header">
+                            <h6 className="mb-0">
+                                <i className="fas fa-user me-2"></i>
+                                Información del Cliente
+                            </h6>
+                        </div>
+                        <div className="card-body">
+                            <p><strong>Nombre:</strong> {selectedMarker.data.nombre} {selectedMarker.data.apellido}</p>
+                            <p><strong>Email:</strong> {selectedMarker.data.email}</p>
+                            <p><strong>Dirección:</strong> {selectedMarker.data.direccion}</p>
+                            <p><strong>Coordenadas:</strong> {selectedMarker.data.lat.toFixed(6)}, {selectedMarker.data.lng.toFixed(6)}</p>
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => goToLocation(selectedMarker.data.lat, selectedMarker.data.lng)}
+                            >
+                                <i className="fas fa-crosshairs me-1"></i>
+                                Acercar
+                            </button>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {error && (
-                    <div className="alert alert-danger" role="alert">
-                        <i className="fas fa-exclamation-triangle me-2"></i>
-                        Error al cargar el mapa de calor: {error}
-                    </div>
-                )}
-
-                {!loading && !error && (
-                    <>
-                        <div className="mb-3 d-flex justify-content-between align-items-center">
-                            <div>
-                                <small className="text-muted">
-                                    <i className="fas fa-info-circle me-1"></i>
-                                    Puntos de calor: {heatmapData.length} ubicaciones de clientes
-                                </small>
-                            </div>
-                            <div className="btn-group" role="group">
-                                <button
-                                    className={`btn btn-sm ${showMarkers ? 'btn-primary' : 'btn-outline-primary'}`}
-                                    onClick={() => setShowMarkers(!showMarkers)}
-                                >
-                                    <i className="fas fa-map-marker-alt me-1"></i>
-                                    {showMarkers ? 'Ocultar' : 'Mostrar'} Marcadores
-                                </button>
-                                <button
-                                    className="btn btn-sm btn-outline-secondary"
-                                    onClick={centerOnAllPoints}
-                                >
-                                    <i className="fas fa-expand-arrows-alt me-1"></i>
-                                    Ver Todos
-                                </button>
-                            </div>
-                        </div>
-
-                        <GoogleMap
-                            mapContainerStyle={mapContainerStyle}
-                            center={mapCenter}
-                            zoom={rawData.length > 0 ? 12 : 10}
-                            onLoad={onLoad}
-                            onUnmount={onUnmount}
-                            options={options}
-                        >
-                            {heatmapData.length > 0 && (
-                                <HeatmapLayer
-                                    data={heatmapData}
-                                    options={{
-                                        radius: 30,
-                                        opacity: 0.7,
-                                        maxIntensity: 2,
-                                        gradient: [
-                                            'rgba(0, 255, 255, 0)',
-                                            'rgba(0, 255, 255, 1)',
-                                            'rgba(0, 191, 255, 1)',
-                                            'rgba(0, 127, 255, 1)',
-                                            'rgba(0, 63, 255, 1)',
-                                            'rgba(0, 0, 255, 1)',
-                                            'rgba(0, 0, 223, 1)',
-                                            'rgba(0, 0, 191, 1)',
-                                            'rgba(0, 0, 159, 1)',
-                                            'rgba(0, 0, 127, 1)',
-                                            'rgba(63, 0, 127, 1)',
-                                            'rgba(127, 0, 127, 1)',
-                                            'rgba(191, 0, 127, 1)',
-                                            'rgba(255, 0, 127, 1)',
-                                            'rgba(255, 0, 63, 1)',
-                                            'rgba(255, 0, 0, 1)'
-                                        ]
-                                    }}
-                                />
-                            )}
-
-                            {showMarkers && rawData.map((point, index) => (
-                                <Marker
-                                    key={point.id || index}
-                                    position={{ lat: point.lat, lng: point.lng }}
-                                    onClick={() => setSelectedMarker(point)}
-                                    icon={{
-                                        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                                            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                                                <circle cx="16" cy="16" r="12" fill="#ff6b6b" stroke="#fff" stroke-width="3"/>
-                                                <text x="16" y="20" text-anchor="middle" fill="white" font-size="12" font-weight="bold">${index + 1}</text>
-                                            </svg>
-                                        `),
-                                        scaledSize: new window.google.maps.Size(32, 32),
-                                        anchor: new window.google.maps.Point(16, 16)
-                                    }}
-                                />
-                            ))}
-
-                            {selectedMarker && (
-                                <InfoWindow
-                                    position={{ lat: selectedMarker.lat, lng: selectedMarker.lng }}
-                                    onCloseClick={() => setSelectedMarker(null)}
-                                >
-                                    <div style={{ padding: '10px', minWidth: '200px' }}>
-                                        <h6 className="mb-2">
-                                            <i className="fas fa-user me-1"></i>
-                                            {selectedMarker.nombre}
-                                        </h6>
-                                        <p className="mb-1">
-                                            <i className="fas fa-envelope me-1"></i>
-                                            {selectedMarker.email}
-                                        </p>
-                                        <p className="mb-2">
+            {rawData.length > 0 && (
+                <div className="mt-3">
+                    <h6>
+                        <i className="fas fa-list me-2"></i>
+                        Sugerencias de Navegación
+                    </h6>
+                    <div className="row">
+                        {rawData.slice(0, 6).map((item, index) => (
+                            <div key={index} className="col-md-4 mb-2">
+                                <div className="card h-100">
+                                    <div className="card-body p-2">
+                                        <h6 className="card-title small mb-1">{item.nombre} {item.apellido}</h6>
+                                        <p className="card-text small text-muted mb-1">{item.email}</p>
+                                        <button
+                                            className="btn btn-outline-primary btn-sm w-100"
+                                            onClick={() => goToLocation(item.lat, item.lng)}
+                                        >
                                             <i className="fas fa-map-marker-alt me-1"></i>
-                                            {selectedMarker.direccion}
-                                        </p>
-                                        <div className="d-flex gap-2">
-                                            <button
-                                                className="btn btn-sm btn-primary"
-                                                onClick={() => {
-                                                    goToLocation(selectedMarker.lat, selectedMarker.lng, 18);
-                                                    setSelectedMarker(null);
-                                                }}
-                                            >
-                                                <i className="fas fa-search-plus me-1"></i>
-                                                Acercar
-                                            </button>
-                                            <button
-                                                className="btn btn-sm btn-outline-secondary"
-                                                onClick={() => setSelectedMarker(null)}
-                                            >
-                                                Cerrar
-                                            </button>
-                                        </div>
+                                            Ir a ubicación
+                                        </button>
                                     </div>
-                                </InfoWindow>
-                            )}
-                        </GoogleMap>
-
-                        {rawData.length > 0 && (
-                            <div className="mt-4">
-                                <h6 className="mb-3">
-                                    <i className="fas fa-lightbulb me-2"></i>
-                                    Sugerencias de Navegación
-                                </h6>
-                                <div className="row">
-                                    {rawData.slice(0, 6).map((point, index) => (
-                                        <div key={point.id || index} className="col-md-4 col-lg-2 mb-2">
-                                            <div
-                                                className="card h-100 cursor-pointer"
-                                                style={{ cursor: 'pointer' }}
-                                                onClick={() => goToLocation(point.lat, point.lng, 16)}
-                                            >
-                                                <div className="card-body p-2 text-center">
-                                                    <div className="mb-1">
-                                                        <i className="fas fa-map-marker-alt text-danger"></i>
-                                                    </div>
-                                                    <h6 className="card-title small mb-1" style={{ fontSize: '0.8rem' }}>
-                                                        {point.nombre.length > 15 ? point.nombre.substring(0, 15) + '...' : point.nombre}
-                                                    </h6>
-                                                    <p className="card-text small text-muted mb-0" style={{ fontSize: '0.7rem' }}>
-                                                        {point.direccion.length > 20 ? point.direccion.substring(0, 20) + '...' : point.direccion}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
                                 </div>
-                                {rawData.length > 6 && (
-                                    <div className="text-center mt-2">
-                                        <small className="text-muted">
-                                            Y {rawData.length - 6} ubicaciones más...
-                                        </small>
-                                    </div>
-                                )}
                             </div>
-                        )}
-
-                        {heatmapData.length === 0 && !loading && (
-                            <div className="text-center py-5">
-                                <i className="fas fa-map-marked-alt fa-3x text-muted mb-3"></i>
-                                <h6 className="text-muted">No hay datos de ubicación disponibles</h6>
-                                <p className="text-muted">
-                                    Los clientes no tienen coordenadas geográficas registradas.
-                                </p>
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

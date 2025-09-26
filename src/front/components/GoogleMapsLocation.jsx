@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useGoogleMaps } from '../hooks/useGoogleMaps';
 
 const GoogleMapsLocation = ({
     onLocationChange,
@@ -15,13 +16,31 @@ const GoogleMapsLocation = ({
         lat: initialLat || 19.4326,
         lng: initialLng || -99.1332
     });
+    const { isLoaded, error } = useGoogleMaps();
 
     useEffect(() => {
+        if (!isLoaded || error) return;
+
         const initializeMap = () => {
-            if (!window.google) {
-                console.error('Google Maps API no está cargada');
+            if (!window.google || !window.google.maps) {
+                console.error('Google Maps API no está disponible');
                 return;
             }
+
+            // Suprimir warnings específicos de Google Maps API
+            const originalConsoleWarn = console.warn;
+            console.warn = (...args) => {
+                const message = args.join(' ');
+                // Suprimir warnings específicos de Google Maps
+                if (
+                    message.includes('google.maps.Marker is deprecated') ||
+                    message.includes('Please use google.maps.marker.AdvancedMarkerElement') ||
+                    message.includes('As of February 21st, 2024, google.maps.Marker is deprecated')
+                ) {
+                    return; // No mostrar estos warnings
+                }
+                originalConsoleWarn.apply(console, args);
+            };
 
             // Inicializar el mapa
             const map = new window.google.maps.Map(mapRef.current, {
@@ -105,17 +124,8 @@ const GoogleMapsLocation = ({
             });
         };
 
-        // Cargar la API de Google Maps si no está cargada
-        if (!window.google) {
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=places`;
-            script.async = true;
-            script.defer = true;
-            script.onload = initializeMap;
-            document.head.appendChild(script);
-        } else {
-            initializeMap();
-        }
+        // Inicializar el mapa cuando Google Maps esté listo
+        initializeMap();
 
         return () => {
             // Cleanup
@@ -123,11 +133,35 @@ const GoogleMapsLocation = ({
                 markerRef.current.setMap(null);
             }
         };
-    }, []);
+    }, [isLoaded, error, coordinates.lat, coordinates.lng, onLocationChange]);
 
     const handleAddressChange = (e) => {
         setAddress(e.target.value);
     };
+
+    // Mostrar estado de carga
+    if (!isLoaded) {
+        return (
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
+                <div className="text-center">
+                    <div className="spinner-border text-primary mb-3" role="status">
+                        <span className="visually-hidden">Cargando mapa...</span>
+                    </div>
+                    <p className="text-muted">Cargando Google Maps...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Mostrar error
+    if (error) {
+        return (
+            <div className="alert alert-danger" role="alert">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                Error al cargar Google Maps: {error.message}
+            </div>
+        );
+    }
 
     return (
         <div className="google-maps-location">
