@@ -714,8 +714,42 @@ def delete_administrador(id):
 @api.route('/tickets', methods=['GET'])
 @require_role(['administrador', 'supervisor', 'analista'])
 def listar_tickets():
-    tickets = Ticket.query.all()
-    return jsonify([t.serialize() for t in tickets]), 200
+    try:
+        print("Iniciando consulta de tickets...")
+        tickets = Ticket.query.all()
+        print(f"Tickets encontrados: {len(tickets)}")
+        
+        # Serializar tickets uno por uno para identificar problemas
+        serialized_tickets = []
+        for i, ticket in enumerate(tickets):
+            try:
+                serialized_ticket = ticket.serialize()
+                serialized_tickets.append(serialized_ticket)
+            except Exception as serialize_error:
+                print(f"Error serializando ticket {ticket.id}: {str(serialize_error)}")
+                # Agregar ticket básico sin relaciones problemáticas
+                serialized_tickets.append({
+                    "id": ticket.id,
+                    "id_cliente": ticket.id_cliente,
+                    "estado": ticket.estado,
+                    "titulo": ticket.titulo,
+                    "descripcion": ticket.descripcion,
+                    "fecha_creacion": ticket.fecha_creacion.isoformat() if ticket.fecha_creacion else None,
+                    "fecha_cierre": ticket.fecha_cierre.isoformat() if ticket.fecha_cierre else None,
+                    "prioridad": ticket.prioridad,
+                    "calificacion": ticket.calificacion,
+                    "comentario": ticket.comentario,
+                    "fecha_evaluacion": ticket.fecha_evaluacion.isoformat() if ticket.fecha_evaluacion else None,
+                    "url_imagen": ticket.url_imagen,
+                    "cliente": None,
+                    "asignacion_actual": None
+                })
+        
+        print(f"Tickets serializados exitosamente: {len(serialized_tickets)}")
+        return jsonify(serialized_tickets), 200
+    except Exception as e:
+        print(f"Error en listar_tickets: {str(e)}")
+        return handle_general_error(e, "listar tickets")
 
 
 @api.route('/tickets', methods=['POST'])
