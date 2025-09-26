@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-const GoogleMapsLocation = ({ 
-    onLocationChange, 
-    initialAddress = '', 
-    initialLat = null, 
-    initialLng = null 
+const GoogleMapsLocation = ({
+    onLocationChange,
+    initialAddress = '',
+    initialLat = null,
+    initialLng = null
 }) => {
     const mapRef = useRef(null);
     const autocompleteRef = useRef(null);
@@ -12,7 +12,7 @@ const GoogleMapsLocation = ({
     const mapInstanceRef = useRef(null);
     const [address, setAddress] = useState(initialAddress);
     const [coordinates, setCoordinates] = useState({
-        lat: initialLat || 19.4326,  
+        lat: initialLat || 19.4326,
         lng: initialLng || -99.1332
     });
 
@@ -56,14 +56,14 @@ const GoogleMapsLocation = ({
                 if (place.geometry && place.geometry.location) {
                     const lat = place.geometry.location.lat();
                     const lng = place.geometry.location.lng();
-                    
+
                     setCoordinates({ lat, lng });
                     setAddress(place.formatted_address);
-                    
+
                     // Mover el marcador y el mapa
                     marker.setPosition({ lat, lng });
                     map.setCenter({ lat, lng });
-                    
+
                     // Notificar al componente padre
                     onLocationChange({
                         address: place.formatted_address,
@@ -78,16 +78,16 @@ const GoogleMapsLocation = ({
                 const newPosition = marker.getPosition();
                 const lat = newPosition.lat();
                 const lng = newPosition.lng();
-                
+
                 setCoordinates({ lat, lng });
-                
+
                 // Geocodificación inversa para obtener la dirección
                 const geocoder = new window.google.maps.Geocoder();
                 geocoder.geocode({ location: { lat, lng } }, (results, status) => {
                     if (status === 'OK' && results[0]) {
                         const newAddress = results[0].formatted_address;
                         setAddress(newAddress);
-                        
+
                         // Notificar al componente padre
                         onLocationChange({
                             address: newAddress,
@@ -146,11 +146,11 @@ const GoogleMapsLocation = ({
                     required
                 />
                 <div className="form-text">
-                     Escribe tu dirección (cualquier país) y selecciona una opción del menú desplegable, 
+                    Escribe tu dirección (cualquier país) y selecciona una opción del menú desplegable,
                     o mueve el marcador en el mapa para ajustar la ubicación.
                 </div>
             </div>
-            
+
             <div className="mb-3">
                 <div className="row">
                     <div className="col-md-6">
@@ -175,12 +175,12 @@ const GoogleMapsLocation = ({
             </div>
 
             <div className="map-container" style={{ height: '400px', width: '100%' }}>
-                <div 
-                    ref={mapRef} 
+                <div
+                    ref={mapRef}
                     style={{ height: '100%', width: '100%', borderRadius: '8px' }}
                 />
             </div>
-            
+
             <div className="mt-2">
                 <small className="text-muted">
                     <i className="fas fa-info-circle me-1"></i>

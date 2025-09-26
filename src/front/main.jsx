@@ -5,6 +5,8 @@ import { RouterProvider } from "react-router-dom";  // Import RouterProvider to 
 import { router } from "./routes";  // Import the router configuration
 import { StoreProvider } from './hooks/useGlobalReducer';  // Import the StoreProvider for global state management
 import { BackendURL } from './components/BackendURL';
+
+// Supresión de warnings removida para limpiar consola
 // Listo
 
 const Main = () => {

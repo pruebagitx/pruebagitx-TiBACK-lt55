@@ -4,6 +4,24 @@ import { GoogleMap, useJsApiLoader, HeatmapLayer, Marker, InfoWindow } from '@re
 // Mover libraries fuera del componente para evitar recreación
 const libraries = ['visualization'];
 
+// Suprimir warnings específicos de Google Maps API
+const suppressGoogleMapsWarnings = () => {
+    const originalConsoleWarn = console.warn;
+    console.warn = (...args) => {
+        const message = args.join(' ');
+        // Suprimir warnings específicos de Google Maps
+        if (
+            message.includes('google.maps.places.Autocomplete is not available to new customers') ||
+            message.includes('google.maps.Marker is deprecated') ||
+            message.includes('Please use google.maps.marker.AdvancedMarkerElement') ||
+            message.includes('Please use google.maps.places.PlaceAutocompleteElement')
+        ) {
+            return; // No mostrar estos warnings
+        }
+        originalConsoleWarn.apply(console, args);
+    };
+};
+
 const HeatmapComponent = () => {
     const [heatmapData, setHeatmapData] = useState([]);
     const [rawData, setRawData] = useState([]);
@@ -22,6 +40,11 @@ const HeatmapComponent = () => {
         googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
         libraries: libraries
     });
+
+    // Activar supresión de warnings al cargar el componente
+    useEffect(() => {
+        suppressGoogleMapsWarnings();
+    }, []);
 
     // Configuración del mapa
     const mapContainerStyle = {
@@ -241,8 +264,7 @@ const HeatmapComponent = () => {
                                         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
                                             <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
                                                 <circle cx="16" cy="16" r="12" fill="#ff6b6b" stroke="#fff" stroke-width="3"/>
-                                                <circle cx="16" cy="16" r="6" fill="#fff"/>
-                                                <circle cx="16" cy="16" r="2" fill="#ff6b6b"/>
+                                                <text x="16" y="20" text-anchor="middle" fill="white" font-size="12" font-weight="bold">${index + 1}</text>
                                             </svg>
                                         `),
                                         scaledSize: new window.google.maps.Size(32, 32),
