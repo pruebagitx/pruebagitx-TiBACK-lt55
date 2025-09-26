@@ -374,6 +374,38 @@ export const authActions = {
       const backendUrl = import.meta.env.VITE_BACKEND_URL;
       if (!backendUrl) return;
 
+      // Suprimir errores específicos de WebSocket frame header
+      const originalConsoleError = console.error;
+      const originalConsoleWarn = console.warn;
+      
+      console.error = (...args) => {
+        const message = args.join(' ');
+        if (message.includes('Invalid frame header') || 
+            message.includes('WebSocket connection failed') ||
+            message.includes('probe') ||
+            message.includes('WebSocket') ||
+            message.includes('transport') ||
+            message.includes('socket.io') ||
+            message.includes('EIO=4')) {
+          return; // No mostrar estos errores específicos
+        }
+        originalConsoleError.apply(console, args);
+      };
+      
+      console.warn = (...args) => {
+        const message = args.join(' ');
+        if (message.includes('Invalid frame header') || 
+            message.includes('WebSocket connection failed') ||
+            message.includes('probe') ||
+            message.includes('WebSocket') ||
+            message.includes('transport') ||
+            message.includes('socket.io') ||
+            message.includes('EIO=4')) {
+          return; // No mostrar estos warnings específicos
+        }
+        originalConsoleWarn.apply(console, args);
+      };
+
       // Verificar si ya hay una conexión activa
       const currentSocket = dispatch.getState?.()?.websocket?.socket;
       if (currentSocket && currentSocket.connected) {
@@ -396,16 +428,39 @@ export const authActions = {
         return null;
       }
 
+      // Verificar si hay un retry reciente (evitar reconexiones demasiado frecuentes)
+      const lastRetry = window.lastWebSocketRetry || 0;
+      const now = Date.now();
+      if (now - lastRetry < 3000) { // Esperar al menos 3 segundos entre intentos
+        return null;
+      }
+      window.lastWebSocketRetry = now;
+
       // Marcar como conectando globalmente
       window.websocketConnecting = true;
       dispatch({ type: 'websocket_connecting' });
 
       const socket = io(backendUrl, {
-        transports: ['websocket', 'polling'],
+        transports: ['polling'], // Solo usar polling para evitar problemas de WebSocket
         auth: {
           token: token
         },
-        forceNew: false // Reutilizar conexión existente si está disponible
+        forceNew: false, // Reutilizar conexión existente si está disponible
+        timeout: 15000, // Timeout de 15 segundos
+        reconnection: true,
+        reconnectionAttempts: 3, // Intentos de reconexión
+        reconnectionDelay: 2000, // Delay entre reconexiones
+        reconnectionDelayMax: 10000, // Delay máximo entre reconexiones
+        maxReconnectionAttempts: 3, // Máximo de intentos de reconexión
+        randomizationFactor: 0.5, // Factor de aleatorización
+        upgrade: false, // Deshabilitar upgrade para evitar errores de frame header
+        rememberUpgrade: false, // No recordar upgrade
+        autoConnect: true, // Conectar automáticamente
+        multiplex: false, // No multiplexar conexiones
+        withCredentials: true, // Incluir credenciales
+        extraHeaders: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
       });
 
       socket.on('connect', () => {
@@ -413,8 +468,73 @@ export const authActions = {
         dispatch({ type: 'websocket_connected', payload: socket });
       });
 
-      socket.on('disconnect', () => {
+      // Remover el evento disconnect duplicado - se maneja más abajo
+
+      // Manejar errores de conexión
+      socket.on('connect_error', (error) => {
         window.websocketConnecting = false;
+        // Filtrar errores específicos de frame header y upgrade
+        const errorMessage = error.message || error.toString();
+        const isFrameHeaderError = errorMessage.includes('Invalid frame header') || 
+                                 errorMessage.includes('WebSocket connection failed') ||
+                                 errorMessage.includes('probe') ||
+                                 errorMessage.includes('WebSocket') ||
+                                 errorMessage.includes('transport');
+        
+        if (!isFrameHeaderError) {
+          console.warn('Error de conexión WebSocket:', errorMessage);
+        }
+        // No dispatchar errores de frame header para evitar interrupciones
+        if (!isFrameHeaderError) {
+          dispatch({ type: 'websocket_error', payload: errorMessage });
+        }
+      });
+
+      // Manejar errores de transporte
+      socket.on('error', (error) => {
+        const errorMessage = error.toString();
+        const isFrameHeaderError = errorMessage.includes('Invalid frame header') || 
+                                 errorMessage.includes('WebSocket connection failed') ||
+                                 errorMessage.includes('probe') ||
+                                 errorMessage.includes('WebSocket') ||
+                                 errorMessage.includes('transport');
+        
+        if (!isFrameHeaderError) {
+          console.warn('Error WebSocket:', error);
+        }
+        // No dispatchar errores de frame header para evitar interrupciones
+        if (!isFrameHeaderError) {
+          dispatch({ type: 'websocket_error', payload: error });
+        }
+      });
+
+      // Manejar errores específicos de upgrade
+      socket.on('upgradeError', (error) => {
+        // Silenciar errores de upgrade ya que usamos solo polling
+        window.websocketConnecting = false;
+      });
+
+      // Interceptar errores de WebSocket antes de que se propaguen
+      const originalEmit = socket.emit;
+      socket.emit = function(event, ...args) {
+        try {
+          return originalEmit.call(this, event, ...args);
+        } catch (error) {
+          // Silenciar errores de frame header durante el probe
+          if (error.message && error.message.includes('Invalid frame header')) {
+            return;
+          }
+          throw error;
+        }
+      };
+
+      // Manejar errores específicos de WebSocket
+      socket.on('disconnect', (reason) => {
+        window.websocketConnecting = false;
+        // Solo mostrar desconexiones no intencionales
+        if (reason !== 'io client disconnect') {
+          console.warn('WebSocket desconectado:', reason);
+        }
         dispatch({ type: 'websocket_disconnected' });
       });
 
@@ -584,6 +704,14 @@ export const authActions = {
       window.websocketConnecting = false;
       dispatch({ type: 'websocket_disconnected' });
       return null;
+    } finally {
+      // Restaurar console.error y console.warn originales
+      if (typeof originalConsoleError !== 'undefined') {
+        console.error = originalConsoleError;
+      }
+      if (typeof originalConsoleWarn !== 'undefined') {
+        console.warn = originalConsoleWarn;
+      }
     }
   },
 
@@ -731,6 +859,18 @@ export default function storeReducer(store, action = {}) {
           socket: null,
           connected: false,
           connecting: false
+        }
+      };
+
+    case 'websocket_error':
+      return {
+        ...store,
+        websocket: {
+          ...store.websocket,
+          socket: null,
+          connected: false,
+          connecting: false,
+          error: action.payload
         }
       };
 

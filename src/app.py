@@ -25,7 +25,19 @@ app.url_map.strict_slashes = False
 
 # Configurar CORS para SocketIO
 app.config['SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-super-secret-jwt-key-change-in-production')
-socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
+
+# Configuración más robusta para SocketIO
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*",
+    logger=True, 
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25,
+    max_http_buffer_size=1000000,
+    allow_upgrades=True,
+    transports=['polling', 'websocket']
+)
 
 # database condiguration
 db_url = os.getenv("DATABASE_URL")

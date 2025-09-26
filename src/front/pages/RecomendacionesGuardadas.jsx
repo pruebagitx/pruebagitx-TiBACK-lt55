@@ -33,7 +33,8 @@ const RecomendacionesGuardadas = () => {
 
             // Filtrar solo comentarios que son recomendaciones de IA
             const recomendacionesIA = data.filter(comentario =>
-                comentario.texto.includes('🤖 RECOMENDACIÓN DE IA GENERADA')
+                comentario.texto.includes('🤖 RECOMENDACIÓN DE IA GENERADA') ||
+                comentario.texto.includes('🤖 ANÁLISIS DE IMAGEN CON IA:')
             ).sort((a, b) => new Date(b.fecha_comentario) - new Date(a.fecha_comentario));
 
             setRecomendaciones(recomendacionesIA);
@@ -45,8 +46,24 @@ const RecomendacionesGuardadas = () => {
     };
 
     const parsearRecomendacion = (texto) => {
+        // Verificar si es un análisis de imagen
+        if (texto.includes('🤖 ANÁLISIS DE IMAGEN CON IA:')) {
+            return {
+                tipo: 'analisis_imagen',
+                contenido: texto.replace('🤖 ANÁLISIS DE IMAGEN CON IA:', '').trim(),
+                diagnostico: '',
+                pasos_solucion: [],
+                tiempo_estimado: '',
+                nivel_dificultad: '',
+                recursos_necesarios: [],
+                recomendaciones_adicionales: ''
+            };
+        }
+
+        // Formato de recomendación estructurada
         const lines = texto.split('\n');
         const recomendacion = {
+            tipo: 'recomendacion_estructurada',
             diagnostico: '',
             pasos_solucion: [],
             tiempo_estimado: '',
@@ -233,15 +250,32 @@ const RecomendacionesGuardadas = () => {
                                                             </small>
                                                         </div>
                                                     </div>
-                                                    <span className="badge bg-info">
-                                                        <i className="fas fa-robot me-1"></i>
-                                                        Recomendación IA #{index + 1}
+                                                    <span className={`badge ${recomendacion.tipo === 'analisis_imagen' ? 'bg-warning' : 'bg-info'}`}>
+                                                        <i className={`fas ${recomendacion.tipo === 'analisis_imagen' ? 'fa-image' : 'fa-robot'} me-1`}></i>
+                                                        {recomendacion.tipo === 'analisis_imagen' ? 'Análisis de Imagen' : 'Recomendación IA'} #{index + 1}
                                                     </span>
                                                 </div>
                                             </div>
                                             <div className="card-body">
+                                                {/* Análisis de Imagen */}
+                                                {recomendacion.tipo === 'analisis_imagen' && (
+                                                    <div className="mb-4">
+                                                        <h6 className="text-warning">
+                                                            <i className="fas fa-image me-2"></i>
+                                                            Análisis de Imagen
+                                                        </h6>
+                                                        <div className="card bg-warning bg-opacity-10 border-warning">
+                                                            <div className="card-body">
+                                                                <div className="whitespace-pre-wrap" style={{ whiteSpace: 'pre-wrap' }}>
+                                                                    {recomendacion.contenido}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 {/* Diagnóstico */}
-                                                {recomendacion.diagnostico && (
+                                                {recomendacion.tipo === 'recomendacion_estructurada' && recomendacion.diagnostico && (
                                                     <div className="mb-4">
                                                         <h6 className="text-primary">
                                                             <i className="fas fa-search me-2"></i>
@@ -255,93 +289,98 @@ const RecomendacionesGuardadas = () => {
                                                     </div>
                                                 )}
 
-                                                {/* Pasos de Solución */}
-                                                {recomendacion.pasos_solucion.length > 0 && (
-                                                    <div className="mb-4">
-                                                        <h6 className="text-primary">
-                                                            <i className="fas fa-list-ol me-2"></i>
-                                                            Pasos de Solución
-                                                        </h6>
-                                                        <div className="card">
-                                                            <div className="card-body">
-                                                                <ol className="list-group list-group-numbered">
-                                                                    {recomendacion.pasos_solucion.map((paso, idx) => (
-                                                                        <li key={idx} className="list-group-item border-0 px-0">
-                                                                            {paso}
-                                                                        </li>
-                                                                    ))}
-                                                                </ol>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Información Adicional */}
-                                                <div className="row mb-4">
-                                                    {recomendacion.tiempo_estimado && (
-                                                        <div className="col-md-6">
-                                                            <div className="card h-100">
-                                                                <div className="card-body text-center">
-                                                                    <h6 className="text-primary">
-                                                                        <i className="fas fa-clock me-2"></i>
-                                                                        Tiempo Estimado
-                                                                    </h6>
-                                                                    <h4 className="text-muted">{recomendacion.tiempo_estimado}</h4>
+                                                {/* Secciones solo para recomendaciones estructuradas */}
+                                                {recomendacion.tipo === 'recomendacion_estructurada' && (
+                                                    <>
+                                                        {/* Pasos de Solución */}
+                                                        {recomendacion.pasos_solucion.length > 0 && (
+                                                            <div className="mb-4">
+                                                                <h6 className="text-primary">
+                                                                    <i className="fas fa-list-ol me-2"></i>
+                                                                    Pasos de Solución
+                                                                </h6>
+                                                                <div className="card">
+                                                                    <div className="card-body">
+                                                                        <ol className="list-group list-group-numbered">
+                                                                            {recomendacion.pasos_solucion.map((paso, idx) => (
+                                                                                <li key={idx} className="list-group-item border-0 px-0">
+                                                                                    {paso}
+                                                                                </li>
+                                                                            ))}
+                                                                        </ol>
+                                                                    </div>
                                                                 </div>
                                                             </div>
+                                                        )}
+
+                                                        {/* Información Adicional */}
+                                                        <div className="row mb-4">
+                                                            {recomendacion.tiempo_estimado && (
+                                                                <div className="col-md-6">
+                                                                    <div className="card h-100">
+                                                                        <div className="card-body text-center">
+                                                                            <h6 className="text-primary">
+                                                                                <i className="fas fa-clock me-2"></i>
+                                                                                Tiempo Estimado
+                                                                            </h6>
+                                                                            <h4 className="text-muted">{recomendacion.tiempo_estimado}</h4>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {recomendacion.nivel_dificultad && (
+                                                                <div className="col-md-6">
+                                                                    <div className="card h-100">
+                                                                        <div className="card-body text-center">
+                                                                            <h6 className="text-primary">
+                                                                                <i className="fas fa-signal me-2"></i>
+                                                                                Nivel de Dificultad
+                                                                            </h6>
+                                                                            <span className={`${getNivelDificultadColor(recomendacion.nivel_dificultad)} fs-6`}>
+                                                                                {recomendacion.nivel_dificultad}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                    {recomendacion.nivel_dificultad && (
-                                                        <div className="col-md-6">
-                                                            <div className="card h-100">
-                                                                <div className="card-body text-center">
-                                                                    <h6 className="text-primary">
-                                                                        <i className="fas fa-signal me-2"></i>
-                                                                        Nivel de Dificultad
-                                                                    </h6>
-                                                                    <span className={`${getNivelDificultadColor(recomendacion.nivel_dificultad)} fs-6`}>
-                                                                        {recomendacion.nivel_dificultad}
-                                                                    </span>
+
+                                                        {/* Recursos Necesarios */}
+                                                        {recomendacion.recursos_necesarios.length > 0 && (
+                                                            <div className="mb-4">
+                                                                <h6 className="text-primary">
+                                                                    <i className="fas fa-tools me-2"></i>
+                                                                    Recursos Necesarios
+                                                                </h6>
+                                                                <div className="card">
+                                                                    <div className="card-body">
+                                                                        <ul className="list-group list-group-flush">
+                                                                            {recomendacion.recursos_necesarios.map((recurso, idx) => (
+                                                                                <li key={idx} className="list-group-item d-flex align-items-center border-0 px-0">
+                                                                                    <i className="fas fa-check-circle text-success me-3"></i>
+                                                                                    {recurso}
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                        )}
 
-                                                {/* Recursos Necesarios */}
-                                                {recomendacion.recursos_necesarios.length > 0 && (
-                                                    <div className="mb-4">
-                                                        <h6 className="text-primary">
-                                                            <i className="fas fa-tools me-2"></i>
-                                                            Recursos Necesarios
-                                                        </h6>
-                                                        <div className="card">
-                                                            <div className="card-body">
-                                                                <ul className="list-group list-group-flush">
-                                                                    {recomendacion.recursos_necesarios.map((recurso, idx) => (
-                                                                        <li key={idx} className="list-group-item d-flex align-items-center border-0 px-0">
-                                                                            <i className="fas fa-check-circle text-success me-3"></i>
-                                                                            {recurso}
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
+                                                        {/* Recomendaciones Adicionales */}
+                                                        {recomendacion.recomendaciones_adicionales && (
+                                                            <div className="mb-4">
+                                                                <h6 className="text-primary">
+                                                                    <i className="fas fa-lightbulb me-2"></i>
+                                                                    Recomendaciones Adicionales
+                                                                </h6>
+                                                                <div className="alert alert-info">
+                                                                    <i className="fas fa-info-circle me-2"></i>
+                                                                    {recomendacion.recomendaciones_adicionales}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Recomendaciones Adicionales */}
-                                                {recomendacion.recomendaciones_adicionales && (
-                                                    <div className="mb-4">
-                                                        <h6 className="text-primary">
-                                                            <i className="fas fa-lightbulb me-2"></i>
-                                                            Recomendaciones Adicionales
-                                                        </h6>
-                                                        <div className="alert alert-info">
-                                                            <i className="fas fa-info-circle me-2"></i>
-                                                            {recomendacion.recomendaciones_adicionales}
-                                                        </div>
-                                                    </div>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         </div>

@@ -88,6 +88,9 @@ export function AnalistaPage() {
                             password: '',
                             confirmPassword: ''
                         });
+                    } else {
+                        const errorText = await response.text();
+                        console.error('Error al cargar datos del analista:', response.status, errorText);
                     }
                 }
             } catch (err) {

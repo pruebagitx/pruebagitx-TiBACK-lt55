@@ -510,7 +510,7 @@ const ImageUpload = ({ onImageUpload, onImageRemove, currentImageUrl, disabled =
             <div className="mb-3">
                 <label className="form-label">
                     <i className="fas fa-image me-2"></i>
-                    Imagen del Ticket
+                    Imagen
                 </label>
 
                 {currentImageUrl ? (

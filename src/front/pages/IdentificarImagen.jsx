@@ -120,7 +120,7 @@ const IdentificarImagen = () => {
             const token = localStorage.getItem('cliente') || localStorage.getItem('analista') ||
                 localStorage.getItem('supervisor') || localStorage.getItem('administrador');
 
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/comentarios`, {
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/comentarios`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,

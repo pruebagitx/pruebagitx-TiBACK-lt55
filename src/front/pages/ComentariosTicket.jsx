@@ -191,6 +191,7 @@ const ComentariosTicket = () => {
                 !comentario.texto.includes('Ticket reabierto') &&
                 !comentario.texto.includes('Cliente solicita reapertura') &&
                 !comentario.texto.includes('🤖 RECOMENDACIÓN DE IA GENERADA') &&
+                !comentario.texto.includes('🤖 ANÁLISIS DE IMAGEN CON IA:') &&
                 !comentario.texto.includes('CHAT_SUPERVISOR_ANALISTA:') &&
                 !comentario.texto.includes('CHAT_ANALISTA_CLIENTE:')
             ).sort((a, b) => new Date(b.fecha_comentario) - new Date(a.fecha_comentario));

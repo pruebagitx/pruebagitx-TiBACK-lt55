@@ -87,7 +87,9 @@ const RecomendacionesSimilares = () => {
 
                         const esRecomendacionIA = texto.includes('recomendación') ||
                             texto.includes('diagnóstico') ||
-                            texto.includes('pasos de solución');
+                            texto.includes('pasos de solución') ||
+                            texto.includes('🤖 recomendación de ia generada') ||
+                            texto.includes('🤖 análisis de imagen con ia:');
 
                         return !esTransaccionAutomatica && (esComentarioUsuario || esRecomendacionIA);
                     });

@@ -204,8 +204,11 @@ def delete_cliente(id):
 @api.route('/analistas', methods=['GET'])
 @require_role(['administrador', 'analista', 'supervisor'])
 def listar_analistas():
-    analistas = Analista.query.all()
-    return jsonify([a.serialize() for a in analistas]), 200
+    try:
+        analistas = Analista.query.all()
+        return jsonify([a.serialize() for a in analistas]), 200
+    except Exception as e:
+        return handle_general_error(e, "listar analistas")
 
 
 @api.route('/analistas', methods=['POST'])
@@ -254,10 +257,13 @@ def create_analista():
 @api.route('/analistas/<int:id>', methods=['GET'])
 @require_role(['administrador', 'analista', 'supervisor'])
 def get_analista(id):
-    analista = db.session.get(Analista, id)
-    if not analista:
-        return jsonify({"message": "Analista no encontrado"}), 404
-    return jsonify(analista.serialize()), 200
+    try:
+        analista = db.session.get(Analista, id)
+        if not analista:
+            return jsonify({"message": "Analista no encontrado"}), 404
+        return jsonify(analista.serialize()), 200
+    except Exception as e:
+        return handle_general_error(e, "obtener analista")
 
 
 @api.route('/analistas/<int:id>', methods=['PUT'])
@@ -2575,7 +2581,7 @@ SIEMPRE proporciona soluciones paso a paso usando el método Feynman, sin import
                 analysis_text += f"\n✅ RELACIÓN DETECTADA: La imagen muestra elementos relacionados con tu problema. Los elementos visuales coinciden con la descripción del problema ({relation_percentage:.1f}% de coincidencia).\n"
             elif relation_percentage >= 5:
                 analysis_text += f"\n⚠️ RELACIÓN PARCIAL: La imagen tiene algunos elementos relacionados con tu problema, pero no es una coincidencia completa ({relation_percentage:.1f}% de coincidencia).\n"
-            else:
+        else:
                 analysis_text += f"\n❌ SIN RELACIÓN: La imagen no muestra elementos claramente relacionados con tu problema ({relation_percentage:.1f}% de coincidencia). Se recomienda subir una imagen más específica del problema.\n"
         
         # Análisis de texto detectado
@@ -2742,17 +2748,19 @@ def enviar_mensaje_analista_cliente():
 @api.route('/heatmap-data', methods=['GET'])
 @require_auth
 def get_heatmap_data():
-    """Obtener datos de coordenadas de clientes para el mapa de calor"""
+    """Obtener datos de coordenadas de tickets para el mapa de calor"""
     try:
-        # Obtener todos los clientes con coordenadas válidas
-        clientes = Cliente.query.filter(
+        # Obtener todos los tickets con sus clientes que tengan coordenadas válidas
+        tickets = db.session.query(Ticket, Cliente).join(
+            Cliente, Ticket.id_cliente == Cliente.id
+        ).filter(
             Cliente.latitude.isnot(None),
             Cliente.longitude.isnot(None)
         ).all()
         
         # Preparar datos para el mapa de calor
         heatmap_data = []
-        for cliente in clientes:
+        for ticket, cliente in tickets:
             try:
                 # Convertir coordenadas a float
                 lat = float(cliente.latitude)
@@ -2763,17 +2771,25 @@ def get_heatmap_data():
                     heatmap_data.append({
                         'lat': lat,
                         'lng': lng,
-                        'direccion': cliente.direccion or 'Dirección no disponible',
-                        'nombre': cliente.nombre,
-                        'email': cliente.email,
-                        'id': cliente.id
+                        'ticket_id': ticket.id,
+                        'ticket_titulo': ticket.titulo,
+                        'ticket_descripcion': ticket.descripcion or 'Sin descripción',
+                        'ticket_estado': ticket.estado,
+                        'ticket_prioridad': ticket.prioridad,
+                        'ticket_fecha_creacion': ticket.fecha_creacion.isoformat() if ticket.fecha_creacion else None,
+                        'cliente_nombre': cliente.nombre,
+                        'cliente_apellido': cliente.apellido,
+                        'cliente_email': cliente.email,
+                        'cliente_direccion': cliente.direccion or 'Dirección no disponible',
+                        'cliente_telefono': cliente.telefono,
+                        'cliente_id': cliente.id
                     })
             except (ValueError, TypeError):
                 # Saltar coordenadas inválidas
                 continue
         
         return jsonify({
-            "message": "Datos de mapa de calor obtenidos exitosamente",
+            "message": "Datos de mapa de calor de tickets obtenidos exitosamente",
             "data": heatmap_data,
             "total_points": len(heatmap_data)
         }), 200
