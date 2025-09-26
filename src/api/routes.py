@@ -6,7 +6,6 @@ import requests
 import json
 import cloudinary
 import cloudinary.uploader
-from google.cloud import vision
 from flask import Flask, request, jsonify, url_for, Blueprint
 from api.models import db, User, Cliente, Analista, Supervisor, Comentarios, Asignacion, Administrador, Ticket, Gestion
 from api.utils import generate_sitemap, APIException
@@ -2272,6 +2271,8 @@ def cloud_vision_status():
 def analyze_image():
     """Analizar imagen usando Google Cloud Vision API"""
     try:
+        # Importar Google Cloud Vision solo cuando sea necesario
+        from google.cloud import vision
         # Verificar que se proporcionó una imagen
         if 'image' not in request.files:
             return jsonify({"message": "No se encontró archivo de imagen"}), 400
@@ -2709,3 +2710,50 @@ def enviar_mensaje_analista_cliente():
         db.session.rollback()
         return jsonify({"message": f"Error al enviar mensaje: {str(e)}"}), 500
 
+
+# ==================== RUTAS DE MAPA DE CALOR ====================
+
+@api.route('/heatmap-data', methods=['GET'])
+@require_auth
+def get_heatmap_data():
+    """Obtener datos de coordenadas de clientes para el mapa de calor"""
+    try:
+        # Obtener todos los clientes con coordenadas válidas
+        clientes = Cliente.query.filter(
+            Cliente.latitude.isnot(None),
+            Cliente.longitude.isnot(None)
+        ).all()
+        
+        # Preparar datos para el mapa de calor
+        heatmap_data = []
+        for cliente in clientes:
+            try:
+                # Convertir coordenadas a float
+                lat = float(cliente.latitude)
+                lng = float(cliente.longitude)
+                
+                # Verificar que las coordenadas sean válidas
+                if -90 <= lat <= 90 and -180 <= lng <= 180:
+                    heatmap_data.append({
+                        'lat': lat,
+                        'lng': lng,
+                        'direccion': cliente.direccion or 'Dirección no disponible',
+                        'nombre': cliente.nombre,
+                        'email': cliente.email,
+                        'id': cliente.id
+                    })
+            except (ValueError, TypeError):
+                # Saltar coordenadas inválidas
+                continue
+        
+        return jsonify({
+            "message": "Datos de mapa de calor obtenidos exitosamente",
+            "data": heatmap_data,
+            "total_points": len(heatmap_data)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "message": "Error al obtener datos del mapa de calor",
+            "error": str(e)
+        }), 500

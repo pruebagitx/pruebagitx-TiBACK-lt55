@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useGlobalReducer from '../../hooks/useGlobalReducer';
+import HeatmapComponent from '../../components/HeatmapComponent';
 
 // Utilidades de token seguras
 const tokenUtils = {
@@ -419,6 +420,13 @@ export function AdministradorPage() {
                             <p className="card-text text-muted">Ver historial de gestiones</p>
                         </div>
                     </Link>
+                </div>
+            </div>
+
+            {/* Mapa de Calor */}
+            <div className="row mb-4">
+                <div className="col-12">
+                    <HeatmapComponent />
                 </div>
             </div>
 
