@@ -26,7 +26,7 @@ const tokenUtils = {
 
 export function AnalistaPage() {
     const navigate = useNavigate();
-    const { store, logout, connectWebSocket, disconnectWebSocket, joinRoom, startRealtimeSync, emitCriticalTicketAction, joinCriticalRooms } = useGlobalReducer();
+    const { store, logout, connectWebSocket, disconnectWebSocket, joinRoom, startRealtimeSync, emitCriticalTicketAction, joinCriticalRooms, joinAllCriticalRooms } = useGlobalReducer();
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -105,30 +105,102 @@ export function AnalistaPage() {
 
     // Verificar recomendaciones para todos los tickets
     useEffect(() => {
-        if (tickets.length > 0) {
-            verificarRecomendaciones();
+        if (tickets.length > 0 && store.auth.token && store.auth.isAuthenticated) {
+            // Agregar un pequeño delay para evitar llamadas múltiples
+            const timeoutId = setTimeout(() => {
+                verificarRecomendaciones();
+            }, 500);
+
+            return () => clearTimeout(timeoutId);
         }
-    }, [tickets]);
+    }, [tickets.length, store.auth.token, store.auth.isAuthenticated]);
 
     const verificarRecomendaciones = async () => {
         try {
             const token = store.auth.token;
-            const recomendacionesPromises = tickets.map(async (ticket) => {
-                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticket.id}/recomendaciones-similares`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    return { ticketId: ticket.id, tieneRecomendaciones: data.total_encontrados > 0 };
+            // Validaciones robustas
+            if (!tickets || tickets.length === 0) {
+                console.log('⚠️ No hay tickets para verificar recomendaciones');
+                return;
+            }
+
+            if (!token) {
+                console.log('⚠️ No hay token para verificar recomendaciones');
+                return;
+            }
+
+            console.log(`🔍 Verificando recomendaciones para ${tickets.length} tickets...`);
+
+            const recomendacionesPromises = tickets.map(async (ticket) => {
+                try {
+                    // Validar que el ticket tenga contenido válido
+                    if (!ticket.titulo || !ticket.descripcion || ticket.titulo.trim() === '' || ticket.descripcion.trim() === '') {
+                        console.log(`⚠️ Ticket ${ticket.id} sin contenido suficiente para recomendaciones`);
+                        return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'sin_contenido' };
+                    }
+
+                    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticket.id}/recomendaciones-similares`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        // Aumentar timeout para requests más robustos
+                        signal: AbortSignal.timeout(15000) // 15 segundos timeout
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const tieneRecomendaciones = data.total_encontrados > 0;
+                        console.log(`✅ Ticket ${ticket.id}: ${data.total_encontrados} recomendaciones encontradas`);
+                        return {
+                            ticketId: ticket.id,
+                            tieneRecomendaciones,
+                            totalRecomendaciones: data.total_encontrados,
+                            algoritmo: data.algoritmo || 'legacy'
+                        };
+                    } else {
+                        // Log del error específico pero no fallar
+                        console.warn(`⚠️ Error ${response.status} verificando recomendaciones para ticket ${ticket.id}`);
+                        return { ticketId: ticket.id, tieneRecomendaciones: false, razon: `error_${response.status}` };
+                    }
+                } catch (fetchError) {
+                    // Manejar errores individuales sin fallar toda la operación
+                    if (fetchError.name === 'AbortError') {
+                        console.warn(`⏰ Timeout verificando recomendaciones para ticket ${ticket.id}`);
+                        return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'timeout' };
+                    } else if (fetchError.name === 'TypeError' && fetchError.message.includes('Failed to fetch')) {
+                        console.warn(`🌐 Error de red verificando recomendaciones para ticket ${ticket.id}`);
+                        return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'network_error' };
+                    } else {
+                        console.warn(`❌ Error verificando recomendaciones para ticket ${ticket.id}:`, fetchError.message);
+                        return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'unknown_error' };
+                    }
                 }
-                return { ticketId: ticket.id, tieneRecomendaciones: false };
             });
 
             const resultados = await Promise.all(recomendacionesPromises);
+
+            // Análisis detallado de resultados
+            const ticketsConRecomendaciones = resultados.filter(r => r.tieneRecomendaciones);
+            const ticketsSinRecomendaciones = resultados.filter(r => !r.tieneRecomendaciones);
+
+            console.log('📊 Resultados de recomendaciones:', {
+                total: resultados.length,
+                conRecomendaciones: ticketsConRecomendaciones.length,
+                sinRecomendaciones: ticketsSinRecomendaciones.length,
+                detalles: resultados
+            });
+
+            // Log específico para tickets sin recomendaciones
+            if (ticketsSinRecomendaciones.length > 0) {
+                console.log('⚠️ Tickets sin recomendaciones:', ticketsSinRecomendaciones.map(t => ({
+                    id: t.ticketId,
+                    razon: t.razon
+                })));
+            }
+
+            // Actualizar estado con validaciones robustas
             const ticketsConRecomendacionesSet = new Set();
             resultados.forEach(({ ticketId, tieneRecomendaciones }) => {
                 if (tieneRecomendaciones) {
@@ -136,8 +208,12 @@ export function AnalistaPage() {
                 }
             });
             setTicketsConRecomendaciones(ticketsConRecomendacionesSet);
+
+            console.log(`✅ Verificación de recomendaciones completada para ${tickets.length} tickets`);
         } catch (error) {
-            console.error('Error verificando recomendaciones:', error);
+            console.error('❌ Error general verificando recomendaciones:', error);
+            // En caso de error general, limpiar el estado
+            setTicketsConRecomendaciones(new Set());
         }
     };
 
@@ -163,6 +239,9 @@ export function AnalistaPage() {
     // Configurar sincronización crítica en tiempo real
     useEffect(() => {
         if (store.auth.user && store.websocket.connected && store.websocket.socket) {
+            // Unirse a todas las rooms críticas inmediatamente
+            joinAllCriticalRooms(store.websocket.socket, store.auth.user);
+
             // Configurar sincronización crítica
             const syncConfig = startRealtimeSync({
                 syncTypes: ['tickets', 'comentarios', 'asignaciones'],
@@ -181,6 +260,19 @@ export function AnalistaPage() {
             }
         }
     }, [store.auth.user, store.websocket.connected, tickets.length]);
+
+    // Efecto para manejar sincronización manual desde Footer
+    useEffect(() => {
+        const handleManualSync = (event) => {
+            console.log('🔄 Sincronización manual recibida en AnalistaPage:', event.detail);
+            if (event.detail.role === 'analista') {
+                actualizarTickets();
+            }
+        };
+
+        window.addEventListener('manualSyncTriggered', handleManualSync);
+        return () => window.removeEventListener('manualSyncTriggered', handleManualSync);
+    }, []);
 
     // Efecto para manejar actualizaciones críticas de tickets
     useEffect(() => {

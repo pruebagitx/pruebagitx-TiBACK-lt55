@@ -53,8 +53,9 @@ export function StoreProvider({ children }) {
         // Funciones críticas de sincronización
         emitCriticalTicketAction: (socket, ticketId, action) => authActions.emitCriticalTicketAction(socket, ticketId, action),
         joinCriticalRooms: (socket, ticketIds) => authActions.joinCriticalRooms(socket, ticketIds),
+        joinAllCriticalRooms: (socket, userData) => authActions.joinAllCriticalRooms(socket, userData),
         // Funciones de sincronización en tiempo real integradas
-        startRealtimeSync: (config) => authActions.startRealtimeSync(dispatch, config),
+        startRealtimeSync: (config) => authActions.startRealtimeSync(dispatch, config, store),
         getRealtimeStatus: () => authActions.getRealtimeStatus(store),
         pollingService: authActions.pollingService
     }}>

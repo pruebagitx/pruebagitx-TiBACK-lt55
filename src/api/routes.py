@@ -1992,67 +1992,168 @@ def asignar_ticket(id):
 @api.route('/tickets/<int:ticket_id>/recomendaciones-similares', methods=['GET'])
 @require_auth
 def obtener_tickets_similares(ticket_id):
-    """Obtener tickets similares basados en título y descripción"""
+    """Obtener tickets similares basados en algoritmo robusto de similitud semántica"""
     try:
-        # Obtener el ticket actual
+        # Validaciones robustas del ticket actual
+        if not ticket_id or ticket_id <= 0:
+            return jsonify({"message": "ID de ticket inválido"}), 400
+            
         ticket_actual = Ticket.query.get(ticket_id)
         if not ticket_actual:
             return jsonify({"message": "Ticket no encontrado"}), 404
         
-        # Obtener todos los tickets cerrados y solucionados
+        # Validar que el ticket tenga contenido válido
+        if not ticket_actual.titulo or not ticket_actual.descripcion:
+            return jsonify({
+                "tickets_similares": [],
+                "total_encontrados": 0,
+                "ticket_actual": ticket_actual.serialize(),
+                "mensaje": "Ticket sin contenido suficiente para análisis"
+            }), 200
+        
+        # Obtener tickets cerrados con validaciones adicionales
         tickets_cerrados = Ticket.query.filter(
             Ticket.estado.in_(['cerrado', 'cerrado_por_supervisor']),
-            Ticket.id != ticket_id
+            Ticket.id != ticket_id,
+            Ticket.titulo.isnot(None),
+            Ticket.descripcion.isnot(None),
+            Ticket.titulo != '',
+            Ticket.descripcion != ''
         ).all()
         
         if not tickets_cerrados:
             return jsonify({
                 "tickets_similares": [],
                 "total_encontrados": 0,
-                "ticket_actual": ticket_actual.serialize()
+                "ticket_actual": ticket_actual.serialize(),
+                "mensaje": "No hay tickets cerrados disponibles para comparación"
             }), 200
         
-        # Algoritmo simple de similitud basado en palabras clave
-        def calcular_similitud(titulo1, descripcion1, titulo2, descripcion2):
-            # Convertir a minúsculas y dividir en palabras
-            palabras1 = set((titulo1 + " " + descripcion1).lower().split())
-            palabras2 = set((titulo2 + " " + descripcion2).lower().split())
+        # Algoritmo robusto de similitud semántica mejorado
+        def calcular_similitud_robusta(titulo1, descripcion1, titulo2, descripcion2):
+            import re
+            from difflib import SequenceMatcher
             
-            # Calcular intersección de palabras
+            # Limpiar y normalizar texto
+            def limpiar_texto(texto):
+                if not texto:
+                    return ""
+                # Remover caracteres especiales y normalizar espacios
+                texto_limpio = re.sub(r'[^\w\s]', ' ', str(texto).lower())
+                texto_limpio = re.sub(r'\s+', ' ', texto_limpio).strip()
+                return texto_limpio
+            
+            # Limpiar textos
+            texto1 = limpiar_texto(titulo1) + " " + limpiar_texto(descripcion1)
+            texto2 = limpiar_texto(titulo2) + " " + limpiar_texto(descripcion2)
+            
+            if not texto1 or not texto2:
+                return 0
+            
+            # Dividir en palabras y filtrar palabras vacías
+            palabras_vacias = {'el', 'la', 'de', 'que', 'y', 'a', 'en', 'un', 'es', 'se', 'no', 'te', 'lo', 'le', 'da', 'su', 'por', 'son', 'con', 'para', 'al', 'del', 'los', 'las', 'una', 'como', 'pero', 'sus', 'muy', 'sin', 'sobre', 'entre', 'hasta', 'desde', 'durante', 'mediante', 'según', 'ante', 'bajo', 'contra', 'hacia', 'tras', 'durante', 'excepto', 'salvo', 'menos', 'más', 'todo', 'todos', 'toda', 'todas', 'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'esos', 'esas', 'aquel', 'aquella', 'aquellos', 'aquellas', 'mi', 'mis', 'tu', 'tus', 'su', 'sus', 'nuestro', 'nuestra', 'nuestros', 'nuestras', 'vuestro', 'vuestra', 'vuestros', 'vuestras'}
+            
+            palabras1 = set([p for p in texto1.split() if len(p) > 2 and p not in palabras_vacias])
+            palabras2 = set([p for p in texto2.split() if len(p) > 2 and p not in palabras_vacias])
+            
+            if not palabras1 or not palabras2:
+                return 0
+            
+            # 1. Similitud de Jaccard (palabras exactas)
             interseccion = palabras1.intersection(palabras2)
             union = palabras1.union(palabras2)
+            jaccard = len(interseccion) / len(union) if union else 0
             
-            # Calcular similitud de Jaccard
-            if len(union) == 0:
-                return 0
-            return len(interseccion) / len(union)
-        
-        # Calcular similitud para cada ticket cerrado
-        tickets_con_similitud = []
-        for ticket in tickets_cerrados:
-            similitud = calcular_similitud(
-                ticket_actual.titulo, ticket_actual.descripcion,
-                ticket.titulo, ticket.descripcion
+            # 2. Similitud de secuencia (para palabras similares)
+            palabras1_list = list(palabras1)
+            palabras2_list = list(palabras2)
+            similitud_secuencia = 0
+            coincidencias = 0
+            
+            for p1 in palabras1_list:
+                mejor_similitud = 0
+                for p2 in palabras2_list:
+                    sim = SequenceMatcher(None, p1, p2).ratio()
+                    if sim > mejor_similitud:
+                        mejor_similitud = sim
+                if mejor_similitud > 0.8:  # Umbral para considerar palabras similares
+                    coincidencias += mejor_similitud
+            
+            similitud_secuencia = coincidencias / len(palabras1_list) if palabras1_list else 0
+            
+            # 3. Similitud de título (peso mayor)
+            titulo1_limpio = limpiar_texto(titulo1)
+            titulo2_limpio = limpiar_texto(titulo2)
+            similitud_titulo = SequenceMatcher(None, titulo1_limpio, titulo2_limpio).ratio()
+            
+            # 4. Similitud de descripción
+            desc1_limpio = limpiar_texto(descripcion1)
+            desc2_limpio = limpiar_texto(descripcion2)
+            similitud_descripcion = SequenceMatcher(None, desc1_limpio, desc2_limpio).ratio()
+            
+            # Combinar métricas con pesos
+            similitud_final = (
+                jaccard * 0.3 +           # 30% palabras exactas
+                similitud_secuencia * 0.2 + # 20% palabras similares
+                similitud_titulo * 0.3 +    # 30% similitud de título
+                similitud_descripcion * 0.2 # 20% similitud de descripción
             )
             
-            if similitud > 0.1:  # Umbral mínimo de similitud
-                ticket_data = ticket.serialize()
-                ticket_data['similitud'] = round(similitud, 3)
-                tickets_con_similitud.append(ticket_data)
+            return min(1.0, similitud_final)  # Asegurar que no exceda 1.0
+        
+        # Calcular similitud para cada ticket cerrado con validaciones
+        tickets_con_similitud = []
+        for ticket in tickets_cerrados:
+            try:
+                # Validar contenido del ticket
+                if not ticket.titulo or not ticket.descripcion:
+                    continue
+                
+                similitud = calcular_similitud_robusta(
+                    ticket_actual.titulo, ticket_actual.descripcion,
+                    ticket.titulo, ticket.descripcion
+                )
+                
+                # Umbral más bajo pero con validaciones adicionales
+                if similitud > 0.05:  # Umbral reducido para capturar más similitudes
+                    ticket_data = ticket.serialize()
+                    ticket_data['similitud'] = round(similitud, 4)
+                    ticket_data['nivel_similitud'] = (
+                        'Alta' if similitud > 0.3 else
+                        'Media' if similitud > 0.15 else
+                        'Baja'
+                    )
+                    tickets_con_similitud.append(ticket_data)
+                    
+            except Exception as e:
+                print(f"Error calculando similitud para ticket {ticket.id}: {str(e)}")
+                continue
         
         # Ordenar por similitud descendente
         tickets_con_similitud.sort(key=lambda x: x['similitud'], reverse=True)
         
-        # Limitar a los 5 más similares
-        tickets_similares = tickets_con_similitud[:5]
+        # Limitar a los 8 más similares (aumentado de 5 a 8)
+        tickets_similares = tickets_con_similitud[:8]
+        
+        # Validar que tenemos resultados
+        if not tickets_similares:
+            return jsonify({
+                "tickets_similares": [],
+                "total_encontrados": 0,
+                "ticket_actual": ticket_actual.serialize(),
+                "mensaje": "No se encontraron tickets con similitud suficiente"
+            }), 200
         
         return jsonify({
             "tickets_similares": tickets_similares,
             "total_encontrados": len(tickets_similares),
-            "ticket_actual": ticket_actual.serialize()
+            "ticket_actual": ticket_actual.serialize(),
+            "algoritmo": "similitud_semantica_robusta_v2",
+            "umbral_minimo": 0.05
         }), 200
         
     except Exception as e:
+        print(f"Error en obtener_tickets_similares: {str(e)}")
         return jsonify({"message": f"Error al obtener tickets similares: {str(e)}"}), 500
 
 
@@ -2434,12 +2535,38 @@ def analyze_image():
         elif additional_details:
             context_description = f"El usuario ha proporcionado los siguientes detalles adicionales: '{additional_details}'."
         
-        # Prompt específico para análisis de calidad con método Feynman mejorado
-        analysis_prompt = """Analiza la imagen cargada por el usuario con máxima atención y empatía. El usuario está reportando un problema y necesita tu ayuda experta. Considera cuidadosamente el contexto completo: la descripción del ticket, el título del problema, y todos los detalles adicionales proporcionados. Tu misión es ser un asistente comprensivo que siempre encuentra una manera de ayudar.
+        # Prompt específico para análisis profundo y enfático con método Feynman mejorado
+        analysis_prompt = """Eres un experto analista de imágenes con IA especializado en diagnóstico técnico y resolución de problemas. Tu misión es realizar un análisis PROFUNDO, ENFÁTICO y ESPECÍFICO de la imagen proporcionada, estableciendo conexiones directas y detalladas con el problema reportado.
 
-Evalúa la imagen con precisión para identificar elementos clave, texto visible, objetos relacionados, y cualquier detalle visual que pueda contribuir al diagnóstico. Aplica lógica avanzada para detectar similitudes semánticas, sinónimos, conceptos relacionados, y conexiones indirectas entre la imagen y el problema reportado.
+INSTRUCCIONES CRÍTICAS:
+1. ANALIZA CADA PÍXEL con atención meticulosa
+2. IDENTIFICA TODOS los elementos visuales, patrones, texturas, colores, formas y detalles
+3. ESTABLECE CONEXIONES DIRECTAS entre la imagen y el problema reportado
+4. PROPORCIONA SOLUCIONES ESPECÍFICAS y accionables
+5. USA UN TONO ENFÁTICO Y PROFESIONAL que demuestre expertise
 
-SIEMPRE proporciona soluciones paso a paso usando el método Feynman, sin importar el nivel de relación detectado. Sé verboso, comprensivo y de apoyo. Explica cada paso como si fueras un mentor paciente enseñando a alguien que realmente quiere aprender. Usa analogías claras, ejemplos concretos, y un tono alentador que motive al usuario a seguir adelante. Recuerda: tu objetivo es ayudar genuinamente, no solo analizar."""
+METODOLOGÍA DE ANÁLISIS:
+- Análisis visual exhaustivo de todos los elementos detectados
+- Correlación semántica avanzada entre imagen y problema
+- Identificación de patrones, anomalías y características relevantes
+- Evaluación de la calidad y claridad de la evidencia visual
+- Generación de hipótesis técnicas fundamentadas
+- Propuesta de soluciones paso a paso con justificación técnica
+
+FORMATO DE RESPUESTA REQUERIDO:
+1. 🔍 ANÁLISIS VISUAL DETALLADO: Descripción exhaustiva de todos los elementos
+2. 🎯 CORRELACIÓN CON EL PROBLEMA: Conexiones específicas identificadas
+3. 💡 DIAGNÓSTICO TÉCNICO: Evaluación profesional del problema
+4. 🛠️ SOLUCIONES PROPUESTAS: Pasos específicos y accionables
+5. 📋 RECOMENDACIONES ADICIONALES: Acciones complementarias
+
+SÉ ESPECÍFICO, TÉCNICO Y ENFÁTICO en tu análisis. Cada palabra debe aportar valor técnico y profesional."""
+
+        # PROMPT PROFESIONAL PARA ANÁLISIS ADICIONAL (SOLO PARA USO INTERNO DE LA API):
+        # "Como experto en análisis de imágenes con IA, necesito un análisis PROFUNDO y ESPECÍFICO de la siguiente imagen en relación con el problema reportado: '{ticket_description}'. 
+        # Por favor, proporciona un análisis técnico detallado que incluya: (1) Identificación exhaustiva de todos los elementos visuales, 
+        # (2) Correlación directa con el problema reportado, (3) Diagnóstico técnico fundamentado, (4) Soluciones específicas y accionables, 
+        # y (5) Recomendaciones técnicas adicionales. El análisis debe ser ENFÁTICO, PROFESIONAL y TÉCNICAMENTE PRECISO."
         
         # Realizar análisis con múltiples características
         features = [
@@ -2651,25 +2778,65 @@ SIEMPRE proporciona soluciones paso a paso usando el método Feynman, sin import
             else:
                 analysis_text += "La imagen puede tener calidad limitada o elementos poco claros.\n"
         
-        # Análisis directo de relación imagen-contexto
+        # Análisis PROFUNDO y ENFÁTICO de relación imagen-contexto
         if context_description:
-            analysis_text += f"\n\n🔍 ANÁLISIS DE RELACIÓN CON EL PROBLEMA:\n"
-            analysis_text += f"Problema reportado: \"{ticket_description}\"\n"
-            analysis_text += f"Título del ticket: \"{ticket_title}\"\n"
+            analysis_text += f"\n\n🔍 ANÁLISIS PROFUNDO DE RELACIÓN CON EL PROBLEMA:\n"
+            analysis_text += f"📋 PROBLEMA REPORTADO: \"{ticket_description}\"\n"
+            analysis_text += f"🏷️ TÍTULO DEL TICKET: \"{ticket_title}\"\n"
+            analysis_text += f"📊 NIVEL DE CORRELACIÓN: {relation_percentage:.1f}%\n"
             
-            # Verificar relación entre imagen y problema
+            # Análisis detallado de la relación
             if relation_percentage >= 10:
-                analysis_text += f"\n✅ RELACIÓN DETECTADA: La imagen muestra elementos relacionados con tu problema. Los elementos visuales coinciden con la descripción del problema ({relation_percentage:.1f}% de coincidencia).\n"
+                analysis_text += f"\n✅ CORRELACIÓN DIRECTA CONFIRMADA: La imagen presenta evidencia visual CLARA y ESPECÍFICA relacionada con el problema reportado. Los elementos detectados ({', '.join([label['description'] for label in labels[:5]])}) muestran una correlación directa con la descripción del problema.\n"
+                analysis_text += f"\n🎯 ELEMENTOS CLAVE IDENTIFICADOS:\n"
+                for i, label in enumerate(labels[:5], 1):
+                    analysis_text += f"   {i}. {label['description']} (Confianza: {label['score']:.2f})\n"
+                analysis_text += f"\n💡 IMPLICACIONES TÉCNICAS: Esta correlación sugiere que la imagen proporciona evidencia visual válida para el diagnóstico y resolución del problema.\n"
             elif relation_percentage >= 5:
-                analysis_text += f"\n⚠️ RELACIÓN PARCIAL: La imagen tiene algunos elementos relacionados con tu problema, pero no es una coincidencia completa ({relation_percentage:.1f}% de coincidencia).\n"
-        else:
-                analysis_text += f"\n❌ SIN RELACIÓN: La imagen no muestra elementos claramente relacionados con tu problema ({relation_percentage:.1f}% de coincidencia). Se recomienda subir una imagen más específica del problema.\n"
+                analysis_text += f"\n⚠️ CORRELACIÓN PARCIAL DETECTADA: La imagen muestra algunos elementos relacionados con el problema, pero requiere análisis más profundo. Los elementos visuales sugieren una conexión indirecta que puede ser relevante para el diagnóstico.\n"
+                analysis_text += f"\n🔍 ELEMENTOS RELEVANTES IDENTIFICADOS:\n"
+                for i, label in enumerate(labels[:3], 1):
+                    analysis_text += f"   {i}. {label['description']} (Confianza: {label['score']:.2f})\n"
+                analysis_text += f"\n📝 RECOMENDACIÓN: Se sugiere proporcionar imágenes adicionales o más específicas para fortalecer la correlación.\n"
+            else:
+                analysis_text += f"\n❌ CORRELACIÓN LIMITADA: La imagen no muestra elementos claramente relacionados con el problema reportado. Los elementos visuales detectados no presentan una correlación directa con la descripción del problema.\n"
+                analysis_text += f"\n🔍 ELEMENTOS DETECTADOS EN LA IMAGEN:\n"
+                for i, label in enumerate(labels[:3], 1):
+                    analysis_text += f"   {i}. {label['description']} (Confianza: {label['score']:.2f})\n"
+                analysis_text += f"\n📋 RECOMENDACIÓN URGENTE: Se recomienda encarecidamente subir una imagen más específica del problema para obtener un análisis más preciso y útil.\n"
         
-        # Análisis de texto detectado
+        # Análisis PROFUNDO de texto detectado
         if text_detections:
+            analysis_text += f"\n\n📝 ANÁLISIS DETALLADO DE TEXTO DETECTADO:\n"
+            for i, text_detection in enumerate(text_detections[:5], 1):
+                text_content = text_detection['description'].strip()
+                if len(text_content) > 3:
+                    analysis_text += f"   {i}. \"{text_content}\"\n"
+            
+            # Análisis de relevancia del texto
             main_text = text_detections[0]['description'] if text_detections else ""
             if main_text and len(main_text.strip()) > 3:
-                analysis_text += f"\n📝 TEXTO DETECTADO: \"{main_text}\" - Esta información puede ser útil para el diagnóstico.\n"
+                analysis_text += f"\n💡 RELEVANCIA DEL TEXTO: El texto detectado \"{main_text}\" puede contener información CRÍTICA para el diagnóstico del problema. Se recomienda analizar cuidadosamente esta información en el contexto del problema reportado.\n"
+                
+                # Verificar si el texto está relacionado con el problema
+                if ticket_description and any(word.lower() in main_text.lower() for word in ticket_description.split() if len(word) > 3):
+                    analysis_text += f"\n🎯 CORRELACIÓN TEXTUAL CONFIRMADA: El texto detectado muestra correlación directa con elementos mencionados en la descripción del problema.\n"
+                else:
+                    analysis_text += f"\n⚠️ ANÁLISIS TEXTUAL: El texto detectado requiere análisis adicional para determinar su relevancia específica con el problema reportado.\n"
+        
+        # Sección final con recomendaciones específicas y prompt profesional
+        analysis_text += f"\n\n🛠️ RECOMENDACIONES ESPECÍFICAS Y ACCIONES INMEDIATAS:\n"
+        analysis_text += f"1. 📸 DOCUMENTACIÓN ADICIONAL: Si la imagen no muestra claramente el problema, se recomienda tomar fotografías adicionales desde diferentes ángulos\n"
+        analysis_text += f"2. 🔍 ANÁLISIS TÉCNICO: Revisar los elementos identificados en el contexto del problema reportado\n"
+        analysis_text += f"3. 📋 SEGUIMIENTO: Monitorear la evolución del problema basándose en los elementos visuales detectados\n"
+        analysis_text += f"4. 🎯 PRIORIZACIÓN: Enfocar la resolución en los elementos con mayor correlación identificados\n"
+        
+        
+        analysis_text += f"\n📊 RESUMEN EJECUTIVO:\n"
+        analysis_text += f"• Elementos detectados: {len(labels)} elementos identificados\n"
+        analysis_text += f"• Nivel de correlación: {relation_percentage:.1f}%\n"
+        analysis_text += f"• Texto detectado: {'Sí' if text_detections else 'No'}\n"
+        analysis_text += f"• Calidad de evidencia: {'Alta' if relation_percentage >= 10 else 'Media' if relation_percentage >= 5 else 'Baja'}\n"
         
         return jsonify({
             "message": "Análisis completado exitosamente",

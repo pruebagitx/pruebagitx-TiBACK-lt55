@@ -1,20 +1,115 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useGlobalReducer from "../hooks/useGlobalReducer";
 
 export const Footer = () => {
-	const { store, getRealtimeStatus, startRealtimeSync } = useGlobalReducer();
+	const { store, getRealtimeStatus, startRealtimeSync, joinAllCriticalRooms } = useGlobalReducer();
 	const [showDetails, setShowDetails] = useState(false);
+	const [isSyncing, setIsSyncing] = useState(false);
 
 	const realtimeStatus = getRealtimeStatus();
 	const { isAuthenticated } = store.auth;
 
-	const handleManualSync = () => {
-		const syncConfig = startRealtimeSync({
-			onSyncTriggered: (data) => {
-				console.log('Sincronización activada:', data);
-			}
+	// Debug: Monitorear cambios en el estado de autenticación
+	useEffect(() => {
+		console.log('🔍 Footer - Estado de autenticación actualizado:', {
+			isAuthenticated: store.auth.isAuthenticated,
+			hasUser: !!store.auth.user,
+			hasToken: !!store.auth.token,
+			userRole: store.auth.user?.role,
+			userId: store.auth.user?.id
 		});
-		syncConfig.triggerSync('manual');
+	}, [store.auth.isAuthenticated, store.auth.user, store.auth.token]);
+
+	const handleManualSync = async () => {
+		if (isSyncing) {
+			console.log('⏳ Sincronización ya en progreso...');
+			return;
+		}
+
+		try {
+			setIsSyncing(true);
+			console.log('🔄 Iniciando sincronización manual desde Footer...');
+
+			// Debug: Verificar estado de autenticación
+			console.log('🔍 Estado de autenticación:', {
+				isAuthenticated: store.auth.isAuthenticated,
+				hasUser: !!store.auth.user,
+				hasToken: !!store.auth.token,
+				userRole: store.auth.user?.role,
+				userId: store.auth.user?.id
+			});
+
+			// Verificar que tenemos los datos necesarios
+			// Permitir sincronización si está autenticado y tiene token, incluso si user aún no está cargado
+			if (!store.auth.isAuthenticated || !store.auth.token) {
+				console.warn('⚠️ No hay usuario autenticado para sincronizar:', {
+					isAuthenticated: store.auth.isAuthenticated,
+					hasUser: !!store.auth.user,
+					hasToken: !!store.auth.token
+				});
+				return;
+			}
+
+			// Si no hay objeto user pero sí hay token, intentar obtenerlo del token
+			let userData = store.auth.user;
+			if (!userData && store.auth.token) {
+				console.log('🔄 Objeto user no disponible, intentando obtener datos del token...');
+				try {
+					// Decodificar el token para obtener información del usuario
+					const tokenPayload = JSON.parse(atob(store.auth.token.split('.')[1]));
+					userData = {
+						id: tokenPayload.user_id,
+						role: tokenPayload.role,
+						email: tokenPayload.email
+					};
+					console.log('✅ Datos de usuario obtenidos del token:', userData);
+				} catch (error) {
+					console.error('❌ Error decodificando token:', error);
+					return;
+				}
+			}
+
+			// Configurar sincronización con callbacks específicos por rol
+			const syncConfig = startRealtimeSync({
+				syncTypes: ['tickets', 'comentarios', 'asignaciones'],
+				onSyncTriggered: (data) => {
+					console.log('✅ Sincronización activada desde Footer:', data);
+					// Emitir evento personalizado para que las vistas puedan reaccionar
+					window.dispatchEvent(new CustomEvent('manualSyncTriggered', {
+						detail: {
+							type: data.type,
+							source: data.source,
+							role: userData.role,
+							timestamp: new Date().toISOString()
+						}
+					}));
+				},
+				onSyncRequested: (data) => {
+					console.log('📡 Solicitud de sincronización enviada:', data);
+				}
+			});
+
+			// Inicializar la sincronización primero
+			if (syncConfig && syncConfig.initializeSync) {
+				syncConfig.initializeSync();
+			}
+
+			// Ejecutar la sincronización manual
+			if (syncConfig && syncConfig.triggerSync) {
+				syncConfig.triggerSync('manual');
+			}
+
+			// Unirse a todas las rooms críticas si hay WebSocket conectado
+			if (store.websocket.connected && store.websocket.socket) {
+				joinAllCriticalRooms(store.websocket.socket, userData);
+			}
+
+			console.log('✅ Sincronización manual completada desde Footer');
+		} catch (error) {
+			console.error('❌ Error en sincronización manual desde Footer:', error);
+		} finally {
+			setIsSyncing(false);
+		}
 	};
 
 	if (!isAuthenticated) {
@@ -44,11 +139,25 @@ export const Footer = () => {
 								</small>
 							</div>
 							<button
-								className="btn btn-sm btn-outline-primary me-2"
+								className={`btn btn-sm me-2 ${isSyncing ? 'btn-warning' : 'btn-outline-primary'}`}
 								onClick={handleManualSync}
-								title="Sincronizar ahora"
+								disabled={isSyncing || !store.auth.isAuthenticated || !store.auth.token}
+								title={
+									isSyncing
+										? "Sincronizando..."
+										: (!store.auth.isAuthenticated || !store.auth.token)
+											? "Usuario no autenticado"
+											: "Sincronizar ahora"
+								}
 							>
-								🔄
+								{isSyncing ? (
+									<>
+										<span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+										⏳
+									</>
+								) : (
+									'🔄'
+								)}
 							</button>
 							<button
 								className="btn btn-sm btn-outline-secondary"

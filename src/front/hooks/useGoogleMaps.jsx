@@ -57,7 +57,10 @@ export const useGoogleMaps = () => {
                                 message.includes('As of February 21st, 2024, google.maps.Marker is deprecated') ||
                                 message.includes('google.maps.places.Autocomplete is not available to new customers') ||
                                 message.includes('Please use google.maps.places.PlaceAutocompleteElement instead') ||
-                                message.includes('As of March 1st, 2025, google.maps.places.Autocomplete')
+                                message.includes('As of March 1st, 2025, google.maps.places.Autocomplete') ||
+                                message.includes('Heatmap Layer functionality') ||
+                                message.includes('deprecated in May 2025') ||
+                                message.includes('Maps JavaScript API')
                             ) {
                                 return; // No mostrar estos warnings
                             }

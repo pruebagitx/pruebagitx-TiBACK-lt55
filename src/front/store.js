@@ -423,15 +423,17 @@ export const authActions = {
         return null;
       }
 
-      // Verificar si ya hay una conexión pendiente
+      // Verificar si ya hay una conexión en progreso
       if (window.websocketConnecting) {
+        console.log('🔄 WebSocket ya está conectando, esperando...');
         return null;
       }
 
       // Verificar si hay un retry reciente (evitar reconexiones demasiado frecuentes)
       const lastRetry = window.lastWebSocketRetry || 0;
       const now = Date.now();
-      if (now - lastRetry < 3000) { // Esperar al menos 3 segundos entre intentos
+      if (now - lastRetry < 5000) { // Esperar al menos 5 segundos entre intentos
+        console.log('⏳ Esperando antes del siguiente intento de conexión...');
         return null;
       }
       window.lastWebSocketRetry = now;
@@ -441,20 +443,20 @@ export const authActions = {
       dispatch({ type: 'websocket_connecting' });
 
       const socket = io(backendUrl, {
-        transports: ['polling', 'websocket'], // Permitir ambos transportes
+        transports: ['polling'], // Empezar solo con polling para evitar errores de frame
         auth: {
           token: token
         },
-        forceNew: false, // Reutilizar conexión existente si está disponible
-        timeout: 15000, // Timeout de 15 segundos
+        forceNew: true, // Forzar nueva conexión
+        timeout: 30000, // Timeout de 30 segundos
         reconnection: true,
-        reconnectionAttempts: 5, // Más intentos de reconexión
-        reconnectionDelay: 1000, // Delay inicial más rápido
-        reconnectionDelayMax: 5000, // Delay máximo reducido
-        maxReconnectionAttempts: 5, // Más intentos de reconexión
+        reconnectionAttempts: 10, // Más intentos de reconexión
+        reconnectionDelay: 2000, // Delay inicial más conservador
+        reconnectionDelayMax: 10000, // Delay máximo aumentado
+        maxReconnectionAttempts: 10, // Más intentos de reconexión
         randomizationFactor: 0.5, // Factor de aleatorización
-        upgrade: true, // Permitir upgrade a WebSocket
-        rememberUpgrade: true, // Recordar upgrade exitoso
+        upgrade: false, // Deshabilitar upgrade automático a WebSocket
+        rememberUpgrade: false, // No recordar upgrade
         autoConnect: true, // Conectar automáticamente
         multiplex: false, // No multiplexar conexiones
         withCredentials: true, // Incluir credenciales
@@ -475,11 +477,8 @@ export const authActions = {
         // Unirse automáticamente a rooms del rol si el usuario está autenticado
         const currentUser = dispatch.getState?.()?.auth?.user;
         if (currentUser) {
-          // Unirse al room del rol
-          socket.emit('join_role_room', {
-            role: currentUser.role,
-            user_id: currentUser.id
-          });
+          // Unirse a todas las rooms críticas
+          authActions.joinAllCriticalRooms(socket, currentUser);
         }
       });
 
@@ -491,6 +490,19 @@ export const authActions = {
       socket.on('connect_error', (error) => {
         window.websocketConnecting = false;
         console.error('❌ Error de conexión WebSocket:', error);
+        
+        // Manejo específico para errores de frame
+        if (error.message && error.message.includes('Invalid frame header')) {
+          console.log('🔄 Error de frame detectado, intentando reconexión con polling...');
+          // Forzar reconexión con polling primero
+          setTimeout(() => {
+            if (socket && !socket.connected) {
+              socket.io.opts.transports = ['polling'];
+              socket.connect();
+            }
+          }, 2000);
+        }
+        
         dispatch({ type: 'websocket_error', payload: { error: error.message } });
       });
 
@@ -498,13 +510,10 @@ export const authActions = {
         console.log(`🔄 WebSocket reconectado después de ${attemptNumber} intentos`);
         dispatch({ type: 'websocket_reconnected', payload: { attempts: attemptNumber } });
         
-        // Reunirse a rooms después de reconexión
+        // Reunirse a todas las rooms críticas después de reconexión
         const currentUser = dispatch.getState?.()?.auth?.user;
         if (currentUser) {
-          socket.emit('join_role_room', {
-            role: currentUser.role,
-            user_id: currentUser.id
-          });
+          authActions.joinAllCriticalRooms(socket, currentUser);
         }
       });
 
@@ -1061,8 +1070,28 @@ export const authActions = {
     }
   },
 
+  // Función para unirse a todas las rooms críticas
+  joinAllCriticalRooms: (socket, userData) => {
+    if (!socket || !userData) return;
+    
+    const { role, id } = userData;
+    console.log(`🚨 Uniéndose a todas las rooms críticas para ${role} (ID: ${id})`);
+    
+    // Unirse al room del rol
+    socket.emit('join_role_room', { role, user_id: id });
+    
+    // Unirse a rooms críticas globales
+    socket.emit('join_critical_rooms', { 
+      role, 
+      user_id: id,
+      critical_rooms: ['global_tickets', 'global_chats', 'critical_updates']
+    });
+    
+    console.log(`✅ Unido a rooms críticas: role_${role}, global_tickets, global_chats, critical_updates`);
+  },
+
   // Funciones de sincronización en tiempo real integradas
-  startRealtimeSync: (dispatch, config = {}) => {
+  startRealtimeSync: (dispatch, config = {}, store = null) => {
     const {
       syncInterval = 30000,
       enablePolling = true,
@@ -1071,8 +1100,25 @@ export const authActions = {
       onSyncRequested = null
     } = config;
 
-    const store = dispatch.getState?.();
+    // Intentar obtener el store de diferentes maneras
+    let currentStore = store;
+    if (!currentStore) {
+      currentStore = dispatch.getState?.();
+    }
+    if (!currentStore && typeof window !== 'undefined' && window.store) {
+      currentStore = window.store;
+    }
+
     const pollingService = authActions.pollingService;
+
+    // Verificar que store esté disponible
+    if (!currentStore) {
+      console.error('❌ No se pudo obtener el estado del store');
+      return {
+        triggerSync: () => console.warn('⚠️ Store no disponible'),
+        stopSync: () => console.warn('⚠️ Store no disponible')
+      };
+    }
 
     // Función para iniciar polling como fallback
     const startPolling = () => {
@@ -1080,7 +1126,7 @@ export const authActions = {
 
       console.log('🔄 Iniciando polling como fallback');
       
-      if (store.auth.user) {
+      if (currentStore.auth.user) {
         const callbacks = {
           tickets: (data) => {
             console.log('📡 Datos de tickets recibidos por polling:', data);
@@ -1102,7 +1148,7 @@ export const authActions = {
           }
         };
 
-        pollingService.setupRoleBasedPolling(store.auth.user.role, callbacks);
+        pollingService.setupRoleBasedPolling(currentStore.auth.user.role, callbacks);
       }
     };
 
@@ -1114,9 +1160,9 @@ export const authActions = {
 
     // Función para solicitar sincronización manual
     const triggerSync = (type = 'manual') => {
-      if (store.websocket.connected && store.websocket.socket) {
+      if (currentStore.websocket && currentStore.websocket.connected && currentStore.websocket.socket) {
         console.log(`🔄 Solicitando sincronización: ${type}`);
-        authActions.requestSync(store.websocket.socket, type);
+        authActions.requestSync(currentStore.websocket.socket, type);
       } else {
         console.log('⚠️ WebSocket no conectado, usando polling');
         startPolling();
@@ -1125,30 +1171,32 @@ export const authActions = {
 
     // Función para unirse a rooms de sincronización
     const joinSyncRooms = () => {
-      if (store.auth.user && store.websocket.connected && store.websocket.socket) {
-        const { role, id } = store.auth.user;
-        authActions.joinRoleRoom(store.websocket.socket, role, id);
+      if (currentStore.auth.user && currentStore.websocket && currentStore.websocket.connected && currentStore.websocket.socket) {
+        const { role, id } = currentStore.auth.user;
+        authActions.joinRoleRoom(currentStore.websocket.socket, role, id);
         console.log(`🏠 Unido a rooms de sincronización para ${role} (${id})`);
       }
     };
 
     // Función para salir de rooms de sincronización
     const leaveSyncRooms = () => {
-      if (store.auth.user && store.websocket.connected && store.websocket.socket) {
-        const { role, id } = store.auth.user;
-        authActions.leaveRoleRoom(store.websocket.socket, role, id);
+      if (currentStore.auth.user && currentStore.websocket && currentStore.websocket.connected && currentStore.websocket.socket) {
+        const { role, id } = currentStore.auth.user;
+        authActions.leaveRoleRoom(currentStore.websocket.socket, role, id);
         console.log(`👋 Saliendo de rooms de sincronización para ${role} (${id})`);
       }
     };
 
-    // Manejar cambios en el estado de WebSocket
-    if (store.websocket.connected) {
-      stopPolling();
-      joinSyncRooms();
-    } else {
-      leaveSyncRooms();
-      startPolling();
-    }
+    // Función para inicializar la sincronización (no ejecutar automáticamente)
+    const initializeSync = () => {
+      if (currentStore.websocket && currentStore.websocket.connected) {
+        stopPolling();
+        joinSyncRooms();
+      } else {
+        leaveSyncRooms();
+        startPolling();
+      }
+    };
 
     return {
       triggerSync,
@@ -1156,6 +1204,7 @@ export const authActions = {
       stopPolling,
       joinSyncRooms,
       leaveSyncRooms,
+      initializeSync,
       pollingStats: pollingService.getStats()
     };
   },
