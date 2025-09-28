@@ -49,22 +49,22 @@ const HeatmapComponent = () => {
         }]
     }), [mapCenter]);
 
-    // Configuración del gradiente de calor
+    // Configuración del gradiente de calor - 2 tonos de azul y 1 rojo (configuración original)
     const heatmapGradient = useMemo(() => [
-        'rgba(0, 255, 255, 0)',
-        'rgba(0, 255, 255, 1)',
-        'rgba(0, 191, 255, 1)',
-        'rgba(0, 127, 255, 1)',
-        'rgba(0, 63, 255, 1)',
-        'rgba(0, 0, 255, 1)',
-        'rgba(0, 0, 223, 1)',
-        'rgba(0, 0, 191, 1)',
-        'rgba(0, 0, 159, 1)',
-        'rgba(0, 0, 127, 1)',
-        'rgba(63, 0, 91, 1)',
-        'rgba(127, 0, 63, 1)',
-        'rgba(191, 0, 31, 1)',
-        'rgba(255, 0, 0, 1)'
+        'rgba(0, 255, 255, 0)',      // Transparente en el centro
+        'rgba(0, 255, 255, 1)',      // Cian
+        'rgba(0, 191, 255, 1)',      // Azul claro
+        'rgba(0, 127, 255, 1)',      // Azul
+        'rgba(0, 63, 255, 1)',       // Azul medio
+        'rgba(0, 0, 255, 1)',        // Azul puro
+        'rgba(0, 0, 223, 1)',        // Azul oscuro
+        'rgba(0, 0, 191, 1)',        // Azul más oscuro
+        'rgba(0, 0, 159, 1)',        // Azul muy oscuro
+        'rgba(0, 0, 127, 1)',        // Azul marino
+        'rgba(63, 0, 91, 1)',        // Púrpura
+        'rgba(127, 0, 63, 1)',       // Magenta
+        'rgba(191, 0, 31, 1)',       // Rojo oscuro
+        'rgba(255, 0, 0, 1)'         // Rojo puro
     ], []);
 
     // Función optimizada para obtener color del marcador
@@ -83,17 +83,17 @@ const HeatmapComponent = () => {
 
     // Función optimizada para calcular peso del heatmap
     const calculateHeatmapWeight = useCallback((item) => {
-        let weight = 1;
-
+        let weight = 1; // Peso base original
+        
         // Peso por prioridad
         const priorityWeights = { 'alta': 3, 'media': 2, 'baja': 1 };
         weight += priorityWeights[item.ticket_prioridad] || 0;
-
+        
         // Peso por estado
         const stateWeights = { 'en_proceso': 2, 'en_espera': 1.5, 'creado': 1 };
         weight += stateWeights[item.ticket_estado] || 0;
-
-        return Math.max(0.5, Math.min(10, weight));
+        
+        return Math.max(0.5, Math.min(10, weight)); // Rango original
     }, []);
 
     // Función optimizada para procesar datos
@@ -129,9 +129,10 @@ const HeatmapComponent = () => {
     // Función optimizada para crear datos del heatmap
     const createHeatmapData = useCallback((transformedData) => {
         return transformedData.map((item) => {
-            const latVariation = (Math.random() - 0.5) * 0.001;
+            // Añadir variación geográfica sutil para evitar superposición exacta
+            const latVariation = (Math.random() - 0.5) * 0.001; // ±0.0005 grados
             const lngVariation = (Math.random() - 0.5) * 0.001;
-
+            
             return {
                 location: new window.google.maps.LatLng(
                     item.lat + latVariation,
@@ -276,11 +277,11 @@ const HeatmapComponent = () => {
                 heatmapLayerRef.current = new window.google.maps.visualization.HeatmapLayer({
                     data: [],
                     map: null,
-                    radius: 50,
-                    opacity: 0.8,
+                    radius: 50, // Radio original
+                    opacity: 0.8, // Opacidad original
                     gradient: heatmapGradient,
-                    dissipating: true,
-                    maxIntensity: 10
+                    dissipating: true, // Dispersión original
+                    maxIntensity: 10 // Intensidad máxima original
                 });
                 console.log('🔥 HeatmapLayer creado');
             } else {
@@ -429,18 +430,26 @@ const HeatmapComponent = () => {
     // Inicializar mapa cuando Google Maps esté listo
     useEffect(() => {
         if (isLoaded && !googleMapsError) {
-            // Intentar inicializar inmediatamente
-            initializeMap();
+            let attempts = 0;
+            const maxAttempts = 50; // Máximo 5 segundos (50 * 100ms)
 
-            // Si no se pudo inicializar, reintentar después de un delay
-            const timeoutId = setTimeout(() => {
-                if (!mapInstanceRef.current && mapRef.current) {
-                    console.log('🔄 Reintentando inicialización del mapa...');
+            // Esperar a que el DOM esté completamente renderizado
+            const initializeWithDelay = () => {
+                attempts++;
+
+                if (mapRef.current && !mapInstanceRef.current) {
+                    console.log('🔄 Inicializando mapa con mapRef disponible...');
                     initializeMap();
+                } else if (!mapRef.current && attempts < maxAttempts) {
+                    console.log(`⏳ mapRef aún no disponible (intento ${attempts}/${maxAttempts}), reintentando en 100ms...`);
+                    setTimeout(initializeWithDelay, 100);
+                } else if (attempts >= maxAttempts) {
+                    console.error('❌ Timeout: No se pudo obtener mapRef después de 5 segundos');
                 }
-            }, 500);
+            };
 
-            return () => clearTimeout(timeoutId);
+            // Iniciar el proceso de inicialización
+            initializeWithDelay();
         }
     }, [isLoaded, googleMapsError, initializeMap]);
 
@@ -451,10 +460,10 @@ const HeatmapComponent = () => {
         }
     }, [mapInitialized, rawData, updateMapData]);
 
-    // Efecto adicional para cuando mapRef se vuelve disponible
+    // Efecto adicional para cuando mapRef se vuelve disponible (backup)
     useEffect(() => {
         if (isLoaded && !googleMapsError && mapRef.current && !mapInstanceRef.current) {
-            console.log('🔄 mapRef disponible, inicializando mapa...');
+            console.log('🔄 mapRef disponible (backup), inicializando mapa...');
             initializeMap();
         }
     }, [mapRef.current, isLoaded, googleMapsError, initializeMap]);
