@@ -49,21 +49,21 @@ const HeatmapComponent = () => {
         }]
     }), [mapCenter]);
 
-    // Configuración del gradiente de calor - 2 tonos de azul y 1 rojo (configuración original)
+    // Configuración del gradiente de calor - Paleta completa de rojos
     const heatmapGradient = useMemo(() => [
-        'rgba(0, 255, 255, 0)',      // Transparente en el centro
-        'rgba(0, 255, 255, 1)',      // Cian
-        'rgba(0, 191, 255, 1)',      // Azul claro
-        'rgba(0, 127, 255, 1)',      // Azul
-        'rgba(0, 63, 255, 1)',       // Azul medio
-        'rgba(0, 0, 255, 1)',        // Azul puro
-        'rgba(0, 0, 223, 1)',        // Azul oscuro
-        'rgba(0, 0, 191, 1)',        // Azul más oscuro
-        'rgba(0, 0, 159, 1)',        // Azul muy oscuro
-        'rgba(0, 0, 127, 1)',        // Azul marino
-        'rgba(63, 0, 91, 1)',        // Púrpura
-        'rgba(127, 0, 63, 1)',       // Magenta
-        'rgba(191, 0, 31, 1)',       // Rojo oscuro
+        'rgba(255, 0, 0, 0)',        // Transparente en el centro
+        'rgba(255, 200, 200, 1)',    // Rojo muy claro
+        'rgba(255, 180, 180, 1)',    // Rojo claro
+        'rgba(255, 160, 160, 1)',    // Rojo medio claro
+        'rgba(255, 140, 140, 1)',    // Rojo medio
+        'rgba(255, 120, 120, 1)',    // Rojo medio intenso
+        'rgba(255, 100, 100, 1)',    // Rojo intenso
+        'rgba(255, 80, 80, 1)',      // Rojo más intenso
+        'rgba(255, 60, 60, 1)',      // Rojo muy intenso
+        'rgba(255, 40, 40, 1)',      // Rojo super intenso
+        'rgba(255, 20, 20, 1)',      // Rojo extremo
+        'rgba(255, 10, 10, 1)',      // Rojo casi puro
+        'rgba(255, 5, 5, 1)',        // Rojo casi puro
         'rgba(255, 0, 0, 1)'         // Rojo puro
     ], []);
 
@@ -84,15 +84,15 @@ const HeatmapComponent = () => {
     // Función optimizada para calcular peso del heatmap
     const calculateHeatmapWeight = useCallback((item) => {
         let weight = 1; // Peso base original
-        
+
         // Peso por prioridad
         const priorityWeights = { 'alta': 3, 'media': 2, 'baja': 1 };
         weight += priorityWeights[item.ticket_prioridad] || 0;
-        
+
         // Peso por estado
         const stateWeights = { 'en_proceso': 2, 'en_espera': 1.5, 'creado': 1 };
         weight += stateWeights[item.ticket_estado] || 0;
-        
+
         return Math.max(0.5, Math.min(10, weight)); // Rango original
     }, []);
 
@@ -132,7 +132,7 @@ const HeatmapComponent = () => {
             // Añadir variación geográfica sutil para evitar superposición exacta
             const latVariation = (Math.random() - 0.5) * 0.001; // ±0.0005 grados
             const lngVariation = (Math.random() - 0.5) * 0.001;
-            
+
             return {
                 location: new window.google.maps.LatLng(
                     item.lat + latVariation,
@@ -555,14 +555,14 @@ const HeatmapComponent = () => {
                                     <div style={{
                                         width: '20px',
                                         height: '20px',
-                                        background: 'linear-gradient(45deg, rgba(0,255,255,0.3), rgba(255,0,0,1))',
+                                        background: 'linear-gradient(45deg, rgba(255,200,200,0.3), rgba(255,0,0,1))',
                                         borderRadius: '50%',
                                         border: '2px solid #fff',
                                         boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
                                     }}></div>
                                     <small><strong>Mapa de Calor</strong></small>
                                 </div>
-                                <small className="text-muted">• Intensidad basada en prioridad y estado</small>
+                                <small className="text-muted">• Paleta completa de rojos según intensidad</small>
                             </div>
                             <div className="d-flex align-items-center gap-1">
                                 <i className="fas fa-info-circle text-info"></i>
