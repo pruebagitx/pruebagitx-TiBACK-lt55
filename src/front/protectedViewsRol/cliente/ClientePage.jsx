@@ -28,7 +28,7 @@ const tokenUtils = {
 
 export function ClientePage() {
     const navigate = useNavigate();
-    const { store, logout, dispatch, connectWebSocket, disconnectWebSocket, joinRoom, joinTicketRoom } = useGlobalReducer();
+    const { store, logout, dispatch, connectWebSocket, disconnectWebSocket, joinRoom, joinTicketRoom, startRealtimeSync, emitCriticalTicketAction, joinCriticalRooms } = useGlobalReducer();
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -150,6 +150,49 @@ export function ClientePage() {
             });
         }
     }, [store.websocket.socket, tickets.length]); // Solo cuando cambia la cantidad de tickets
+
+    // Configurar sincronización crítica en tiempo real
+    useEffect(() => {
+        if (store.auth.user && store.websocket.connected && store.websocket.socket) {
+            // Configurar sincronización crítica
+            const syncConfig = startRealtimeSync({
+                syncTypes: ['tickets', 'comentarios'],
+                onSyncTriggered: (data) => {
+                    console.log('🚨 Sincronización crítica activada en ClientePage:', data);
+                    if (data.type === 'tickets' || data.priority === 'critical') {
+                        actualizarTickets();
+                    }
+                }
+            });
+
+            // Unirse a rooms críticos de todos los tickets del cliente
+            const ticketIds = tickets.map(ticket => ticket.id);
+            if (ticketIds.length > 0) {
+                joinCriticalRooms(store.websocket.socket, ticketIds, store.auth.user);
+            }
+        }
+    }, [store.auth.user, store.websocket.connected, tickets.length]);
+
+    // Efecto para manejar actualizaciones críticas de tickets
+    useEffect(() => {
+        if (store.websocket.criticalTicketUpdate) {
+            const criticalUpdate = store.websocket.criticalTicketUpdate;
+            console.log('🚨 ACTUALIZACIÓN CRÍTICA RECIBIDA EN CLIENTE:', criticalUpdate);
+
+            // Actualizar inmediatamente para acciones críticas
+            if (criticalUpdate.priority === 'critical') {
+                actualizarTickets();
+
+                // Mostrar notificación visual si es necesario
+                if (criticalUpdate.action === 'comentario_agregado' ||
+                    criticalUpdate.action === 'ticket_actualizado' ||
+                    criticalUpdate.action.includes('estado_cambiado') ||
+                    criticalUpdate.action.includes('ticket_asignado')) {
+                    console.log(`🚨 Acción crítica: ${criticalUpdate.action} en ticket ${criticalUpdate.ticket_id}`);
+                }
+            }
+        }
+    }, [store.websocket.criticalTicketUpdate]);
 
     // Actualizar tickets cuando lleguen notificaciones WebSocket
     useEffect(() => {
@@ -314,24 +357,23 @@ export function ClientePage() {
             setTicketImageUrl(''); // Limpiar la imagen también
             setShowTicketForm(false); // Cerrar el formulario
 
+            // Obtener el ID del ticket creado para emitir acción crítica
+            const responseData = await response.json();
+            const ticketId = responseData.id;
+
+            // Emitir acción crítica de ticket creado
+            if (store.websocket.socket && ticketId) {
+                emitCriticalTicketAction(store.websocket.socket, ticketId, 'ticket_creado', store.auth.user);
+            }
+
             // Actualizar tickets sin recargar la página
             await actualizarTickets();
 
             // Unirse al room del nuevo ticket
-            if (store.websocket.socket) {
-                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/cliente`, {
-                    headers: {
-                        'Authorization': `Bearer ${store.auth.token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                if (response.ok) {
-                    const ticketsData = await response.json();
-                    const nuevoTicket = ticketsData[ticketsData.length - 1]; // El último ticket creado
-                    if (nuevoTicket) {
-                        joinTicketRoom(store.websocket.socket, nuevoTicket.id);
-                    }
-                }
+            if (store.websocket.socket && ticketId) {
+                joinTicketRoom(store.websocket.socket, ticketId);
+                // También unirse a rooms críticos
+                joinCriticalRooms(store.websocket.socket, [ticketId], store.auth.user);
             }
         } catch (err) {
             setError(err.message);

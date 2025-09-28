@@ -51,19 +51,80 @@ def get_socketio():
         # Log del error pero no interrumpir la funcionalidad
         return None
 
-# Función helper para emitir eventos WebSocket de manera segura
-def emit_websocket_event(event_name, data, room=None):
-    """Emite un evento WebSocket de manera segura, sin interrumpir la funcionalidad si falla"""
+# Función helper mejorada para emitir eventos WebSocket de manera segura
+def emit_websocket_event(event_name, data, room=None, include_self=False, callback=None):
+    """
+    Emite eventos WebSocket de manera robusta con manejo de errores
+    
+    Args:
+        event_name (str): Nombre del evento
+        data (dict): Datos a enviar
+        room (str, optional): Room específica. Si es None, envía a todos
+        include_self (bool): Si incluir al emisor en el broadcast
+        callback (callable, optional): Callback para manejar confirmación
+    """
     try:
         socketio = get_socketio()
         if socketio:
+            # Agregar timestamp si no existe
+            if 'timestamp' not in data:
+                data['timestamp'] = datetime.now().isoformat()
+            
             if room:
-                socketio.emit(event_name, data, room=room)
+                socketio.emit(event_name, data, room=room, include_self=include_self, callback=callback)
+                print(f"📤 Evento '{event_name}' enviado a room '{room}'")
             else:
-                socketio.emit(event_name, data)
+                socketio.emit(event_name, data, callback=callback)
+                print(f"📤 Evento '{event_name}' enviado globalmente")
+                
+            return True
     except Exception as e:
-        # WebSocket no disponible o error, continuar sin notificación
-        pass
+        print(f"❌ Error enviando WebSocket '{event_name}': {e}")
+        # En caso de error, podrías implementar un sistema de cola aquí
+        return False
+    
+    return False
+
+def emit_websocket_to_role(event_name, data, role, include_self=False):
+    """Emite evento a todos los usuarios de un rol específico"""
+    role_room = f'role_{role}'
+    return emit_websocket_event(event_name, data, room=role_room, include_self=include_self)
+
+def emit_websocket_to_user(event_name, data, user_id):
+    """Emite evento a un usuario específico"""
+    user_room = f'user_{user_id}'
+    return emit_websocket_event(event_name, data, room=user_room)
+
+def emit_websocket_to_ticket(event_name, data, ticket_id, include_self=False):
+    """Emite evento a todos los usuarios conectados a un ticket"""
+    ticket_room = f'room_ticket_{ticket_id}'
+    return emit_websocket_event(event_name, data, room=ticket_room, include_self=include_self)
+
+def emit_critical_ticket_action(ticket_id, action, user_data):
+    """Emite evento crítico de ticket a todos los roles críticos"""
+    critical_roles = ['cliente', 'analista', 'supervisor']
+    
+    # Emitir a roles críticos
+    for role in critical_roles:
+        emit_websocket_to_role('critical_ticket_update', {
+            'ticket_id': ticket_id,
+            'action': action,
+            'user_id': user_data['id'],
+            'role': user_data['role'],
+            'priority': 'critical'
+        }, role, include_self=False)
+    
+    # Emitir al room del ticket
+    emit_websocket_to_ticket('critical_ticket_update', {
+        'ticket_id': ticket_id,
+        'action': action,
+        'user_id': user_data['id'],
+        'role': user_data['role'],
+        'priority': 'critical'
+    }, ticket_id, include_self=False)
+    
+    print(f'🚨 Evento crítico emitido: {action} en ticket {ticket_id} por {user_data["role"]} (ID: {user_data["id"]})')
+    return True
 
 # Funciones helper para manejo de errores
 def handle_database_error(e, operation="operación"):
@@ -477,21 +538,16 @@ def create_comentario():
         db.session.add(comentario)
         db.session.commit()
         
-        # Emitir evento WebSocket para notificar nuevo comentario al room del ticket
-        socketio = get_socketio()
-        if socketio:
-            try:
-                # Notificar a todos los usuarios conectados al room del ticket
-                ticket_room = f'room_ticket_{comentario.id_ticket}'
-                socketio.emit('nuevo_comentario', {
-                    'comentario': comentario.serialize(),
-                    'tipo': 'comentario_agregado',
-                    'timestamp': datetime.now().isoformat()
-                }, room=ticket_room)
-                
-                    
-            except Exception as e:
-                print(f"Error enviando WebSocket: {e}")
+        # Emitir evento crítico para nuevo comentario
+        emit_critical_ticket_action(comentario.id_ticket, 'comentario_agregado', user)
+        
+        # También emitir evento normal para compatibilidad
+        emit_websocket_to_ticket('nuevo_comentario', {
+            'comentario': comentario.serialize(),
+            'tipo': 'comentario_agregado',
+            'usuario': user['role'],
+            'usuario_id': user['id']
+        }, comentario.id_ticket, include_self=False)
         
         return jsonify(comentario.serialize()), 201
     except IntegrityError:
@@ -777,33 +833,29 @@ def create_ticket():
         db.session.commit()
         
         # Emitir evento WebSocket para notificar nuevo ticket
-        socketio = get_socketio()
-        if socketio:
-            try:
-                # Datos del ticket
-                ticket_data = {
-                    'ticket_id': ticket.id,
-                    'ticket_estado': ticket.estado,
-                    'ticket_titulo': ticket.titulo,
-                    'ticket_prioridad': ticket.prioridad,
-                    'cliente_id': ticket.id_cliente,
-                    'tipo': 'creado',
-                    'timestamp': datetime.now().isoformat()
-                }
-                
-                # Notificar al room del ticket (todos los involucrados se unirán automáticamente)
-                ticket_room = f'room_ticket_{ticket.id}'
-                socketio.emit('nuevo_ticket', ticket_data, room=ticket_room)
-                
-                # Notificar a supervisores y administradores para asignación
-                socketio.emit('nuevo_ticket_disponible', ticket_data, room='supervisores')
-                socketio.emit('nuevo_ticket_disponible', ticket_data, room='administradores')
-                
-                # Notificar a administradores para actualizar CRUD de tickets
-                socketio.emit('nuevo_ticket', ticket_data, room='administradores')
-                
-            except Exception as e:
-                print(f"Error enviando WebSocket de nuevo ticket: {e}")
+        # Datos del ticket para notificaciones
+        ticket_data = {
+            'ticket_id': ticket.id,
+            'ticket_estado': ticket.estado,
+            'ticket_titulo': ticket.titulo,
+            'ticket_prioridad': ticket.prioridad,
+            'cliente_id': ticket.id_cliente,
+            'tipo': 'creado'
+        }
+        
+        # Emitir evento crítico para nuevo ticket
+        user_data = get_user_from_token()
+        emit_critical_ticket_action(ticket.id, 'ticket_creado', user_data)
+        
+        # Notificar al room del ticket
+        emit_websocket_to_ticket('nuevo_ticket', ticket_data, ticket.id, include_self=False)
+        
+        # Notificar a supervisores y administradores para asignación
+        emit_websocket_to_role('nuevo_ticket_disponible', ticket_data, 'supervisor', include_self=False)
+        emit_websocket_to_role('nuevo_ticket_disponible', ticket_data, 'administrador', include_self=False)
+        
+        # Notificar a administradores para actualizar CRUD de tickets
+        emit_websocket_to_role('nuevo_ticket', ticket_data, 'administrador', include_self=False)
         
         return jsonify(ticket.serialize()), 201
 
@@ -927,22 +979,17 @@ def update_ticket(id):
                 setattr(ticket, field, value)
         db.session.commit()
         
-        # Emitir evento WebSocket para notificar actualización al room del ticket
-        socketio = get_socketio()
-        if socketio:
-            try:
-                # Notificar a todos los usuarios conectados al room del ticket
-                ticket_room = f'room_ticket_{ticket.id}'
-                socketio.emit('ticket_actualizado', {
-                    'ticket': ticket.serialize(),
-                    'tipo': 'actualizado',
-                    'usuario': get_user_from_token()['role'],
-                    'timestamp': datetime.now().isoformat()
-                }, room=ticket_room)
-                
-                    
-            except Exception as e:
-                print(f"Error enviando WebSocket: {e}")
+        # Emitir evento crítico para actualización de ticket
+        user = get_user_from_token()
+        emit_critical_ticket_action(ticket.id, 'ticket_actualizado', user)
+        
+        # También emitir evento normal para compatibilidad
+        emit_websocket_to_ticket('ticket_actualizado', {
+            'ticket': ticket.serialize(),
+            'tipo': 'actualizado',
+            'usuario': user['role'],
+            'usuario_id': user['id']
+        }, ticket.id, include_self=False)
         
         return jsonify(ticket.serialize()), 200
     except IntegrityError:

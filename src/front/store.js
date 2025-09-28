@@ -368,7 +368,7 @@ export const authActions = {
     return allowedRoles.includes(userRole);
   },
 
-  // Funciones de WebSocket
+  // Funciones de WebSocket mejoradas
   connectWebSocket: (dispatch, token) => {
     try {
       const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -441,23 +441,27 @@ export const authActions = {
       dispatch({ type: 'websocket_connecting' });
 
       const socket = io(backendUrl, {
-        transports: ['polling'], // Solo usar polling para evitar problemas de WebSocket
+        transports: ['polling', 'websocket'], // Permitir ambos transportes
         auth: {
           token: token
         },
         forceNew: false, // Reutilizar conexión existente si está disponible
         timeout: 15000, // Timeout de 15 segundos
         reconnection: true,
-        reconnectionAttempts: 3, // Intentos de reconexión
-        reconnectionDelay: 2000, // Delay entre reconexiones
-        reconnectionDelayMax: 10000, // Delay máximo entre reconexiones
-        maxReconnectionAttempts: 3, // Máximo de intentos de reconexión
+        reconnectionAttempts: 5, // Más intentos de reconexión
+        reconnectionDelay: 1000, // Delay inicial más rápido
+        reconnectionDelayMax: 5000, // Delay máximo reducido
+        maxReconnectionAttempts: 5, // Más intentos de reconexión
         randomizationFactor: 0.5, // Factor de aleatorización
-        upgrade: false, // Deshabilitar upgrade para evitar errores de frame header
-        rememberUpgrade: false, // No recordar upgrade
+        upgrade: true, // Permitir upgrade a WebSocket
+        rememberUpgrade: true, // Recordar upgrade exitoso
         autoConnect: true, // Conectar automáticamente
         multiplex: false, // No multiplexar conexiones
         withCredentials: true, // Incluir credenciales
+        // Configuraciones adicionales para mejor rendimiento
+        pingTimeout: 60000, // 60 segundos
+        pingInterval: 25000, // 25 segundos
+        // Headers adicionales
         extraHeaders: {
           'X-Requested-With': 'XMLHttpRequest'
         }
@@ -465,7 +469,86 @@ export const authActions = {
 
       socket.on('connect', () => {
         window.websocketConnecting = false;
+        console.log('🔌 WebSocket conectado exitosamente');
         dispatch({ type: 'websocket_connected', payload: socket });
+        
+        // Unirse automáticamente a rooms del rol si el usuario está autenticado
+        const currentUser = dispatch.getState?.()?.auth?.user;
+        if (currentUser) {
+          // Unirse al room del rol
+          socket.emit('join_role_room', {
+            role: currentUser.role,
+            user_id: currentUser.id
+          });
+        }
+      });
+
+      socket.on('disconnect', (reason) => {
+        console.log('🔌 WebSocket desconectado:', reason);
+        dispatch({ type: 'websocket_disconnected', payload: { reason } });
+      });
+
+      socket.on('connect_error', (error) => {
+        window.websocketConnecting = false;
+        console.error('❌ Error de conexión WebSocket:', error);
+        dispatch({ type: 'websocket_error', payload: { error: error.message } });
+      });
+
+      socket.on('reconnect', (attemptNumber) => {
+        console.log(`🔄 WebSocket reconectado después de ${attemptNumber} intentos`);
+        dispatch({ type: 'websocket_reconnected', payload: { attempts: attemptNumber } });
+        
+        // Reunirse a rooms después de reconexión
+        const currentUser = dispatch.getState?.()?.auth?.user;
+        if (currentUser) {
+          socket.emit('join_role_room', {
+            role: currentUser.role,
+            user_id: currentUser.id
+          });
+        }
+      });
+
+      socket.on('reconnect_attempt', (attemptNumber) => {
+        console.log(`🔄 Intento de reconexión WebSocket #${attemptNumber}`);
+        dispatch({ type: 'websocket_reconnecting', payload: { attempt: attemptNumber } });
+      });
+
+      socket.on('reconnect_error', (error) => {
+        console.error('❌ Error en reconexión WebSocket:', error);
+        dispatch({ type: 'websocket_reconnect_error', payload: { error: error.message } });
+      });
+
+      socket.on('reconnect_failed', () => {
+        console.error('❌ Falló la reconexión WebSocket después de todos los intentos');
+        dispatch({ type: 'websocket_reconnect_failed' });
+      });
+
+      // Eventos de sincronización global
+      socket.on('sync_triggered', (data) => {
+        console.log('🔄 Sincronización global solicitada:', data);
+        dispatch({ type: 'sync_triggered', payload: data });
+      });
+
+      socket.on('sync_requested', (data) => {
+        console.log('🔄 Solicitud de sincronización recibida:', data);
+        dispatch({ type: 'sync_requested', payload: data });
+      });
+
+      // Eventos críticos de tickets
+      socket.on('critical_ticket_update', (data) => {
+        console.log('🚨 ACTUALIZACIÓN CRÍTICA DE TICKET:', data);
+        dispatch({ 
+          type: 'critical_ticket_update', 
+          payload: {
+            ...data,
+            timestamp: Date.now()
+          }
+        });
+      });
+
+      socket.on('joined_critical_rooms', (data) => {
+        console.log('🔐 Unido a rooms críticos:', data);
+        dispatch({ type: 'joined_critical_rooms', payload: data });
       });
 
       // Remover el evento disconnect duplicado - se maneja más abajo
@@ -717,11 +800,410 @@ export const authActions = {
 
   disconnectWebSocket: (dispatch, socket) => {
     if (socket) {
+      // Salir de todas las rooms antes de desconectar
+      const currentUser = dispatch.getState?.()?.auth?.user;
+      if (currentUser) {
+        socket.emit('leave_role_room', {
+          role: currentUser.role,
+          user_id: currentUser.id
+        });
+      }
+      
       // Limpiar todos los listeners antes de desconectar
       socket.removeAllListeners();
       socket.disconnect();
       dispatch({ type: 'websocket_disconnected' });
     }
+  },
+
+  // Función para solicitar sincronización global
+  requestSync: (socket, syncType = 'all', userData = null) => {
+    if (socket && socket.connected) {
+      const currentUser = userData || (typeof window !== 'undefined' && window.store?.auth?.user);
+      if (currentUser) {
+        socket.emit('request_sync', {
+          type: syncType,
+          user_id: currentUser.id,
+          role: currentUser.role
+        });
+      }
+    }
+  },
+
+  // Función para emitir acción crítica de ticket
+  emitCriticalTicketAction: (socket, ticketId, action, userData = null) => {
+    if (socket && socket.connected) {
+      const currentUser = userData || (typeof window !== 'undefined' && window.store?.auth?.user);
+      if (currentUser) {
+        console.log(`🚨 Emitiendo acción crítica: ${action} en ticket ${ticketId}`);
+        socket.emit('critical_ticket_action', {
+          ticket_id: ticketId,
+          action: action,
+          user_id: currentUser.id,
+          role: currentUser.role
+        });
+      }
+    }
+  },
+
+  // Función para unirse a rooms críticos
+  joinCriticalRooms: (socket, ticketIds = [], userData = null) => {
+    if (socket && socket.connected) {
+      const currentUser = userData || (typeof window !== 'undefined' && window.store?.auth?.user);
+      if (currentUser) {
+        console.log(`🔐 Uniéndose a rooms críticos para tickets: ${ticketIds.join(', ')}`);
+        socket.emit('join_critical_rooms', {
+          user_id: currentUser.id,
+          role: currentUser.role,
+          ticket_ids: ticketIds
+        });
+      }
+    }
+  },
+
+  // Función para unirse a room de rol
+  joinRoleRoom: (socket, role, userId) => {
+    if (socket && socket.connected) {
+      socket.emit('join_role_room', {
+        role: role,
+        user_id: userId
+      });
+    }
+  },
+
+  // Función para salir de room de rol
+  leaveRoleRoom: (socket, role, userId) => {
+    if (socket && socket.connected) {
+      socket.emit('leave_role_room', {
+        role: role,
+        user_id: userId
+      });
+    }
+  },
+
+  // Servicio de polling integrado
+  pollingService: {
+    intervals: new Map(),
+    isActive: false,
+    retryCounts: new Map(),
+    lastCallbacks: new Map(),
+
+    startPolling(type, callback, interval = 30000, options = {}) {
+      if (this.intervals.has(type)) {
+        console.log(`⚠️ Polling ya activo para ${type}`);
+        return;
+      }
+
+      const {
+        endpoint = this.getEndpoint(type),
+        method = 'GET',
+        headers = {},
+        onError = null,
+        retryOnError = true,
+        maxRetries = 3
+      } = options;
+
+      console.log(`🔄 Iniciando polling para ${type} cada ${interval}ms`);
+
+      const pollFunction = async () => {
+        try {
+          const backendUrl = import.meta.env.VITE_BACKEND_URL;
+          const token = localStorage.getItem('token');
+          
+          const response = await fetch(`${backendUrl}${endpoint}`, {
+            method,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+              ...headers
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          callback(data);
+          
+          // Reset retry count on success
+          this.retryCounts.set(type, 0);
+          
+        } catch (error) {
+          console.error(`❌ Error en polling ${type}:`, error);
+          
+          if (onError) {
+            onError(error);
+          }
+
+          if (retryOnError) {
+            this.handleRetry(type, error, maxRetries);
+          }
+        }
+      };
+
+      // Ejecutar inmediatamente
+      pollFunction();
+
+      // Configurar intervalo
+      const intervalId = setInterval(pollFunction, interval);
+      this.intervals.set(type, intervalId);
+      this.lastCallbacks.set(type, callback);
+      this.isActive = true;
+
+      return intervalId;
+    },
+
+    stopPolling(type) {
+      const intervalId = this.intervals.get(type);
+      if (intervalId) {
+        clearInterval(intervalId);
+        this.intervals.delete(type);
+        this.lastCallbacks.delete(type);
+        console.log(`⏹️ Polling detenido para ${type}`);
+      }
+
+      if (this.intervals.size === 0) {
+        this.isActive = false;
+      }
+    },
+
+    stopAllPolling() {
+      console.log('⏹️ Deteniendo todo el polling');
+      this.intervals.forEach((intervalId, type) => {
+        clearInterval(intervalId);
+        console.log(`⏹️ Polling detenido para ${type}`);
+      });
+      this.intervals.clear();
+      this.lastCallbacks.clear();
+      this.isActive = false;
+    },
+
+    getEndpoint(type) {
+      const endpoints = {
+        tickets: '/api/tickets',
+        comentarios: '/api/comentarios',
+        asignaciones: '/api/asignaciones',
+        clientes: '/api/clientes',
+        analistas: '/api/analistas',
+        supervisores: '/api/supervisores',
+        administradores: '/api/administradores',
+        gestion: '/api/gestion'
+      };
+      return endpoints[type] || '/api/tickets';
+    },
+
+    handleRetry(type, error, maxRetries) {
+      const currentRetries = this.retryCounts.get(type) || 0;
+      
+      if (currentRetries < maxRetries) {
+        this.retryCounts.set(type, currentRetries + 1);
+        console.log(`🔄 Reintentando polling ${type} (${currentRetries + 1}/${maxRetries})`);
+        
+        const delay = Math.min(1000 * Math.pow(2, currentRetries), 30000);
+        setTimeout(() => {
+          if (this.intervals.has(type)) {
+            const callback = this.lastCallbacks.get(type);
+            if (callback) {
+              this.startPolling(type, callback, 30000);
+            }
+          }
+        }, delay);
+      } else {
+        console.error(`❌ Máximo de reintentos alcanzado para ${type}`);
+        this.stopPolling(type);
+      }
+    },
+
+    setupRoleBasedPolling(role, callbacks = {}) {
+      const roleConfigs = {
+        cliente: {
+          tickets: { interval: 15000, priority: 'high' },
+          comentarios: { interval: 10000, priority: 'high' }
+        },
+        analista: {
+          tickets: { interval: 20000, priority: 'high' },
+          comentarios: { interval: 15000, priority: 'high' },
+          asignaciones: { interval: 30000, priority: 'medium' }
+        },
+        supervisor: {
+          tickets: { interval: 25000, priority: 'high' },
+          asignaciones: { interval: 20000, priority: 'high' },
+          analistas: { interval: 60000, priority: 'low' }
+        },
+        administrador: {
+          tickets: { interval: 30000, priority: 'medium' },
+          clientes: { interval: 120000, priority: 'low' },
+          analistas: { interval: 120000, priority: 'low' },
+          supervisores: { interval: 120000, priority: 'low' }
+        }
+      };
+
+      const config = roleConfigs[role] || {};
+      
+      Object.entries(config).forEach(([type, { interval, priority }]) => {
+        if (callbacks[type]) {
+          this.startPolling(type, callbacks[type], interval, {
+            priority,
+            retryOnError: priority === 'high'
+          });
+        }
+      });
+    },
+
+    getStats() {
+      return {
+        isActive: this.isActive,
+        activePolling: Array.from(this.intervals.keys()),
+        totalIntervals: this.intervals.size,
+        retryCounts: Object.fromEntries(this.retryCounts)
+      };
+    }
+  },
+
+  // Funciones de sincronización en tiempo real integradas
+  startRealtimeSync: (dispatch, config = {}) => {
+    const {
+      syncInterval = 30000,
+      enablePolling = true,
+      syncTypes = ['tickets', 'comentarios', 'asignaciones'],
+      onSyncTriggered = null,
+      onSyncRequested = null
+    } = config;
+
+    const store = dispatch.getState?.();
+    const pollingService = authActions.pollingService;
+
+    // Función para iniciar polling como fallback
+    const startPolling = () => {
+      if (!enablePolling || pollingService.isActive) return;
+
+      console.log('🔄 Iniciando polling como fallback');
+      
+      if (store.auth.user) {
+        const callbacks = {
+          tickets: (data) => {
+            console.log('📡 Datos de tickets recibidos por polling:', data);
+            if (onSyncTriggered) {
+              onSyncTriggered({ type: 'tickets', data, source: 'polling' });
+            }
+          },
+          comentarios: (data) => {
+            console.log('📡 Datos de comentarios recibidos por polling:', data);
+            if (onSyncTriggered) {
+              onSyncTriggered({ type: 'comentarios', data, source: 'polling' });
+            }
+          },
+          asignaciones: (data) => {
+            console.log('📡 Datos de asignaciones recibidos por polling:', data);
+            if (onSyncTriggered) {
+              onSyncTriggered({ type: 'asignaciones', data, source: 'polling' });
+            }
+          }
+        };
+
+        pollingService.setupRoleBasedPolling(store.auth.user.role, callbacks);
+      }
+    };
+
+    // Función para detener polling
+    const stopPolling = () => {
+      console.log('⏹️ Deteniendo polling');
+      pollingService.stopAllPolling();
+    };
+
+    // Función para solicitar sincronización manual
+    const triggerSync = (type = 'manual') => {
+      if (store.websocket.connected && store.websocket.socket) {
+        console.log(`🔄 Solicitando sincronización: ${type}`);
+        authActions.requestSync(store.websocket.socket, type);
+      } else {
+        console.log('⚠️ WebSocket no conectado, usando polling');
+        startPolling();
+      }
+    };
+
+    // Función para unirse a rooms de sincronización
+    const joinSyncRooms = () => {
+      if (store.auth.user && store.websocket.connected && store.websocket.socket) {
+        const { role, id } = store.auth.user;
+        authActions.joinRoleRoom(store.websocket.socket, role, id);
+        console.log(`🏠 Unido a rooms de sincronización para ${role} (${id})`);
+      }
+    };
+
+    // Función para salir de rooms de sincronización
+    const leaveSyncRooms = () => {
+      if (store.auth.user && store.websocket.connected && store.websocket.socket) {
+        const { role, id } = store.auth.user;
+        authActions.leaveRoleRoom(store.websocket.socket, role, id);
+        console.log(`👋 Saliendo de rooms de sincronización para ${role} (${id})`);
+      }
+    };
+
+    // Manejar cambios en el estado de WebSocket
+    if (store.websocket.connected) {
+      stopPolling();
+      joinSyncRooms();
+    } else {
+      leaveSyncRooms();
+      startPolling();
+    }
+
+    return {
+      triggerSync,
+      startPolling,
+      stopPolling,
+      joinSyncRooms,
+      leaveSyncRooms,
+      pollingStats: pollingService.getStats()
+    };
+  },
+
+  // Función para mostrar estado de sincronización
+  getRealtimeStatus: (store) => {
+    const pollingService = authActions.pollingService;
+    const isConnected = store.websocket.connected;
+    const isPolling = pollingService.isActive;
+    const lastSync = store.websocket.lastSync || 0;
+
+    const getStatusColor = () => {
+      if (isConnected) return 'text-green-500';
+      if (isPolling) return 'text-yellow-500';
+      return 'text-red-500';
+    };
+
+    const getStatusText = () => {
+      if (isConnected) return 'Conectado';
+      if (isPolling) return 'Polling';
+      return 'Desconectado';
+    };
+
+    const getStatusIcon = () => {
+      if (isConnected) return '🟢';
+      if (isPolling) return '🟡';
+      return '🔴';
+    };
+
+    const formatLastSync = () => {
+      if (!lastSync) return 'Nunca';
+      const diff = Math.floor((Date.now() - lastSync) / 1000);
+      if (diff < 60) return `${diff}s`;
+      if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+      return `${Math.floor(diff / 3600)}h`;
+    };
+
+    return {
+      isConnected,
+      isPolling,
+      lastSync,
+      statusColor: getStatusColor(),
+      statusText: getStatusText(),
+      statusIcon: getStatusIcon(),
+      lastSyncFormatted: formatLastSync(),
+      pollingStats: pollingService.getStats(),
+      notifications: store.websocket.notifications.length
+    };
   },
 
   joinRoom: (socket, role, userId) => {

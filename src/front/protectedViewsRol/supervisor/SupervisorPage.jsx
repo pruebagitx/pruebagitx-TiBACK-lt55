@@ -26,7 +26,7 @@ const tokenUtils = {
 
 export function SupervisorPage() {
     const navigate = useNavigate();
-    const { store, logout, dispatch, connectWebSocket, disconnectWebSocket, joinRoom } = useGlobalReducer();
+    const { store, logout, dispatch, connectWebSocket, disconnectWebSocket, joinRoom, startRealtimeSync, emitCriticalTicketAction, joinCriticalRooms } = useGlobalReducer();
     const [tickets, setTickets] = useState([]);
     const [ticketsCerrados, setTicketsCerrados] = useState([]);
     const [analistas, setAnalistas] = useState([]);
@@ -275,6 +275,52 @@ export function SupervisorPage() {
         }
     };
 
+    // Configurar sincronización crítica en tiempo real
+    useEffect(() => {
+        if (store.auth.user && store.websocket.connected && store.websocket.socket) {
+            // Configurar sincronización crítica
+            const syncConfig = startRealtimeSync({
+                syncTypes: ['tickets', 'comentarios', 'asignaciones', 'analistas'],
+                onSyncTriggered: (data) => {
+                    console.log('🚨 Sincronización crítica activada en SupervisorPage:', data);
+                    if (data.type === 'tickets' || data.priority === 'critical') {
+                        actualizarTickets();
+                    }
+                    if (data.type === 'analistas' || data.priority === 'critical') {
+                        actualizarAnalistas();
+                    }
+                }
+            });
+
+            // Unirse a rooms críticos de todos los tickets supervisados
+            const ticketIds = tickets.map(ticket => ticket.id);
+            if (ticketIds.length > 0) {
+                joinCriticalRooms(store.websocket.socket, ticketIds, store.auth.user);
+            }
+        }
+    }, [store.auth.user, store.websocket.connected, tickets.length]);
+
+    // Efecto para manejar actualizaciones críticas de tickets
+    useEffect(() => {
+        if (store.websocket.criticalTicketUpdate) {
+            const criticalUpdate = store.websocket.criticalTicketUpdate;
+            console.log('🚨 ACTUALIZACIÓN CRÍTICA RECIBIDA EN SUPERVISOR:', criticalUpdate);
+
+            // Actualizar inmediatamente para acciones críticas
+            if (criticalUpdate.priority === 'critical') {
+                actualizarTickets();
+
+                // Mostrar notificación visual si es necesario
+                if (criticalUpdate.action === 'comentario_agregado' ||
+                    criticalUpdate.action === 'ticket_actualizado' ||
+                    criticalUpdate.action === 'ticket_creado' ||
+                    criticalUpdate.action.includes('estado_cambiado')) {
+                    console.log(`🚨 Acción crítica: ${criticalUpdate.action} en ticket ${criticalUpdate.ticket_id}`);
+                }
+            }
+        }
+    }, [store.websocket.criticalTicketUpdate]);
+
     // Actualizar tickets cuando lleguen notificaciones WebSocket
     useEffect(() => {
         if (store.websocket.notifications.length > 0) {
@@ -394,6 +440,12 @@ export function SupervisorPage() {
             }
 
             console.log('✅ TICKET ASIGNADO EXITOSAMENTE');
+
+            // Emitir acción crítica de asignación
+            if (store.websocket.socket) {
+                emitCriticalTicketAction(store.websocket.socket, ticketId, `ticket_asignado_${analistaId}`, store.auth.user);
+            }
+
             // Actualización ULTRA RÁPIDA sin esperar
             actualizarTodasLasTablas();
         } catch (err) {
@@ -415,6 +467,11 @@ export function SupervisorPage() {
 
             if (!response.ok) {
                 throw new Error('Error al cambiar estado del ticket');
+            }
+
+            // Emitir acción crítica de cambio de estado
+            if (store.websocket.socket) {
+                emitCriticalTicketAction(store.websocket.socket, ticketId, `estado_cambiado_${nuevoEstado}`, store.auth.user);
             }
 
             // Actualizar tickets sin recargar la página

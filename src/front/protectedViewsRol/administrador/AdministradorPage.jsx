@@ -40,6 +40,7 @@ export function AdministradorPage() {
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [showMapaDistribucion, setShowMapaDistribucion] = useState(false);
 
     // Conectar WebSocket cuando el usuario esté autenticado
     useEffect(() => {
@@ -82,7 +83,10 @@ export function AdministradorPage() {
             const token = store.auth.token;
 
             // Cargar tickets
-            const ticketsResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets`, {
+            const backendUrl = import.meta.env.VITE_BACKEND_URL;
+            console.log('Backend URL en AdministradorPage:', backendUrl);
+
+            const ticketsResponse = await fetch(`${backendUrl}/api/tickets`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -91,10 +95,10 @@ export function AdministradorPage() {
 
             if (ticketsResponse.ok) {
                 const tickets = await ticketsResponse.json();
-                const ticketsCreados = tickets.filter(t => t.estado.toLowerCase() === 'creado').length;
-                const ticketsEnProceso = tickets.filter(t => t.estado.toLowerCase() === 'en_proceso').length;
-                const ticketsSolucionados = tickets.filter(t => t.estado.toLowerCase() === 'solucionado').length;
-                const ticketsCerrados = tickets.filter(t => t.estado.toLowerCase() === 'cerrado').length;
+                const ticketsCreados = tickets.filter(t => t.estado && t.estado.toLowerCase() === 'creado').length;
+                const ticketsEnProceso = tickets.filter(t => t.estado && t.estado.toLowerCase() === 'en_proceso').length;
+                const ticketsSolucionados = tickets.filter(t => t.estado && t.estado.toLowerCase() === 'solucionado').length;
+                const ticketsCerrados = tickets.filter(t => t.estado && t.estado.toLowerCase() === 'cerrado').length;
 
                 setStats(prev => ({
                     ...prev,
@@ -104,45 +108,66 @@ export function AdministradorPage() {
                     ticketsSolucionados,
                     ticketsCerrados
                 }));
+            } else {
+                console.error('Error cargando tickets:', ticketsResponse.status, ticketsResponse.statusText);
+                // No lanzar error, solo continuar con valores por defecto
             }
 
             // Cargar clientes
-            const clientesResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/clientes`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+            try {
+                const clientesResponse = await fetch(`${backendUrl}/api/clientes`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-            if (clientesResponse.ok) {
-                const clientes = await clientesResponse.json();
-                setStats(prev => ({ ...prev, totalClientes: clientes.length }));
+                if (clientesResponse.ok) {
+                    const clientes = await clientesResponse.json();
+                    setStats(prev => ({ ...prev, totalClientes: clientes.length }));
+                } else {
+                    console.error('Error cargando clientes:', clientesResponse.status);
+                }
+            } catch (err) {
+                console.error('Error en fetch clientes:', err);
             }
 
             // Cargar analistas
-            const analistasResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/analistas`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+            try {
+                const analistasResponse = await fetch(`${backendUrl}/api/analistas`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-            if (analistasResponse.ok) {
-                const analistas = await analistasResponse.json();
-                setStats(prev => ({ ...prev, totalAnalistas: analistas.length }));
+                if (analistasResponse.ok) {
+                    const analistas = await analistasResponse.json();
+                    setStats(prev => ({ ...prev, totalAnalistas: analistas.length }));
+                } else {
+                    console.error('Error cargando analistas:', analistasResponse.status);
+                }
+            } catch (err) {
+                console.error('Error en fetch analistas:', err);
             }
 
             // Cargar supervisores
-            const supervisoresResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/supervisores`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+            try {
+                const supervisoresResponse = await fetch(`${backendUrl}/api/supervisores`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-            if (supervisoresResponse.ok) {
-                const supervisores = await supervisoresResponse.json();
-                setStats(prev => ({ ...prev, totalSupervisores: supervisores.length }));
+                if (supervisoresResponse.ok) {
+                    const supervisores = await supervisoresResponse.json();
+                    setStats(prev => ({ ...prev, totalSupervisores: supervisores.length }));
+                } else {
+                    console.error('Error cargando supervisores:', supervisoresResponse.status);
+                }
+            } catch (err) {
+                console.error('Error en fetch supervisores:', err);
             }
 
         } catch (err) {
@@ -372,15 +397,6 @@ export function AdministradorPage() {
                     </Link>
                 </div>
 
-                <div className="col-md-6 col-lg-3 mb-3">
-                    <Link to="/administradores" className="card text-decoration-none h-100">
-                        <div className="card-body text-center">
-                            <i className="fas fa-crown fa-3x text-danger mb-3"></i>
-                            <h5 className="card-title">Gestionar Administradores</h5>
-                            <p className="card-text text-muted">Administrar cuentas de administradores</p>
-                        </div>
-                    </Link>
-                </div>
 
                 <div className="col-md-6 col-lg-3 mb-3">
                     <Link to="/tickets" className="card text-decoration-none h-100">
@@ -388,16 +404,6 @@ export function AdministradorPage() {
                             <i className="fas fa-ticket-alt fa-3x text-info mb-3"></i>
                             <h5 className="card-title">Gestionar Tickets</h5>
                             <p className="card-text text-muted">Ver y administrar todos los tickets</p>
-                        </div>
-                    </Link>
-                </div>
-
-                <div className="col-md-6 col-lg-3 mb-3">
-                    <Link to="/asignaciones" className="card text-decoration-none h-100">
-                        <div className="card-body text-center">
-                            <i className="fas fa-tasks fa-3x text-secondary mb-3"></i>
-                            <h5 className="card-title">Gestionar Asignaciones</h5>
-                            <p className="card-text text-muted">Administrar asignaciones de tickets</p>
                         </div>
                     </Link>
                 </div>
@@ -412,23 +418,42 @@ export function AdministradorPage() {
                     </Link>
                 </div>
 
+                {/* Mapa de Calor */}
                 <div className="col-md-6 col-lg-3 mb-3">
-                    <Link to="/gestiones" className="card text-decoration-none h-100">
+                    <div className="card h-100">
                         <div className="card-body text-center">
-                            <i className="fas fa-clipboard-list fa-3x text-primary mb-3"></i>
-                            <h5 className="card-title">Gestionar Gestiones</h5>
-                            <p className="card-text text-muted">Ver historial de gestiones</p>
+                            <i className="fas fa-map-marked-alt fa-3x text-success mb-3"></i>
+                            <h5 className="card-title">Mapa de Calor</h5>
+                            <p className="card-text text-muted">Visualizar tickets por ubicación del cliente</p>
+                            <button
+                                className="btn btn-outline-success btn-sm"
+                                onClick={() => setShowMapaDistribucion(!showMapaDistribucion)}
+                            >
+                                {showMapaDistribucion ? 'Ocultar Mapa' : 'Ver Mapa'}
+                            </button>
                         </div>
-                    </Link>
+                    </div>
                 </div>
             </div>
 
-            {/* Mapa de Calor */}
-            <div className="row mb-4">
-                <div className="col-12">
-                    <HeatmapComponent />
+            {/* Mapa de Calor Expandible */}
+            {showMapaDistribucion && (
+                <div className="row mb-4">
+                    <div className="col-12">
+                        <div className="card">
+                            <div className="card-header">
+                                <h5 className="card-title mb-0">
+                                    <i className="fas fa-map-marked-alt me-2"></i>
+                                    Mapa de Calor - Tickets por Ubicación del Cliente
+                                </h5>
+                            </div>
+                            <div className="card-body">
+                                <HeatmapComponent />
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
 
         </div>
     );

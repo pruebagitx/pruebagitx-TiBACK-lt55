@@ -26,7 +26,7 @@ const tokenUtils = {
 
 export function AnalistaPage() {
     const navigate = useNavigate();
-    const { store, logout, connectWebSocket, disconnectWebSocket, joinRoom } = useGlobalReducer();
+    const { store, logout, connectWebSocket, disconnectWebSocket, joinRoom, startRealtimeSync, emitCriticalTicketAction, joinCriticalRooms } = useGlobalReducer();
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -160,6 +160,48 @@ export function AnalistaPage() {
         };
     }, [store.auth.isAuthenticated, store.auth.token, store.websocket.connected, store.websocket.connecting]);
 
+    // Configurar sincronización crítica en tiempo real
+    useEffect(() => {
+        if (store.auth.user && store.websocket.connected && store.websocket.socket) {
+            // Configurar sincronización crítica
+            const syncConfig = startRealtimeSync({
+                syncTypes: ['tickets', 'comentarios', 'asignaciones'],
+                onSyncTriggered: (data) => {
+                    console.log('🚨 Sincronización crítica activada en AnalistaPage:', data);
+                    if (data.type === 'tickets' || data.priority === 'critical') {
+                        actualizarTickets();
+                    }
+                }
+            });
+
+            // Unirse a rooms críticos de todos los tickets asignados
+            const ticketIds = tickets.map(ticket => ticket.id);
+            if (ticketIds.length > 0) {
+                joinCriticalRooms(store.websocket.socket, ticketIds, store.auth.user);
+            }
+        }
+    }, [store.auth.user, store.websocket.connected, tickets.length]);
+
+    // Efecto para manejar actualizaciones críticas de tickets
+    useEffect(() => {
+        if (store.websocket.criticalTicketUpdate) {
+            const criticalUpdate = store.websocket.criticalTicketUpdate;
+            console.log('🚨 ACTUALIZACIÓN CRÍTICA RECIBIDA EN ANALISTA:', criticalUpdate);
+
+            // Actualizar inmediatamente para acciones críticas
+            if (criticalUpdate.priority === 'critical') {
+                actualizarTickets();
+
+                // Mostrar notificación visual si es necesario
+                if (criticalUpdate.action === 'comentario_agregado' ||
+                    criticalUpdate.action === 'ticket_actualizado' ||
+                    criticalUpdate.action === 'ticket_creado') {
+                    console.log(`🚨 Acción crítica: ${criticalUpdate.action} en ticket ${criticalUpdate.ticket_id}`);
+                }
+            }
+        }
+    }, [store.websocket.criticalTicketUpdate]);
+
     // Actualizar tickets cuando lleguen notificaciones WebSocket (optimizado)
     useEffect(() => {
         if (store.websocket.notifications.length > 0) {
@@ -244,6 +286,11 @@ export function AnalistaPage() {
                 throw new Error('Error al cambiar estado del ticket');
             }
 
+            // Emitir acción crítica de cambio de estado
+            if (store.websocket.socket) {
+                emitCriticalTicketAction(store.websocket.socket, ticketId, `estado_cambiado_${nuevoEstado}`, store.auth.user);
+            }
+
             // Actualizar tickets sin recargar la página
             await actualizarTickets();
         } catch (err) {
@@ -284,6 +331,11 @@ export function AnalistaPage() {
 
             if (!response.ok) {
                 throw new Error('Error al agregar comentario');
+            }
+
+            // Emitir acción crítica de comentario agregado
+            if (store.websocket.socket) {
+                emitCriticalTicketAction(store.websocket.socket, ticketId, 'comentario_agregado', store.auth.user);
             }
 
             // Actualizar tickets sin recargar la página
