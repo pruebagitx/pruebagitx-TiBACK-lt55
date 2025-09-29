@@ -4,6 +4,7 @@ import useGlobalReducer from '../../hooks/useGlobalReducer';
 import GoogleMapsLocation from '../../components/GoogleMapsLocation';
 import ImageUpload from '../../components/ImageUpload';
 import { VerTicketHD } from './VerTicketHD';
+import { SideBarCentral } from '../../components/SideBarCentral';
 
 // Utilidades de token seguras
 const tokenUtils = {
@@ -273,6 +274,13 @@ export function ClientePage() {
                 if (userResponse.ok) {
                     const userData = await userResponse.json();
                     setUserData(userData);
+
+                    // Actualizar el store global con los datos del usuario
+                    dispatch({
+                        type: 'SET_USER',
+                        payload: userData
+                    });
+
                     setInfoData({
                         nombre: userData.nombre === 'Pendiente' ? '' : userData.nombre || '',
                         apellido: userData.apellido === 'Pendiente' ? '' : userData.apellido || '',
@@ -883,48 +891,15 @@ export function ClientePage() {
         sidebarHidden
     });
 
+
     return (
         <div className="hyper-layout d-flex">
-            {/* Sidebar izquierdo */}
-            <div className={`hyper-sidebar ${sidebarHidden ? 'hidden' : ''} overflow-auto`} data-hidden={sidebarHidden}>
-                <div className="hyper-sidebar-header p-4">
-                    <a href="#" className="hyper-logo d-flex align-items-center gap-2 text-decoration-none">
-                        <i className="fas fa-ticket-alt fs-4"></i>
-                        {!sidebarHidden && <span className="fw-bold">TiBACK</span>}
-                    </a>
-                </div>
-
-                <nav className="p-3">
-                    <div className="mb-4">
-                        <div className="hyper-nav-title px-3 mb-2">Navegación</div>
-                        <a
-                            href="#"
-                            className={`hyper-nav-item d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none ${activeView === 'dashboard' ? 'active' : ''}`}
-                            onClick={(e) => { e.preventDefault(); changeView('dashboard'); }}
-                        >
-                            <i className="fas fa-tachometer-alt"></i>
-                            {!sidebarHidden && <span>Dashboard</span>}
-                        </a>
-                        <a
-                            href="#"
-                            className={`hyper-nav-item d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none ${activeView === 'tickets' ? 'active' : ''}`}
-                            onClick={(e) => { e.preventDefault(); changeView('tickets'); }}
-                        >
-                            <i className="fas fa-ticket-alt"></i>
-                            {!sidebarHidden && <span>Mis Tickets</span>}
-                        </a>
-                        <a
-                            href="#"
-                            className={`hyper-nav-item d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none ${activeView === 'create' ? 'active' : ''}`}
-                            onClick={(e) => { e.preventDefault(); changeView('create'); }}
-                        >
-                            <i className="fas fa-plus"></i>
-                            {!sidebarHidden && <span>Crear Ticket</span>}
-                        </a>
-                    </div>
-
-                </nav>
-            </div>
+            {/* Sidebar central dinámico */}
+            <SideBarCentral
+                sidebarHidden={sidebarHidden}
+                activeView={activeView}
+                changeView={changeView}
+            />
 
             {/* Contenido principal */}
             <div className={`hyper-main-content flex-grow-1 ${sidebarHidden ? 'sidebar-hidden' : ''}`}>
@@ -958,17 +933,18 @@ export function ClientePage() {
                                 {/* Resultados de búsqueda */}
                                 {showSearchResults && searchResults.length > 0 && (
                                     <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg" style={{ top: '100%', zIndex: 1000 }}>
-                                        <div className="p-2">
-                                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <div className="p-3">
+                                            <div className="d-flex justify-content-between align-items-center mb-3 w-100">
                                                 <small className="text-muted fw-semibold">
-                                                    <i className="fas fa-ticket-alt me-1"></i>
+
                                                     Tickets encontrados ({searchResults.length})
                                                 </small>
                                                 <button
-                                                    className="btn btn-sm btn-outline-secondary"
+                                                    className="btn btn-sm btn-outline-secondary ms-3"
                                                     onClick={closeSearchResults}
+                                                    title="Cerrar resultados"
                                                 >
-                                                    <i className="fas fa-times"></i>
+                                                    <span>X</span>
                                                 </button>
                                             </div>
                                             {searchResults.map((ticket) => (
@@ -1877,16 +1853,99 @@ export function ClientePage() {
                                     <h3 className="hyper-widget-title">Conversaciones Activas</h3>
                                 </div>
 
-                                <div className="text-center py-4">
-                                    <i className="fas fa-comments fa-3x text-muted mb-3"></i>
-                                    <p className="text-muted">Selecciona un ticket para iniciar una conversación</p>
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={() => changeView('tickets')}
-                                    >
-                                        <i className="fas fa-ticket-alt me-1"></i>
-                                        Ver Mis Tickets
-                                    </button>
+                                <div className="hyper-widget-body">
+                                    {(() => {
+                                        // Obtener chats activos del localStorage
+                                        const getActiveChats = () => {
+                                            try {
+                                                const chatsData = localStorage.getItem('activeChats');
+                                                if (chatsData) {
+                                                    const chats = JSON.parse(chatsData);
+                                                    const userId = userData?.id;
+                                                    return chats.filter(chat =>
+                                                        chat.userId === userId &&
+                                                        (chat.commentsCount > 0 || chat.messagesCount > 0)
+                                                    );
+                                                }
+                                            } catch (error) {
+                                                console.error('Error al obtener chats activos:', error);
+                                            }
+                                            return [];
+                                        };
+
+                                        const activeChats = getActiveChats();
+
+                                        if (activeChats.length === 0) {
+                                            return (
+                                                <div className="text-center py-4">
+                                                    <i className="fas fa-comments fa-3x text-muted mb-3"></i>
+                                                    <p className="text-muted">No tienes conversaciones activas</p>
+                                                    <p className="text-muted small">Los chats aparecerán aquí cuando tengas comentarios o mensajes en tus tickets</p>
+                                                    <button
+                                                        className="btn btn-primary mt-3"
+                                                        onClick={() => changeView('tickets')}
+                                                    >
+                                                        <i className="fas fa-ticket-alt me-1"></i>
+                                                        Ver Mis Tickets
+                                                    </button>
+                                                </div>
+                                            );
+                                        }
+
+                                        return (
+                                            <div className="row g-3">
+                                                {activeChats.map((chat) => (
+                                                    <div key={chat.ticketId} className="col-md-6 col-lg-4">
+                                                        <div className="card h-100 border-0 shadow-sm">
+                                                            <div className="card-body">
+                                                                <div className="d-flex align-items-center mb-3">
+                                                                    <div className="hyper-metric-icon bg-primary me-3">
+                                                                        <i className="fas fa-ticket-alt"></i>
+                                                                    </div>
+                                                                    <div>
+                                                                        <h6 className="card-title mb-0">Ticket #{chat.ticketId}</h6>
+                                                                        <small className="text-muted">
+                                                                            {new Date(chat.lastActivity).toLocaleDateString()}
+                                                                        </small>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="mb-3">
+                                                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                                                        <span className="badge bg-info">
+                                                                            <i className="fas fa-comment me-1"></i>
+                                                                            {chat.commentsCount} comentarios
+                                                                        </span>
+                                                                        <span className="badge bg-success">
+                                                                            <i className="fas fa-comments me-1"></i>
+                                                                            {chat.messagesCount} mensajes
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="d-grid gap-2">
+                                                                    <button
+                                                                        className="btn btn-outline-primary btn-sm"
+                                                                        onClick={() => window.open(`/ticket/${chat.ticketId}/chat`, '_self')}
+                                                                    >
+                                                                        <i className="fas fa-comments me-1"></i>
+                                                                        Abrir Chat
+                                                                    </button>
+                                                                    <button
+                                                                        className="btn btn-outline-secondary btn-sm"
+                                                                        onClick={() => window.open(`/ticket/${chat.ticketId}/comentarios`, '_self')}
+                                                                    >
+                                                                        <i className="fas fa-comment me-1"></i>
+                                                                        Ver Comentarios
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </>

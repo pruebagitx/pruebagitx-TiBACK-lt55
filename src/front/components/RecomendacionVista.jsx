@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import useGlobalReducer from '../hooks/useGlobalReducer';
-import { ClienteSidebar } from './ClienteSidebar';
+import { SideBarCentral } from './SideBarCentral';
 
 export function RecomendacionVista() {
     const navigate = useNavigate();
@@ -131,7 +131,7 @@ ${recomendacion.recomendaciones_adicionales || 'N/A'}
     return (
         <div className="hyper-layout d-flex">
             {/* Sidebar izquierdo */}
-            <ClienteSidebar
+            <SideBarCentral
                 sidebarHidden={sidebarHidden}
                 activeView={activeView}
                 changeView={changeView}

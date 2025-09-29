@@ -1,17 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import useGlobalReducer from '../hooks/useGlobalReducer';
-import { ClienteSidebar } from '../components/ClienteSidebar';
+import { SideBarCentral } from '../components/SideBarCentral';
+
+// Utilidades de token seguras
+const tokenUtils = {
+    decodeToken: (token) => {
+        try {
+            if (!token) return null;
+            const parts = token.split('.');
+            if (parts.length !== 3) return null;
+            return JSON.parse(atob(parts[1]));
+        } catch (error) {
+            return null;
+        }
+    },
+    getUserId: (token) => {
+        const payload = tokenUtils.decodeToken(token);
+        return payload ? payload.user_id : null;
+    },
+    getRole: (token) => {
+        const payload = tokenUtils.decodeToken(token);
+        return payload ? payload.role : null;
+    }
+};
 
 const RecomendacionesSimilares = () => {
     const { ticketId } = useParams();
     const navigate = useNavigate();
-    const { store } = useGlobalReducer();
+    const { store, dispatch } = useGlobalReducer();
     const [ticketsSimilares, setTicketsSimilares] = useState([]);
     const [ticketActual, setTicketActual] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [comentariosPorTicket, setComentariosPorTicket] = useState({});
+    const [userData, setUserData] = useState(null);
     const [sidebarHidden, setSidebarHidden] = useState(false);
     const [activeView, setActiveView] = useState('recomendaciones-similares');
 
@@ -49,6 +72,77 @@ const RecomendacionesSimilares = () => {
 
         cargarRecomendaciones();
     }, [ticketId, store.auth.token]);
+
+    // Cargar datos del usuario para el sidebar (solo si no están disponibles)
+    useEffect(() => {
+        // Si ya tenemos datos del usuario en el store, usarlos directamente
+        if (store.auth.user && store.auth.isAuthenticated) {
+            setUserData(store.auth.user);
+            return;
+        }
+
+        // Solo cargar si no tenemos datos del usuario
+        const cargarDatosUsuario = async () => {
+            try {
+                const token = store.auth.token;
+                if (!token) return;
+
+                const userId = tokenUtils.getUserId(token);
+                const role = tokenUtils.getRole(token);
+
+                if (!userId || !role) return;
+
+                // Cargar datos del usuario según su rol
+                let userResponse;
+                if (role === 'cliente') {
+                    userResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/clientes/${userId}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                } else if (role === 'analista') {
+                    userResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/analistas/${userId}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                } else if (role === 'supervisor') {
+                    userResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/supervisores/${userId}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                } else if (role === 'administrador') {
+                    userResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/administradores/${userId}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                }
+
+                if (userResponse && userResponse.ok) {
+                    const userData = await userResponse.json();
+                    setUserData(userData);
+
+                    // Actualizar el store global con los datos del usuario
+                    dispatch({
+                        type: 'SET_USER',
+                        payload: userData
+                    });
+                }
+            } catch (err) {
+                console.error('Error al cargar datos del usuario:', err);
+            }
+        };
+
+        if (store.auth.isAuthenticated && store.auth.token && !store.auth.user) {
+            cargarDatosUsuario();
+        }
+    }, [store.auth.isAuthenticated, store.auth.token, store.auth.user, dispatch]);
 
     const cargarComentariosTickets = async (tickets) => {
         try {
@@ -157,7 +251,7 @@ const RecomendacionesSimilares = () => {
     if (loading) {
         return (
             <div className="hyper-layout d-flex">
-                <ClienteSidebar
+                <SideBarCentral
                     sidebarHidden={sidebarHidden}
                     activeView={activeView}
                     changeView={changeView}
@@ -176,7 +270,7 @@ const RecomendacionesSimilares = () => {
     return (
         <div className="hyper-layout d-flex">
             {/* Sidebar izquierdo */}
-            <ClienteSidebar
+            <SideBarCentral
                 sidebarHidden={sidebarHidden}
                 activeView={activeView}
                 changeView={changeView}

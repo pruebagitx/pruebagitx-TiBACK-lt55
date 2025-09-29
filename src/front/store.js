@@ -1,6 +1,46 @@
 import { string } from "prop-types";
 import { io } from 'socket.io-client';
 
+// Función global para manejar chats activos en localStorage
+window.updateActiveChat = (ticketId, ticketTitle, userId, commentsCount = 0, messagesCount = 0) => {
+    try {
+        const chatsData = localStorage.getItem('activeChats');
+        let activeChats = chatsData ? JSON.parse(chatsData) : [];
+        
+        // Buscar si ya existe un chat para este ticket y usuario
+        const existingChatIndex = activeChats.findIndex(
+            chat => chat.ticketId === ticketId && chat.userId === userId
+        );
+        
+        const chatData = {
+            ticketId,
+            ticketTitle,
+            userId,
+            commentsCount,
+            messagesCount,
+            lastActivity: new Date().toISOString()
+        };
+        
+        if (existingChatIndex !== -1) {
+            // Actualizar chat existente
+            activeChats[existingChatIndex] = chatData;
+        } else {
+            // Agregar nuevo chat
+            activeChats.push(chatData);
+        }
+        
+        // Guardar en localStorage
+        localStorage.setItem('activeChats', JSON.stringify(activeChats));
+        
+        // Disparar evento personalizado para notificar cambios
+        window.dispatchEvent(new CustomEvent('activeChatsUpdated'));
+        
+        console.log('Chat activo actualizado:', chatData);
+    } catch (error) {
+        console.error('Error al actualizar chat activo:', error);
+    }
+};
+
 // Utilidades de token seguras - SOLO TOKEN COMO FUENTE DE VERDAD
 const tokenUtils = {
   // Decodifica el token JWT
@@ -1358,6 +1398,15 @@ export default function storeReducer(store, action = {}) {
           token: action.payload.token,
           isAuthenticated: !!action.payload.token,
           isLoading: false
+        }
+      };
+
+    case 'SET_USER':
+      return {
+        ...store,
+        auth: {
+          ...store.auth,
+          user: action.payload
         }
       };
 
