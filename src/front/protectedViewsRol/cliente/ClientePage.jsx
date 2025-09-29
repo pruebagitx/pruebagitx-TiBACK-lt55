@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import useGlobalReducer from '../../hooks/useGlobalReducer';
 import GoogleMapsLocation from '../../components/GoogleMapsLocation';
 import ImageUpload from '../../components/ImageUpload';
@@ -28,6 +28,7 @@ const tokenUtils = {
 };
 
 export function ClientePage() {
+    console.log('🚀 ClientePage - Componente iniciado');
     const navigate = useNavigate();
     const { store, logout, dispatch, connectWebSocket, disconnectWebSocket, joinRoom, joinTicketRoom, startRealtimeSync, emitCriticalTicketAction, joinCriticalRooms, joinAllCriticalRooms } = useGlobalReducer();
     const [tickets, setTickets] = useState([]);
@@ -252,6 +253,11 @@ export function ClientePage() {
     useEffect(() => {
         const cargarDatos = async () => {
             try {
+                console.log('🔍 ClientePage - Iniciando carga de datos:', {
+                    isAuthenticated: store.auth.isAuthenticated,
+                    hasToken: !!store.auth.token,
+                    hasUser: !!store.auth.user
+                });
                 setLoading(true);
                 const token = store.auth.token;
                 const userId = tokenUtils.getUserId(token);
@@ -295,10 +301,16 @@ export function ClientePage() {
 
                 const ticketsData = await ticketsResponse.json();
                 setTickets(ticketsData);
+                console.log('✅ ClientePage - Datos cargados exitosamente:', {
+                    userData: userData,
+                    ticketsCount: ticketsData.length
+                });
             } catch (err) {
+                console.error('❌ ClientePage - Error al cargar datos:', err);
                 setError(err.message);
             } finally {
                 setLoading(false);
+                console.log('🏁 ClientePage - Carga completada, loading: false');
             }
         };
 
@@ -720,6 +732,14 @@ export function ClientePage() {
     const [activeView, setActiveView] = useState('dashboard');
     const [showUserDropdown, setShowUserDropdown] = useState(false);
     const [selectedTicketId, setSelectedTicketId] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(false);
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+    const [filterEstado, setFilterEstado] = useState('');
+    const [filterAsignado, setFilterAsignado] = useState('');
+    const [filterPrioridad, setFilterPrioridad] = useState('');
 
     // FunciÃ³n para alternar sidebar
     const toggleSidebar = () => {
@@ -741,11 +761,102 @@ export function ClientePage() {
         }
     };
 
+    // FunciÃ³n para buscar tickets por tÃ­tulo
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+
+        if (query.trim().length === 0) {
+            setSearchResults([]);
+            setShowSearchResults(false);
+            return;
+        }
+
+        // Filtrar tickets por tÃ­tulo (bÃºsqueda meticulosa)
+        const filteredTickets = tickets.filter(ticket =>
+            ticket.titulo.toLowerCase().includes(query.toLowerCase().trim())
+        );
+
+        // Limitar resultados a 5 para mejor UX
+        const limitedResults = filteredTickets.slice(0, 5);
+
+        setSearchResults(limitedResults);
+        setShowSearchResults(limitedResults.length > 0);
+    };
+
+    // FunciÃ³n para seleccionar un ticket de la bÃºsqueda
+    const selectTicketFromSearch = (ticket) => {
+        setSearchQuery('');
+        setSearchResults([]);
+        setShowSearchResults(false);
+        changeView(`ticket-${ticket.id}`);
+    };
+
+    // FunciÃ³n para cerrar resultados de bÃºsqueda
+    const closeSearchResults = () => {
+        setShowSearchResults(false);
+    };
+
+    // FunciÃ³n para alternar tema
+    const toggleTheme = () => {
+        setIsDarkMode(!isDarkMode);
+    };
+
+    // Función para aplicar filtros
+    const applyFilters = () => {
+        setShowFilterDropdown(false);
+    };
+
+    // Función para limpiar filtros
+    const clearFilters = () => {
+        setFilterEstado('');
+        setFilterAsignado('');
+        setFilterPrioridad('');
+        setShowFilterDropdown(false);
+    };
+
+    // Función para obtener tickets filtrados
+    const getFilteredTickets = () => {
+        let filtered = [...tickets];
+
+        if (filterEstado) {
+            filtered = filtered.filter(ticket =>
+                ticket.estado.toLowerCase() === filterEstado.toLowerCase()
+            );
+        }
+
+        if (filterAsignado) {
+            if (filterAsignado === 'asignados') {
+                filtered = filtered.filter(ticket =>
+                    tieneAnalistaAsignado(ticket)
+                );
+            } else if (filterAsignado === 'sin_asignar') {
+                filtered = filtered.filter(ticket =>
+                    !tieneAnalistaAsignado(ticket)
+                );
+            }
+        }
+
+        if (filterPrioridad) {
+            filtered = filtered.filter(ticket => {
+                const ticketPrioridad = ticket.prioridad || 'normal';
+                return ticketPrioridad.toLowerCase() === filterPrioridad.toLowerCase();
+            });
+        }
+
+        return filtered;
+    };
+
     // Cerrar dropdown al hacer clic fuera
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (showUserDropdown && !event.target.closest('.dropdown')) {
                 setShowUserDropdown(false);
+            }
+            if (showSearchResults && !event.target.closest('.hyper-search')) {
+                setShowSearchResults(false);
+            }
+            if (showFilterDropdown && !event.target.closest('.filter-dropdown')) {
+                setShowFilterDropdown(false);
             }
         };
 
@@ -753,7 +864,24 @@ export function ClientePage() {
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showUserDropdown]);
+    }, [showUserDropdown, showSearchResults, showFilterDropdown]);
+
+    // Aplicar tema al body
+    useEffect(() => {
+        if (isDarkMode) {
+            document.body.classList.add('dark-theme');
+        } else {
+            document.body.classList.remove('dark-theme');
+        }
+    }, [isDarkMode]);
+
+    console.log('🎨 ClientePage - Renderizando componente:', {
+        loading,
+        error,
+        ticketsCount: tickets.length,
+        activeView,
+        sidebarHidden
+    });
 
     return (
         <div className="hyper-layout d-flex">
@@ -817,27 +945,71 @@ export function ClientePage() {
                                 <input
                                     type="text"
                                     className="form-control"
-                                    placeholder="Buscar tickets, analistas..."
+                                    placeholder="Buscar tickets por título..."
+                                    value={searchQuery}
+                                    onChange={(e) => handleSearch(e.target.value)}
+                                    onFocus={() => {
+                                        if (searchResults.length > 0) {
+                                            setShowSearchResults(true);
+                                        }
+                                    }}
                                 />
+
+                                {/* Resultados de búsqueda */}
+                                {showSearchResults && searchResults.length > 0 && (
+                                    <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg" style={{ top: '100%', zIndex: 1000 }}>
+                                        <div className="p-2">
+                                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                                <small className="text-muted fw-semibold">
+                                                    <i className="fas fa-ticket-alt me-1"></i>
+                                                    Tickets encontrados ({searchResults.length})
+                                                </small>
+                                                <button
+                                                    className="btn btn-sm btn-outline-secondary"
+                                                    onClick={closeSearchResults}
+                                                >
+                                                    <i className="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                            {searchResults.map((ticket) => (
+                                                <div
+                                                    key={ticket.id}
+                                                    className="search-result-item p-2 border-bottom cursor-pointer"
+                                                    onClick={() => selectTicketFromSearch(ticket)}
+                                                    style={{ cursor: 'pointer' }}
+                                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
+                                                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                                                >
+                                                    <div className="d-flex justify-content-between align-items-start">
+                                                        <div className="flex-grow-1">
+                                                            <div className="fw-semibold text-primary">#{ticket.id}</div>
+                                                            <div className="text-dark">{ticket.titulo}</div>
+                                                            <small className="text-muted">
+                                                                {ticket.descripcion.length > 60
+                                                                    ? `${ticket.descripcion.substring(0, 60)}...`
+                                                                    : ticket.descripcion
+                                                                }
+                                                            </small>
+                                                        </div>
+                                                        <div className="ms-2">
+                                                            <span className={`badge ${ticket.estado.toLowerCase() === 'solucionado' ? 'bg-success' :
+                                                                ticket.estado.toLowerCase() === 'en_proceso' ? 'bg-warning' :
+                                                                    ticket.estado.toLowerCase() === 'en_espera' ? 'bg-info' :
+                                                                        'bg-primary'
+                                                                }`}>
+                                                                {ticket.estado}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         <div className="d-flex align-items-center gap-3">
-                            <div className="d-flex align-items-center gap-2">
-                                <button className="hyper-header-btn btn btn-link p-2">
-                                    <i className="fas fa-th"></i>
-                                </button>
-                                <button className="hyper-header-btn btn btn-link p-2 position-relative">
-                                    <i className="fas fa-bell"></i>
-                                    <span className="hyper-notification-badge badge bg-danger rounded-pill">3</span>
-                                </button>
-                                <button className="hyper-header-btn btn btn-link p-2">
-                                    <i className="fas fa-sun"></i>
-                                </button>
-                                <button className="hyper-header-btn btn btn-link p-2">
-                                    <i className="fas fa-expand-arrows-alt"></i>
-                                </button>
-                            </div>
 
                             <div className="dropdown">
                                 <div
@@ -882,10 +1054,21 @@ export function ClientePage() {
                                             <i className="fas fa-user"></i>
                                             Mi Perfil
                                         </button>
-                                        <button className="dropdown-item d-flex align-items-center gap-2">
-                                            <i className="fas fa-cog"></i>
-                                            Configuración
-                                        </button>
+                                        <div className="dropdown-item d-flex align-items-center justify-content-between">
+                                            <div className="d-flex align-items-center gap-2">
+                                                <i className={`fas ${isDarkMode ? 'fa-moon' : 'fa-sun'}`}></i>
+                                                <span>{isDarkMode ? 'Tema Oscuro' : 'Tema Claro'}</span>
+                                            </div>
+                                            <div className="form-check form-switch">
+                                                <input
+                                                    className="form-check-input"
+                                                    type="checkbox"
+                                                    id="themeSwitch"
+                                                    checked={isDarkMode}
+                                                    onChange={toggleTheme}
+                                                />
+                                            </div>
+                                        </div>
                                         <div className="dropdown-divider"></div>
                                         <button
                                             className="dropdown-item d-flex align-items-center gap-2 text-danger"
@@ -1131,111 +1314,40 @@ export function ClientePage() {
                                 </div>
                             </div>
 
-                            {/* Todos los tickets */}
+                            {/* Botón Ver Todos los Tickets */}
                             <div className="row g-4">
                                 <div className="col-12">
-                                    <div className="card border-0 shadow-sm">
-                                        <div className="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-                                            <h5 className="card-title mb-0">Todos los Tickets</h5>
-                                            <div className="d-flex gap-2">
-                                                <button
-                                                    className="btn btn-outline-primary btn-sm"
-                                                    onClick={() => changeView('tickets')}
-                                                >
-                                                    Ver Todos
-                                                </button>
+                                    <div className="card border-0 shadow-sm bg-gradient-primary text-white">
+                                        <div className="card-body text-center py-5">
+                                            <div className="mb-4">
+                                                <i className="fas fa-ticket-alt fa-4x mb-3 opacity-75"></i>
+                                                <h3 className="mb-2">Gestiona Todos tus Tickets</h3>
+                                                <p className="mb-4 opacity-90">
+                                                    Accede a la vista completa de todos tus tickets con filtros avanzados y acciones detalladas
+                                                </p>
                                             </div>
-                                        </div>
-                                        <div className="card-body">
-                                            {tickets.length > 0 ? (
-                                                <div className="table-responsive">
-                                                    <table className="table table-hover">
-                                                        <thead>
-                                                            <tr>
-                                                                <th>ID</th>
-                                                                <th>Título</th>
-                                                                <th>Descripción</th>
-                                                                <th>Estado</th>
-                                                                <th>Prioridad</th>
-                                                                <th>Fecha</th>
-                                                                <th>Acciones</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {tickets.map((ticket) => (
-                                                                <tr key={ticket.id}>
-                                                                    <td>
-                                                                        <span className="fw-bold text-primary">#{ticket.id}</span>
-                                                                    </td>
-                                                                    <td>
-                                                                        <div className="d-flex flex-column">
-                                                                            <span className="fw-semibold">{ticket.titulo}</span>
-                                                                            {ticket.categoria && (
-                                                                                <small className="text-muted">{ticket.categoria}</small>
-                                                                            )}
-                                                                        </div>
-                                                                    </td>
-                                                                    <td>
-                                                                        <div className="text-truncate" style={{ maxWidth: '200px' }} title={ticket.descripcion}>
-                                                                            {ticket.descripcion}
-                                                                        </div>
-                                                                    </td>
-                                                                    <td>
-                                                                        <span className={`badge ${ticket.estado.toLowerCase() === 'solucionado' ? 'bg-success' :
-                                                                            ticket.estado.toLowerCase() === 'en_proceso' ? 'bg-warning' :
-                                                                                ticket.estado.toLowerCase() === 'en_espera' ? 'bg-info' :
-                                                                                    'bg-primary'
-                                                                            }`}>
-                                                                            {ticket.estado}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td>
-                                                                        <span className={`badge ${ticket.prioridad === 'alta' ? 'bg-danger' :
-                                                                            ticket.prioridad === 'media' ? 'bg-warning' :
-                                                                                'bg-success'
-                                                                            }`}>
-                                                                            {ticket.prioridad || 'Normal'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td>
-                                                                        <div className="d-flex flex-column">
-                                                                            <small className="text-muted">
-                                                                                {new Date(ticket.fecha_creacion).toLocaleDateString('es-ES', {
-                                                                                    year: 'numeric',
-                                                                                    month: 'short',
-                                                                                    day: 'numeric',
-                                                                                    hour: '2-digit',
-                                                                                    minute: '2-digit',
-                                                                                    hour12: true
-                                                                                })}
-                                                                            </small>
-                                                                            {ticket.fecha_solucion && (
-                                                                                <small className="text-success">
-                                                                                    Resuelto: {new Date(ticket.fecha_solucion).toLocaleDateString('es-ES')}
-                                                                                </small>
-                                                                            )}
-                                                                        </div>
-                                                                    </td>
-                                                                    <td>
-                                                                        <span className="text-muted">-</span>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            ) : (
-                                                <div className="text-center py-4">
-                                                    <i className="fas fa-ticket-alt fa-3x text-muted mb-3"></i>
-                                                    <p className="text-muted">No tienes tickets aún</p>
-                                                    <button
-                                                        className="btn btn-primary"
-                                                        onClick={() => changeView('create')}
-                                                    >
-                                                        Crear mi primer ticket
-                                                    </button>
-                                                </div>
-                                            )}
+                                            <button
+                                                className="btn btn-light btn-lg px-5 py-3 fw-bold shadow-sm"
+                                                onClick={() => changeView('tickets')}
+                                                style={{
+                                                    borderRadius: '50px',
+                                                    fontSize: '1.1rem',
+                                                    transition: 'all 0.3s ease',
+                                                    border: 'none'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.target.style.transform = 'translateY(-2px)';
+                                                    e.target.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.target.style.transform = 'translateY(0)';
+                                                    e.target.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
+                                                }}
+                                            >
+                                                <i className="fas fa-list me-2"></i>
+                                                Ver Todos los Tickets
+                                                <i className="fas fa-arrow-right ms-2"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -1253,14 +1365,90 @@ export function ClientePage() {
                                 <div className="card-header bg-white border-0 d-flex justify-content-between align-items-center">
                                     <h5 className="card-title mb-0">Mis Tickets</h5>
                                     <div className="d-flex gap-2">
-                                        <button className="btn btn-outline-secondary btn-sm">
-                                            <i className="fas fa-download me-1"></i>
-                                            Exportar
-                                        </button>
-                                        <button className="btn btn-outline-primary btn-sm">
-                                            <i className="fas fa-filter me-1"></i>
-                                            Filtrar
-                                        </button>
+                                        <div className="dropdown filter-dropdown">
+                                            <button
+                                                className="btn btn-outline-primary btn-sm dropdown-toggle"
+                                                type="button"
+                                                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                                            >
+                                                <i className="fas fa-filter me-1"></i>
+                                                Filtrar
+                                                {(filterEstado || filterAsignado || filterPrioridad) && (
+                                                    <span className="badge bg-primary ms-1">{(filterEstado ? 1 : 0) + (filterAsignado ? 1 : 0) + (filterPrioridad ? 1 : 0)}</span>
+                                                )}
+                                            </button>
+
+                                            {showFilterDropdown && (
+                                                <div className="dropdown-menu show position-absolute" style={{ right: 0, top: '100%', minWidth: '250px' }}>
+                                                    <div className="dropdown-header">
+                                                        <h6 className="mb-0">Filtrar Tickets</h6>
+                                                    </div>
+
+                                                    <div className="px-3 py-2">
+                                                        <label className="form-label small">Por Estado:</label>
+                                                        <select
+                                                            className="form-select form-select-sm"
+                                                            value={filterEstado}
+                                                            onChange={(e) => setFilterEstado(e.target.value)}
+                                                        >
+                                                            <option value="">Todos los estados</option>
+                                                            <option value="creado">Creado</option>
+                                                            <option value="en_espera">En Espera</option>
+                                                            <option value="en_proceso">En Proceso</option>
+                                                            <option value="solucionado">Solucionado</option>
+                                                            <option value="cerrado">Cerrado</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="px-3 py-2">
+                                                        <label className="form-label small">Por Asignación:</label>
+                                                        <select
+                                                            className="form-select form-select-sm"
+                                                            value={filterAsignado}
+                                                            onChange={(e) => setFilterAsignado(e.target.value)}
+                                                        >
+                                                            <option value="">Todos</option>
+                                                            <option value="asignados">Con Analista Asignado</option>
+                                                            <option value="sin_asignar">Sin Asignar</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="px-3 py-2">
+                                                        <label className="form-label small">Por Prioridad:</label>
+                                                        <select
+                                                            className="form-select form-select-sm"
+                                                            value={filterPrioridad}
+                                                            onChange={(e) => setFilterPrioridad(e.target.value)}
+                                                        >
+                                                            <option value="">Todas las prioridades</option>
+                                                            <option value="alta">Alta</option>
+                                                            <option value="media">Media</option>
+                                                            <option value="normal">Normal</option>
+                                                            <option value="baja">Baja</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="dropdown-divider"></div>
+
+                                                    <div className="d-flex gap-2 px-3 py-2">
+                                                        <button
+                                                            className="btn btn-primary btn-sm flex-fill"
+                                                            onClick={applyFilters}
+                                                        >
+                                                            <i className="fas fa-check me-1"></i>
+                                                            Aplicar
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-outline-secondary btn-sm flex-fill"
+                                                            onClick={clearFilters}
+                                                        >
+                                                            <i className="fas fa-times me-1"></i>
+                                                            Limpiar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="card-body p-0">
@@ -1271,17 +1459,32 @@ export function ClientePage() {
                                                 <span className="visually-hidden">Cargando tickets...</span>
                                             </div>
                                         </div>
-                                    ) : tickets.length === 0 ? (
+                                    ) : getFilteredTickets().length === 0 ? (
                                         <div className="text-center py-4">
-                                            <i className="fas fa-ticket-alt fa-3x text-muted mb-3"></i>
-                                            <p className="text-muted">No tienes tickets creados aÃºn.</p>
-                                            <button
-                                                className="btn btn-primary"
-                                                onClick={() => changeView('create')}
-                                            >
-                                                <i className="fas fa-plus me-1"></i>
-                                                Crear mi primer ticket
-                                            </button>
+                                            <i className="fas fa-filter fa-3x text-muted mb-3"></i>
+                                            <p className="text-muted">
+                                                {tickets.length === 0
+                                                    ? "No tienes tickets creados aún."
+                                                    : "No se encontraron tickets con los filtros aplicados."
+                                                }
+                                            </p>
+                                            {tickets.length === 0 ? (
+                                                <button
+                                                    className="btn btn-primary"
+                                                    onClick={() => changeView('create')}
+                                                >
+                                                    <i className="fas fa-plus me-1"></i>
+                                                    Crear mi primer ticket
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    className="btn btn-outline-secondary"
+                                                    onClick={clearFilters}
+                                                >
+                                                    <i className="fas fa-times me-1"></i>
+                                                    Limpiar filtros
+                                                </button>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="table-responsive">
@@ -1299,7 +1502,7 @@ export function ClientePage() {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {tickets.map((ticket) => (
+                                                    {getFilteredTickets().map((ticket) => (
                                                         <tr key={ticket.id}>
                                                             <td className="text-center px-3">
                                                                 <span className="fw-bold text-primary">#{ticket.id}</span>
@@ -1386,20 +1589,20 @@ export function ClientePage() {
                                                                         >
                                                                             <i className="fas fa-eye"></i>
                                                                         </button>
-                                                                        <Link
-                                                                            to={`/ticket/${ticket.id}/comentarios`}
+                                                                        <button
                                                                             className="btn btn-info btn-sm"
                                                                             title="Ver y agregar comentarios"
+                                                                            onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
                                                                         >
                                                                             <i className="fas fa-comments"></i>
-                                                                        </Link>
-                                                                        <Link
-                                                                            to={`/ticket/${ticket.id}/chat-analista-cliente`}
+                                                                        </button>
+                                                                        <button
                                                                             className={`btn btn-sm ${tieneAnalistaAsignado(ticket) ? 'btn-success' : 'btn-primary'}`}
                                                                             title={tieneAnalistaAsignado(ticket) ? `Chat con ${getAnalistaAsignado(ticket)}` : "Chat con analista"}
+                                                                            onClick={() => window.open(`/ticket/${ticket.id}/chat-analista-cliente`, '_self')}
                                                                         >
                                                                             <i className={`fas ${tieneAnalistaAsignado(ticket) ? 'fa-signal' : 'fa-comments'}`}></i>
-                                                                        </Link>
+                                                                        </button>
                                                                     </div>
 
                                                                     {/* Fila inferior: IA y Sugerencias */}
@@ -1425,24 +1628,24 @@ export function ClientePage() {
                                                                                     </button>
                                                                                 </li>
                                                                                 <li>
-                                                                                    <Link
-                                                                                        to={`/ticket/${ticket.id}/identificar-imagen`}
+                                                                                    <button
                                                                                         className="dropdown-item"
+                                                                                        onClick={() => window.open(`/ticket/${ticket.id}/identificar-imagen`, '_self')}
                                                                                     >
                                                                                         <i className="fas fa-camera me-2"></i>
                                                                                         Analizar Imagen
-                                                                                    </Link>
+                                                                                    </button>
                                                                                 </li>
                                                                             </ul>
                                                                         </div>
                                                                         {ticketsConRecomendaciones.has(ticket.id) && (
-                                                                            <Link
-                                                                                to={`/ticket/${ticket.id}/recomendaciones-similares`}
+                                                                            <button
                                                                                 className="btn btn-outline-success btn-sm"
                                                                                 title="Ver sugerencias disponibles"
+                                                                                onClick={() => window.open(`/ticket/${ticket.id}/recomendaciones-similares`, '_self')}
                                                                             >
                                                                                 <i className="fas fa-lightbulb"></i>
-                                                                            </Link>
+                                                                            </button>
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -1688,6 +1891,7 @@ export function ClientePage() {
                             </div>
                         </>
                     )}
+
 
                     {/* VerTicketHD View */}
                     {(() => {

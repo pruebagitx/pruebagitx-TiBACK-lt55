@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import useGlobalReducer from '../hooks/useGlobalReducer';
+import { ClienteSidebar } from '../components/ClienteSidebar';
 
 const RecomendacionesSimilares = () => {
     const { ticketId } = useParams();
@@ -11,6 +12,8 @@ const RecomendacionesSimilares = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [comentariosPorTicket, setComentariosPorTicket] = useState({});
+    const [sidebarHidden, setSidebarHidden] = useState(false);
+    const [activeView, setActiveView] = useState('recomendaciones-similares');
 
     useEffect(() => {
         const cargarRecomendaciones = async () => {
@@ -134,12 +137,36 @@ const RecomendacionesSimilares = () => {
         return new Date(fecha).toLocaleString();
     };
 
+    // Función para alternar sidebar
+    const toggleSidebar = () => {
+        setSidebarHidden(!sidebarHidden);
+    };
+
+    // Función para cambiar vista
+    const changeView = (view) => {
+        setActiveView(view);
+        if (view === 'dashboard') {
+            navigate('/cliente');
+        } else if (view === 'tickets') {
+            navigate('/cliente');
+        } else if (view === 'create') {
+            navigate('/cliente');
+        }
+    };
+
     if (loading) {
         return (
-            <div className="container mt-4">
-                <div className="d-flex justify-content-center">
-                    <div className="spinner-border" role="status">
-                        <span className="visually-hidden">Cargando recomendaciones...</span>
+            <div className="hyper-layout d-flex">
+                <ClienteSidebar
+                    sidebarHidden={sidebarHidden}
+                    activeView={activeView}
+                    changeView={changeView}
+                />
+                <div className={`hyper-main-content flex-grow-1 ${sidebarHidden ? 'sidebar-hidden' : ''}`}>
+                    <div className="d-flex justify-content-center align-items-center vh-100">
+                        <div className="spinner-border" role="status">
+                            <span className="visually-hidden">Cargando recomendaciones...</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -147,27 +174,51 @@ const RecomendacionesSimilares = () => {
     }
 
     return (
-        <div className="container mt-4">
-            <div className="row">
-                <div className="col-12">
-                    <div className="d-flex justify-content-between align-items-center mb-4">
-                        <div>
-                            <h2>
-                                <i className="fas fa-lightbulb me-2 text-warning"></i>
-                                Recomendaciones de Tickets Similares
-                            </h2>
-                            <p className="text-muted mb-0">
-                                Tickets resueltos con problemas similares al ticket #{ticketId}
-                            </p>
+        <div className="hyper-layout d-flex">
+            {/* Sidebar izquierdo */}
+            <ClienteSidebar
+                sidebarHidden={sidebarHidden}
+                activeView={activeView}
+                changeView={changeView}
+            />
+
+            {/* Contenido principal */}
+            <div className={`hyper-main-content flex-grow-1 ${sidebarHidden ? 'sidebar-hidden' : ''}`}>
+                {/* Header superior */}
+                <header className="hyper-header bg-white border-bottom p-3">
+                    <div className="d-flex align-items-center justify-content-between w-100">
+                        <div className="d-flex align-items-center gap-3">
+                            <button
+                                className="hyper-sidebar-toggle btn btn-link p-2"
+                                onClick={toggleSidebar}
+                                title={sidebarHidden ? "Mostrar menú" : "Ocultar menú"}
+                            >
+                                <i className={`fas ${sidebarHidden ? 'fa-eye' : 'fa-eye-slash'}`}></i>
+                            </button>
+                            <div>
+                                <h1 className="mb-0 fw-semibold">
+                                    <i className="fas fa-lightbulb me-2 text-warning"></i>
+                                    Recomendaciones de Tickets Similares
+                                </h1>
+                                <p className="text-muted mb-0">
+                                    Tickets resueltos con problemas similares al ticket #{ticketId}
+                                </p>
+                            </div>
                         </div>
-                        <button
-                            className="btn btn-outline-secondary"
-                            onClick={() => navigate(`/ticket/${ticketId}/comentarios`)}
-                        >
-                            <i className="fas fa-arrow-left me-1"></i>
-                            Volver a Comentarios
-                        </button>
+                        <div className="d-flex align-items-center gap-3">
+                            <button
+                                className="btn btn-outline-secondary"
+                                onClick={() => navigate(`/ticket/${ticketId}/comentarios`)}
+                            >
+                                <i className="fas fa-arrow-left me-1"></i>
+                                Volver a Comentarios
+                            </button>
+                        </div>
                     </div>
+                </header>
+
+                {/* Contenido del dashboard */}
+                <div className="p-4">
 
                     {error && (
                         <div className="alert alert-danger" role="alert">

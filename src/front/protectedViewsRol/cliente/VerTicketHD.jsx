@@ -7,6 +7,20 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Función para verificar si un ticket tiene analista asignado
+    const tieneAnalistaAsignado = (ticket) => {
+        return ticket.asignacion_actual && ticket.asignacion_actual.analista;
+    };
+
+    // Función para obtener el nombre del analista asignado
+    const getAnalistaAsignado = (ticket) => {
+        if (tieneAnalistaAsignado(ticket)) {
+            const analista = ticket.asignacion_actual.analista;
+            return `${analista.nombre} ${analista.apellido}`;
+        }
+        return null;
+    };
+
     useEffect(() => {
         const fetchTicket = async () => {
             try {
@@ -128,13 +142,19 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                                 <p className="text-muted mb-0">Vista detallada del ticket</p>
                             </div>
                         </div>
-                        <div className="d-flex gap-2">
-                            <span className={`badge bg-${getEstadoColor(ticket.estado)} fs-6 px-3 py-2`}>
-                                {ticket.estado}
-                            </span>
-                            <span className={`badge bg-${getPrioridadColor(ticket.prioridad)} fs-6 px-3 py-2`}>
-                                {ticket.prioridad || 'Normal'}
-                            </span>
+                        <div className="d-flex gap-4">
+                            <div className="d-flex flex-column align-items-center">
+                                <small className="text-muted mb-1 fw-semibold">ESTADO</small>
+                                <span className={`badge bg-${getEstadoColor(ticket.estado)} fs-6 px-3 py-2`}>
+                                    {ticket.estado}
+                                </span>
+                            </div>
+                            <div className="d-flex flex-column align-items-center">
+                                <small className="text-muted mb-1 fw-semibold">PRIORIDAD</small>
+                                <span className={`badge bg-${getPrioridadColor(ticket.prioridad)} fs-6 px-3 py-2`}>
+                                    {ticket.prioridad || 'Normal'}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -221,17 +241,20 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                             </h5>
                         </div>
                         <div className="card-body text-center">
-                            {ticket.analista_asignado ? (
+                            {tieneAnalistaAsignado(ticket) ? (
                                 <div>
                                     <div className="mb-3">
                                         <div className="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center"
                                             style={{ width: '60px', height: '60px' }}>
-                                            <i className="fas fa-user text-white fs-4"></i>
+                                            <i className="fas fa-user-tie text-white fs-4"></i>
                                         </div>
                                     </div>
-                                    <h6 className="fw-semibold">{ticket.analista_asignado}</h6>
+                                    <h6 className="fw-semibold">{getAnalistaAsignado(ticket)}</h6>
                                     <p className="text-muted mb-3">Analista de Soporte</p>
-                                    <button className="btn btn-success btn-sm">
+                                    <button
+                                        className="btn btn-success btn-sm"
+                                        onClick={() => window.open(`/ticket/${ticket.id}/chat-analista-cliente`, '_blank')}
+                                    >
                                         <i className="fas fa-comments me-1"></i>
                                         Iniciar Chat
                                     </button>
@@ -370,12 +393,12 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                                     </div>
                                 </div>
 
-                                {ticket.analista_asignado && (
+                                {tieneAnalistaAsignado(ticket) && (
                                     <div className="timeline-item">
                                         <div className="timeline-marker bg-info"></div>
                                         <div className="timeline-content">
                                             <h6 className="fw-semibold">Analista Asignado</h6>
-                                            <p className="text-muted mb-1">Analista: {ticket.analista_asignado}</p>
+                                            <p className="text-muted mb-1">Analista: {getAnalistaAsignado(ticket)}</p>
                                             <p className="mb-0">El ticket ha sido asignado a un analista.</p>
                                         </div>
                                     </div>
