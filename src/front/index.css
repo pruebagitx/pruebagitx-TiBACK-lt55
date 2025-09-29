@@ -1,0 +1,391 @@
+/* Estilos específicos para la plantilla Hyper - Optimizado con Bootstrap */
+
+/* Variables CSS para colores del tema */
+:root {
+  --sidebar-bg: #2a3042;
+  --sidebar-text: #a6b0cf;
+  --sidebar-active: #5b73e8;
+}
+
+/* Layout principal - Solo lo que Bootstrap no puede hacer */
+.hyper-layout {
+  min-height: 100vh;
+  background-color: #f5f6fa;
+}
+
+/* Sidebar izquierdo - Estilos específicos del diseño */
+.hyper-sidebar {
+  width: 260px;
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 1000;
+  transition: width 0.3s ease, transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.hyper-sidebar.collapsed {
+  width: 70px;
+}
+
+.hyper-sidebar.hidden {
+  transform: translateX(-100%) !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+.hyper-sidebar-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hyper-logo {
+  color: white;
+  text-decoration: none;
+}
+
+.hyper-logo i {
+  color: var(--sidebar-active);
+}
+
+/* Navegación del sidebar */
+.hyper-nav-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8a96b5;
+}
+
+.hyper-nav-item {
+  color: var(--sidebar-text);
+  text-decoration: none;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.hyper-nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  text-decoration: none;
+}
+
+.hyper-nav-item.active {
+  background-color: var(--sidebar-active);
+  color: white;
+}
+
+.hyper-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: white;
+}
+
+.hyper-nav-item i {
+  width: 20px;
+  text-align: center;
+}
+
+/* Contenido principal */
+.hyper-main-content {
+  margin-left: 260px;
+  transition: margin-left 0.3s ease;
+}
+
+.hyper-main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+.hyper-main-content.sidebar-hidden {
+  margin-left: 0;
+}
+
+/* Header superior */
+.hyper-header {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.hyper-sidebar-toggle {
+  background: none;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.hyper-search input {
+  border-radius: 25px;
+  padding-left: 2.5rem;
+  width: 300px;
+  transition: all 0.3s ease;
+}
+
+.hyper-search input:focus {
+  border-color: var(--sidebar-active);
+  box-shadow: 0 0 0 0.2rem rgba(91, 115, 232, 0.25);
+}
+
+.hyper-search i {
+  position: absolute;
+  left: 0.75rem;
+}
+
+.hyper-header-btn {
+  background: none;
+  border: none;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.hyper-notification-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  font-size: 0.6rem;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* Perfil de usuario */
+.hyper-user-profile {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.hyper-user-avatar {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+}
+
+/* Tarjetas de métricas - Solo gradientes específicos */
+.hyper-metric-icon.customers {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.hyper-metric-icon.orders {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.hyper-metric-icon.revenue {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.hyper-metric-icon.growth {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.hyper-metric-value {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+/* Widgets */
+.hyper-widget {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.hyper-widget:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.hyper-widget-btn {
+  background: none;
+  transition: all 0.3s ease;
+}
+
+/* Gráficos placeholder */
+.hyper-chart-placeholder {
+  height: 300px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+/* Actividad reciente */
+.hyper-activity-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.hyper-activity-icon.sold {
+  background-color: var(--bs-success);
+}
+
+.hyper-activity-icon.product {
+  background-color: var(--bs-info);
+}
+
+.hyper-activity-icon.message {
+  background-color: var(--bs-warning);
+}
+
+.hyper-activity-icon.upload {
+  background-color: var(--sidebar-active);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hyper-sidebar {
+    transform: translateX(-100%);
+  }
+  
+  .hyper-sidebar.show {
+    transform: translateX(0);
+  }
+  
+  .hyper-main-content {
+    margin-left: 0;
+  }
+  
+  .hyper-search input {
+    width: 200px;
+  }
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hyper-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Scrollbar personalizado */
+.hyper-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.hyper-sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hyper-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.hyper-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Animación para la flecha del dropdown */
+.rotate-180 {
+  transform: rotate(180deg);
+  transition: transform 0.3s ease;
+}
+
+/* Footer con sidebar - Ajustar ancho máximo */
+.footer-with-sidebar {
+  margin-left: 260px;
+  transition: margin-left 0.3s ease;
+}
+
+.footer-with-sidebar.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+.footer-with-sidebar.sidebar-hidden {
+  margin-left: 0;
+}
+
+/* Asegurar que el footer respete el espacio del sidebar */
+.footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Responsive para footer con sidebar */
+@media (max-width: 768px) {
+  .footer-with-sidebar {
+    margin-left: 0;
+  }
+  
+  .footer-with-sidebar.sidebar-collapsed {
+    margin-left: 0;
+  }
+}
+
+/* Estilos para VerTicketHD */
+.timeline {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 0.75rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, #007bff, #28a745);
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.timeline-marker {
+  position: absolute;
+  left: -2rem;
+  top: 0.25rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 0 0 3px #e9ecef;
+}
+
+.timeline-content {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border-left: 3px solid #007bff;
+}
+
+.timeline-item:last-child .timeline-content {
+  border-left-color: #28a745;
+}
+
+/* Animaciones para VerTicketHD */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.card:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.card:nth-child(4) {
+  animation-delay: 0.3s;
+}

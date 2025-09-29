@@ -5,6 +5,7 @@ export const Footer = () => {
 	const { store, getRealtimeStatus, startRealtimeSync, joinAllCriticalRooms } = useGlobalReducer();
 	const [showDetails, setShowDetails] = useState(false);
 	const [isSyncing, setIsSyncing] = useState(false);
+	const [sidebarState, setSidebarState] = useState({ collapsed: false, hidden: false, exists: false });
 
 	const realtimeStatus = getRealtimeStatus();
 	const { isAuthenticated } = store.auth;
@@ -19,6 +20,36 @@ export const Footer = () => {
 			userId: store.auth.user?.id
 		});
 	}, [store.auth.isAuthenticated, store.auth.user, store.auth.token]);
+
+	// Detectar estado del sidebar
+	useEffect(() => {
+		const checkSidebar = () => {
+			const sidebar = document.querySelector('.hyper-sidebar');
+			const layout = document.querySelector('.hyper-layout');
+
+			if (sidebar && layout) {
+				const isCollapsed = sidebar.classList.contains('collapsed');
+				const isHidden = sidebar.classList.contains('hidden');
+				setSidebarState({ collapsed: isCollapsed, hidden: isHidden, exists: true });
+			} else {
+				setSidebarState({ collapsed: false, hidden: false, exists: false });
+			}
+		};
+
+		// Verificar inmediatamente
+		checkSidebar();
+
+		// Observar cambios en el DOM
+		const observer = new MutationObserver(checkSidebar);
+		observer.observe(document.body, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			attributeFilter: ['class']
+		});
+
+		return () => observer.disconnect();
+	}, []);
 
 	const handleManualSync = async () => {
 		if (isSyncing) {
@@ -114,14 +145,14 @@ export const Footer = () => {
 
 	if (!isAuthenticated) {
 		return (
-			<footer className="footer mt-auto py-4 text-center">
+			<footer className={`footer mt-auto py-4 text-center ${sidebarState.exists ? 'footer-with-sidebar' : ''} ${sidebarState.collapsed ? 'sidebar-collapsed' : ''} ${sidebarState.hidden ? 'sidebar-hidden' : ''}`}>
 				<h4>"Tu turno, tu tiempo, tu solución. Con la velocidad que mereces."</h4>
 			</footer>
 		);
 	}
 
 	return (
-		<footer className="footer mt-auto py-4">
+		<footer className={`footer mt-auto py-4 ${sidebarState.exists ? 'footer-with-sidebar' : ''} ${sidebarState.collapsed ? 'sidebar-collapsed' : ''} ${sidebarState.hidden ? 'sidebar-hidden' : ''}`}>
 			<div className="container">
 				<div className="row">
 					<div className="col-md-8">
