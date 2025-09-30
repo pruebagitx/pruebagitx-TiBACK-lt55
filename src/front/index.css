@@ -5,6 +5,98 @@
   --sidebar-bg: #2a3042;
   --sidebar-text: #a6b0cf;
   --sidebar-active: #5b73e8;
+  
+  /* Colores de la paleta del SideBarCentral para botones de acciones */
+  --btn-sidebar-primary: #5b73e8; /* Azul del sidebar activo */
+  --btn-sidebar-secondary: #2a3042; /* Fondo del sidebar */
+  --btn-sidebar-accent: #a6b0cf; /* Texto del sidebar */
+  --btn-sidebar-success: #28a745; /* Verde Bootstrap */
+  --btn-sidebar-warning: #ffc107; /* Amarillo Bootstrap */
+}
+
+/* Reducción global del tamaño de letra en 20% + aumento del 10% */
+html {
+  font-size: 0.88rem; /* Aumentado 10% de 0.8rem (total -12% del tamaño base) */
+}
+
+body {
+  font-size: 0.88rem; /* Aumentado 10% de 0.8rem */
+}
+
+/* Botones de acciones con colores de la paleta del SideBarCentral */
+.btn-sidebar-primary {
+  background-color: var(--btn-sidebar-primary) !important;
+  border-color: var(--btn-sidebar-primary) !important;
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(91, 115, 232, 0.2) !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn-sidebar-primary:hover {
+  background-color: #4a5fd8 !important;
+  border-color: #4a5fd8 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(91, 115, 232, 0.3) !important;
+}
+
+.btn-sidebar-secondary {
+  background-color: var(--btn-sidebar-secondary) !important;
+  border-color: var(--btn-sidebar-secondary) !important;
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(42, 48, 66, 0.2) !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn-sidebar-secondary:hover {
+  background-color: #1e2430 !important;
+  border-color: #1e2430 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(42, 48, 66, 0.3) !important;
+}
+
+.btn-sidebar-accent {
+  background-color: var(--btn-sidebar-accent) !important;
+  border-color: var(--btn-sidebar-accent) !important;
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(166, 176, 207, 0.2) !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn-sidebar-accent:hover {
+  background-color: #8a96b5 !important;
+  border-color: #8a96b5 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(166, 176, 207, 0.3) !important;
+}
+
+.btn-sidebar-success {
+  background-color: var(--btn-sidebar-success) !important;
+  border-color: var(--btn-sidebar-success) !important;
+  color: white !important;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2) !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn-sidebar-success:hover {
+  background-color: #218838 !important;
+  border-color: #218838 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3) !important;
+}
+
+.btn-sidebar-warning {
+  background-color: var(--btn-sidebar-warning) !important;
+  border-color: var(--btn-sidebar-warning) !important;
+  color: #212529 !important;
+  box-shadow: 0 2px 4px rgba(255, 193, 7, 0.2) !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn-sidebar-warning:hover {
+  background-color: #e0a800 !important;
+  border-color: #e0a800 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(255, 193, 7, 0.3) !important;
 }
 
 /* Layout principal - Solo lo que Bootstrap no puede hacer */
@@ -15,7 +107,7 @@
 
 /* Sidebar izquierdo - Estilos específicos del diseño */
 .hyper-sidebar {
-  width: 260px;
+  width: 187px; /* Reducido 10% adicional de 208px (total 28% de reducción) */
   background-color: var(--sidebar-bg);
   color: var(--sidebar-text);
   position: fixed;
@@ -24,6 +116,7 @@
   height: 100vh;
   z-index: 1000;
   transition: width 0.3s ease, transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+  font-size: 0.88rem; /* Aumentado 10% de 0.8rem */
 }
 
 .hyper-sidebar.collapsed {
@@ -51,7 +144,7 @@
 
 /* Navegación del sidebar */
 .hyper-nav-title {
-  font-size: 0.75rem;
+  font-size: 0.66rem; /* Aumentado 10% de 0.6rem */
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: #8a96b5;
@@ -92,7 +185,7 @@
 
 /* Contenido principal */
 .hyper-main-content {
-  margin-left: 260px;
+  margin-left: 187px; /* Reducido 10% adicional de 208px (total 28% de reducción) */
   transition: margin-left 0.3s ease;
 }
 
@@ -666,4 +759,421 @@
 
 .dark-theme .table .fa-star.text-muted {
   color: #555555 !important;
+}
+
+/* Estilos para puntos de color y texto en modo oscuro */
+.dark-theme .text-dark {
+  color: #ffffff !important;
+}
+
+.dark-theme .text-white {
+  color: #ffffff !important;
+}
+
+/* Puntos de color para estados, prioridades y asignaciones */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.status-dot.solucionado {
+  background-color: #28a745;
+}
+
+.status-dot.en-proceso {
+  background-color: #ffc107;
+}
+
+.status-dot.en-espera {
+  background-color: #17a2b8;
+}
+
+.status-dot.activo {
+  background-color: #007bff;
+}
+
+.priority-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.priority-dot.alta {
+  background-color: #dc3545;
+}
+
+.priority-dot.media {
+  background-color: #ffc107;
+}
+
+.priority-dot.baja {
+  background-color: #28a745;
+}
+
+.assignment-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.assignment-dot.asignado {
+  background-color: #28a745;
+}
+
+.assignment-dot.sin-asignar {
+  background-color: #6c757d;
+}
+
+/* Puntos de color para ID, Título, Fecha y Calificación */
+.id-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  background-color: #007bff;
+}
+
+.title-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  background-color: #6f42c1;
+}
+
+.date-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  background-color: #17a2b8;
+}
+
+.rating-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.rating-dot.calificado {
+  background-color: #ffc107;
+}
+
+.rating-dot.sin-calificar {
+  background-color: #6c757d;
+}
+
+/* Reglas para mantener el tamaño de los puntos de color */
+.status-dot,
+.priority-dot,
+.assignment-dot,
+.id-dot,
+.title-dot,
+.date-dot,
+.rating-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  box-sizing: border-box !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Asegurar que los puntos no se reduzcan en contenedores flex */
+.d-flex .status-dot,
+.d-flex .priority-dot,
+.d-flex .assignment-dot,
+.d-flex .id-dot,
+.d-flex .title-dot,
+.d-flex .date-dot,
+.d-flex .rating-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Prevenir aplastamiento en contenedores con overflow */
+.overflow-hidden .status-dot,
+.overflow-hidden .priority-dot,
+.overflow-hidden .assignment-dot,
+.overflow-hidden .id-dot,
+.overflow-hidden .title-dot,
+.overflow-hidden .date-dot,
+.overflow-hidden .rating-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+}
+
+/* Prevenir aplastamiento en contenedores con text-overflow */
+.text-truncate .status-dot,
+.text-truncate .priority-dot,
+.text-truncate .assignment-dot,
+.text-truncate .id-dot,
+.text-truncate .title-dot,
+.text-truncate .date-dot,
+.text-truncate .rating-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+}
+
+/* Prevenir que los puntos se reduzcan en tablas */
+.table .status-dot,
+.table .priority-dot,
+.table .assignment-dot,
+.table .id-dot,
+.table .title-dot,
+.table .date-dot,
+.table .rating-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Prevenir aplastamiento en celdas de tabla específicamente */
+.table td .status-dot,
+.table td .priority-dot,
+.table td .assignment-dot,
+.table td .id-dot,
+.table td .title-dot,
+.table td .date-dot,
+.table td .rating-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Prevenir aplastamiento en contenedores con ancho fijo */
+.col-1 .status-dot, .col-2 .status-dot, .col-3 .status-dot, .col-4 .status-dot, .col-5 .status-dot, .col-6 .status-dot,
+.col-1 .priority-dot, .col-2 .priority-dot, .col-3 .priority-dot, .col-4 .priority-dot, .col-5 .priority-dot, .col-6 .priority-dot,
+.col-1 .assignment-dot, .col-2 .assignment-dot, .col-3 .assignment-dot, .col-4 .assignment-dot, .col-5 .assignment-dot, .col-6 .assignment-dot,
+.col-1 .id-dot, .col-2 .id-dot, .col-3 .id-dot, .col-4 .id-dot, .col-5 .id-dot, .col-6 .id-dot,
+.col-1 .title-dot, .col-2 .title-dot, .col-3 .title-dot, .col-4 .title-dot, .col-5 .title-dot, .col-6 .title-dot,
+.col-1 .date-dot, .col-2 .date-dot, .col-3 .date-dot, .col-4 .date-dot, .col-5 .date-dot, .col-6 .date-dot,
+.col-1 .rating-dot, .col-2 .rating-dot, .col-3 .rating-dot, .col-4 .rating-dot, .col-5 .rating-dot, .col-6 .rating-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Asegurar tamaño en modo oscuro */
+.dark-theme .status-dot,
+.dark-theme .priority-dot,
+.dark-theme .assignment-dot,
+.dark-theme .id-dot,
+.dark-theme .title-dot,
+.dark-theme .date-dot,
+.dark-theme .rating-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Regla universal para prevenir aplastamiento horizontal en cualquier contexto */
+* .status-dot,
+* .priority-dot,
+* .assignment-dot,
+* .id-dot,
+* .title-dot,
+* .date-dot,
+* .rating-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+}
+
+/* Reglas específicas para puntos con clase rounded-circle (Asignado a y Fecha) */
+.rounded-circle {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+}
+
+/* Protección específica para puntos en contenedores flex con rounded-circle */
+.d-flex .rounded-circle {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+}
+
+/* Protección específica para puntos en tablas con rounded-circle */
+.table .rounded-circle,
+.table td .rounded-circle {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+}
+
+/* Protección específica para puntos con rounded-circle en modo oscuro */
+.dark-theme .rounded-circle {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+}
+
+/* Regla universal para TODOS los puntos con rounded-circle */
+* .rounded-circle {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* Protección específica para puntos en contenedores con ancho restringido */
+.px-3 .rounded-circle,
+.px-4 .rounded-circle,
+.text-center .rounded-circle {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 8px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+  transform: none !important;
+  scale: 1 !important;
 }

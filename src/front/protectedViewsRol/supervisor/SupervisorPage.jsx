@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useGlobalReducer from '../../hooks/useGlobalReducer';
+import { SideBarCentral } from '../../components/SideBarCentral';
+import { DashboardCalidad } from '../../pages/DashboardCalidad';
 
 // Utilidades de token seguras
 const tokenUtils = {
@@ -47,7 +49,60 @@ export function SupervisorPage() {
     });
     const [ticketsConRecomendaciones, setTicketsConRecomendaciones] = useState(new Set());
 
-    // Función helper para actualizar tickets sin recargar la página
+    // Estados para el nuevo diseÃ±o
+    const [sidebarHidden, setSidebarHidden] = useState(false);
+    const [activeView, setActiveView] = useState('dashboard');
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+    const [filterEstado, setFilterEstado] = useState('');
+    const [filterAsignado, setFilterAsignado] = useState('');
+    const [filterPrioridad, setFilterPrioridad] = useState('');
+
+
+    // Funciones para el nuevo diseÃ±o
+    const toggleSidebar = () => {
+        setSidebarHidden(!sidebarHidden);
+    };
+
+    const changeView = (view) => {
+        setActiveView(view);
+    };
+
+    const toggleTheme = () => {
+        setIsDarkMode(!isDarkMode);
+        document.body.classList.toggle('dark-theme');
+    };
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        if (query.trim()) {
+            const results = tickets.filter(ticket =>
+                ticket.titulo.toLowerCase().includes(query.toLowerCase())
+            );
+            setSearchResults(results);
+            setShowSearchResults(true);
+        } else {
+            setSearchResults([]);
+            setShowSearchResults(false);
+        }
+    };
+
+    const closeSearchResults = () => {
+        setShowSearchResults(false);
+        setSearchQuery('');
+        setSearchResults([]);
+    };
+
+    const selectTicketFromSearch = (ticket) => {
+        setActiveView(`ticket-${ticket.id}`);
+        closeSearchResults();
+    };
+
+    // FunciÃ³n helper para actualizar tickets sin recargar la pÃ¡gina
     const actualizarTickets = async () => {
         try {
             const token = store.auth.token;
@@ -66,7 +121,7 @@ export function SupervisorPage() {
         }
     };
 
-    // Función para cargar tickets cerrados
+    // FunciÃ³n para cargar tickets cerrados
     const cargarTicketsCerrados = async () => {
         try {
             setLoadingCerrados(true);
@@ -88,7 +143,7 @@ export function SupervisorPage() {
         }
     };
 
-    // Función para actualizar la lista de analistas
+    // FunciÃ³n para actualizar la lista de analistas
     const actualizarAnalistas = async () => {
         try {
             const token = store.auth.token;
@@ -101,7 +156,7 @@ export function SupervisorPage() {
             if (response.ok) {
                 const analistasData = await response.json();
                 setAnalistas(analistasData);
-                // También actualizar el store global
+                // TambiÃ©n actualizar el store global
                 dispatch({ type: "analistas_set_list", payload: analistasData });
             }
         } catch (err) {
@@ -109,7 +164,7 @@ export function SupervisorPage() {
         }
     };
 
-    // Función helper para actualizar tanto tickets activos como cerrados
+    // FunciÃ³n helper para actualizar tanto tickets activos como cerrados
     const actualizarTodasLasTablas = async () => {
         await actualizarTickets();
         if (showCerrados) {
@@ -117,7 +172,7 @@ export function SupervisorPage() {
         }
     };
 
-    // Función específica para manejar tickets cerrados
+    // FunciÃ³n especÃ­fica para manejar tickets cerrados
     const manejarTicketCerrado = (ticketId) => {
 
         // Remover inmediatamente de la lista de tickets activos
@@ -128,13 +183,13 @@ export function SupervisorPage() {
             return prev.filter(ticket => ticket.id !== ticketId);
         });
 
-        // Si está viendo la lista de cerrados, actualizar inmediatamente
+        // Si estÃ¡ viendo la lista de cerrados, actualizar inmediatamente
         if (showCerrados) {
             cargarTicketsCerrados();
         }
     };
 
-    // Conectar WebSocket cuando el usuario esté autenticado
+    // Conectar WebSocket cuando el usuario estÃ© autenticado
     useEffect(() => {
         if (store.auth.isAuthenticated && store.auth.token && !store.websocket.connected) {
             const socket = connectWebSocket(store.auth.token);
@@ -152,6 +207,38 @@ export function SupervisorPage() {
             }
         };
     }, [store.auth.isAuthenticated, store.auth.token]);
+
+    // Funciones de filtrado y estadÃ­sticas
+    const getFilteredTickets = () => {
+        let filtered = tickets;
+
+        if (filterEstado) {
+            filtered = filtered.filter(ticket => ticket.estado === filterEstado);
+        }
+
+        if (filterAsignado) {
+            if (filterAsignado === 'asignados') {
+                filtered = filtered.filter(ticket => ticket.asignacion_actual && ticket.asignacion_actual.analista);
+            } else if (filterAsignado === 'no-asignados') {
+                filtered = filtered.filter(ticket => !ticket.asignacion_actual || !ticket.asignacion_actual.analista);
+            }
+        }
+
+        if (filterPrioridad) {
+            filtered = filtered.filter(ticket => ticket.prioridad === filterPrioridad);
+        }
+
+        return filtered;
+    };
+
+    const getStats = () => {
+        const total = tickets.length;
+        const activos = tickets.filter(t => t.estado === 'activo').length;
+        const resueltos = tickets.filter(t => t.estado === 'resuelto').length;
+        const escalados = tickets.filter(t => t.estado === 'escalado').length;
+
+        return { total, activos, resueltos, escalados };
+    };
 
     // Cargar datos del usuario
     useEffect(() => {
@@ -179,6 +266,12 @@ export function SupervisorPage() {
                             password: '',
                             confirmPassword: ''
                         });
+
+                        // Actualizar el store global con los datos del usuario
+                        dispatch({
+                            type: 'SET_USER',
+                            payload: data
+                        });
                     }
                 }
             } catch (err) {
@@ -186,10 +279,11 @@ export function SupervisorPage() {
             }
         };
 
-        if (store.auth.isAuthenticated && store.auth.token) {
+        if (store.auth.isAuthenticated && store.auth.token && !store.auth.user) {
             cargarDatosUsuario();
         }
-    }, [store.auth.isAuthenticated, store.auth.token]);
+    }, [store.auth.isAuthenticated, store.auth.token, store.auth.user, dispatch]);
+
 
     // Cargar tickets y analistas
     useEffect(() => {
@@ -240,7 +334,7 @@ export function SupervisorPage() {
     // Verificar recomendaciones para todos los tickets
     useEffect(() => {
         if (tickets.length > 0 && store.auth.token && store.auth.isAuthenticated) {
-            // Agregar un pequeño delay para evitar llamadas múltiples
+            // Agregar un pequeÃ±o delay para evitar llamadas mÃºltiples
             const timeoutId = setTimeout(() => {
                 verificarRecomendaciones();
             }, 500);
@@ -253,17 +347,17 @@ export function SupervisorPage() {
         try {
             const token = store.auth.token;
 
-            // Verificar que tenemos tickets y token válido
+            // Verificar que tenemos tickets y token vÃ¡lido
             if (!tickets || tickets.length === 0 || !token) {
-                console.log('⚠️ No hay tickets o token para verificar recomendaciones');
+                console.log('âš ï¸ No hay tickets o token para verificar recomendaciones');
                 return;
             }
 
             const recomendacionesPromises = tickets.map(async (ticket) => {
                 try {
-                    // Validar que el ticket tenga contenido válido
+                    // Validar que el ticket tenga contenido vÃ¡lido
                     if (!ticket.titulo || !ticket.descripcion || ticket.titulo.trim() === '' || ticket.descripcion.trim() === '') {
-                        console.log(`⚠️ Ticket ${ticket.id} sin contenido suficiente para recomendaciones`);
+                        console.log(`âš ï¸ Ticket ${ticket.id} sin contenido suficiente para recomendaciones`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'sin_contenido' };
                     }
 
@@ -272,14 +366,14 @@ export function SupervisorPage() {
                             'Authorization': `Bearer ${token}`,
                             'Content-Type': 'application/json'
                         },
-                        // Aumentar timeout para requests más robustos
+                        // Aumentar timeout para requests mÃ¡s robustos
                         signal: AbortSignal.timeout(15000) // 15 segundos timeout
                     });
 
                     if (response.ok) {
                         const data = await response.json();
                         const tieneRecomendaciones = data.total_encontrados > 0;
-                        console.log(`✅ Ticket ${ticket.id}: ${data.total_encontrados} recomendaciones encontradas`);
+                        console.log(`âœ… Ticket ${ticket.id}: ${data.total_encontrados} recomendaciones encontradas`);
                         return {
                             ticketId: ticket.id,
                             tieneRecomendaciones,
@@ -287,20 +381,20 @@ export function SupervisorPage() {
                             algoritmo: data.algoritmo || 'legacy'
                         };
                     } else {
-                        // Log del error específico pero no fallar
-                        console.warn(`⚠️ Error ${response.status} verificando recomendaciones para ticket ${ticket.id}`);
+                        // Log del error especÃ­fico pero no fallar
+                        console.warn(`âš ï¸ Error ${response.status} verificando recomendaciones para ticket ${ticket.id}`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: `error_${response.status}` };
                     }
                 } catch (fetchError) {
-                    // Manejar errores individuales sin fallar toda la operación
+                    // Manejar errores individuales sin fallar toda la operaciÃ³n
                     if (fetchError.name === 'AbortError') {
-                        console.warn(`⏰ Timeout verificando recomendaciones para ticket ${ticket.id}`);
+                        console.warn(`â° Timeout verificando recomendaciones para ticket ${ticket.id}`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'timeout' };
                     } else if (fetchError.name === 'TypeError' && fetchError.message.includes('Failed to fetch')) {
-                        console.warn(`🌐 Error de red verificando recomendaciones para ticket ${ticket.id}`);
+                        console.warn(`ðŸŒ Error de red verificando recomendaciones para ticket ${ticket.id}`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'network_error' };
                     } else {
-                        console.warn(`❌ Error verificando recomendaciones para ticket ${ticket.id}:`, fetchError.message);
+                        console.warn(`âŒ Error verificando recomendaciones para ticket ${ticket.id}:`, fetchError.message);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'unknown_error' };
                     }
                 }
@@ -308,20 +402,20 @@ export function SupervisorPage() {
 
             const resultados = await Promise.all(recomendacionesPromises);
 
-            // Análisis detallado de resultados
+            // AnÃ¡lisis detallado de resultados
             const ticketsConRecomendaciones = resultados.filter(r => r.tieneRecomendaciones);
             const ticketsSinRecomendaciones = resultados.filter(r => !r.tieneRecomendaciones);
 
-            console.log('📊 Resultados de recomendaciones:', {
+            console.log('ðŸ“Š Resultados de recomendaciones:', {
                 total: resultados.length,
                 conRecomendaciones: ticketsConRecomendaciones.length,
                 sinRecomendaciones: ticketsSinRecomendaciones.length,
                 detalles: resultados
             });
 
-            // Log específico para tickets sin recomendaciones
+            // Log especÃ­fico para tickets sin recomendaciones
             if (ticketsSinRecomendaciones.length > 0) {
-                console.log('⚠️ Tickets sin recomendaciones:', ticketsSinRecomendaciones.map(t => ({
+                console.log('âš ï¸ Tickets sin recomendaciones:', ticketsSinRecomendaciones.map(t => ({
                     id: t.ticketId,
                     razon: t.razon
                 })));
@@ -336,25 +430,25 @@ export function SupervisorPage() {
             });
             setTicketsConRecomendaciones(ticketsConRecomendacionesSet);
 
-            console.log(`✅ Verificación de recomendaciones completada para ${tickets.length} tickets`);
+            console.log(`âœ… VerificaciÃ³n de recomendaciones completada para ${tickets.length} tickets`);
         } catch (error) {
-            console.error('❌ Error general verificando recomendaciones:', error);
+            console.error('âŒ Error general verificando recomendaciones:', error);
             // En caso de error general, limpiar el estado
             setTicketsConRecomendaciones(new Set());
         }
     };
 
-    // Configurar sincronización crítica en tiempo real
+    // Configurar sincronizaciÃ³n crÃ­tica en tiempo real
     useEffect(() => {
         if (store.auth.user && store.websocket.connected && store.websocket.socket) {
-            // Unirse a todas las rooms críticas inmediatamente
+            // Unirse a todas las rooms crÃ­ticas inmediatamente
             joinAllCriticalRooms(store.websocket.socket, store.auth.user);
 
-            // Configurar sincronización crítica
+            // Configurar sincronizaciÃ³n crÃ­tica
             const syncConfig = startRealtimeSync({
                 syncTypes: ['tickets', 'comentarios', 'asignaciones', 'analistas'],
                 onSyncTriggered: (data) => {
-                    console.log('🚨 Sincronización crítica activada en SupervisorPage:', data);
+                    console.log('ðŸš¨ SincronizaciÃ³n crÃ­tica activada en SupervisorPage:', data);
                     if (data.type === 'tickets' || data.priority === 'critical') {
                         actualizarTickets();
                     }
@@ -364,7 +458,7 @@ export function SupervisorPage() {
                 }
             });
 
-            // Unirse a rooms críticos de todos los tickets supervisados
+            // Unirse a rooms crÃ­ticos de todos los tickets supervisados
             const ticketIds = tickets.map(ticket => ticket.id);
             if (ticketIds.length > 0) {
                 joinCriticalRooms(store.websocket.socket, ticketIds, store.auth.user);
@@ -372,10 +466,10 @@ export function SupervisorPage() {
         }
     }, [store.auth.user, store.websocket.connected, tickets.length]);
 
-    // Efecto para manejar sincronización manual desde Footer
+    // Efecto para manejar sincronizaciÃ³n manual desde Footer
     useEffect(() => {
         const handleManualSync = (event) => {
-            console.log('🔄 Sincronización manual recibida en SupervisorPage:', event.detail);
+            console.log('ðŸ”„ SincronizaciÃ³n manual recibida en SupervisorPage:', event.detail);
             if (event.detail.role === 'supervisor') {
                 actualizarTickets();
                 actualizarAnalistas();
@@ -386,22 +480,22 @@ export function SupervisorPage() {
         return () => window.removeEventListener('manualSyncTriggered', handleManualSync);
     }, []);
 
-    // Efecto para manejar actualizaciones críticas de tickets
+    // Efecto para manejar actualizaciones crÃ­ticas de tickets
     useEffect(() => {
         if (store.websocket.criticalTicketUpdate) {
             const criticalUpdate = store.websocket.criticalTicketUpdate;
-            console.log('🚨 ACTUALIZACIÓN CRÍTICA RECIBIDA EN SUPERVISOR:', criticalUpdate);
+            console.log('ðŸš¨ ACTUALIZACIÃ“N CRÃTICA RECIBIDA EN SUPERVISOR:', criticalUpdate);
 
-            // Actualizar inmediatamente para acciones críticas
+            // Actualizar inmediatamente para acciones crÃ­ticas
             if (criticalUpdate.priority === 'critical') {
                 actualizarTickets();
 
-                // Mostrar notificación visual si es necesario
+                // Mostrar notificaciÃ³n visual si es necesario
                 if (criticalUpdate.action === 'comentario_agregado' ||
                     criticalUpdate.action === 'ticket_actualizado' ||
                     criticalUpdate.action === 'ticket_creado' ||
                     criticalUpdate.action.includes('estado_cambiado')) {
-                    console.log(`🚨 Acción crítica: ${criticalUpdate.action} en ticket ${criticalUpdate.ticket_id}`);
+                    console.log(`ðŸš¨ AcciÃ³n crÃ­tica: ${criticalUpdate.action} en ticket ${criticalUpdate.ticket_id}`);
                 }
             }
         }
@@ -412,12 +506,12 @@ export function SupervisorPage() {
         if (store.websocket.notifications.length > 0) {
             const lastNotification = store.websocket.notifications[store.websocket.notifications.length - 1];
 
-            // Actualización inmediata para eventos específicos (sin esperar)
+            // ActualizaciÃ³n inmediata para eventos especÃ­ficos (sin esperar)
             if (lastNotification.tipo === 'asignado' || lastNotification.tipo === 'estado_cambiado' || lastNotification.tipo === 'iniciado' || lastNotification.tipo === 'escalado') {
-                // Los datos ya están en el store por el WebSocket - actualización instantánea
+                // Los datos ya estÃ¡n en el store por el WebSocket - actualizaciÃ³n instantÃ¡nea
             }
 
-            // Actualización específica para analistas
+            // ActualizaciÃ³n especÃ­fica para analistas
             if (lastNotification.tipo === 'analista_creado') {
 
                 // Actualizar estado local inmediatamente si hay datos del analista
@@ -427,69 +521,69 @@ export function SupervisorPage() {
                         return newList;
                     });
                 }
-                // También hacer actualización completa para asegurar consistencia
+                // TambiÃ©n hacer actualizaciÃ³n completa para asegurar consistencia
                 actualizarAnalistas();
             }
 
-            // Actualización específica para analistas eliminados
+            // ActualizaciÃ³n especÃ­fica para analistas eliminados
             if (lastNotification.tipo === 'analista_eliminado') {
-                console.log('🗑️ SUPERVISOR - Analista eliminado detectado:', lastNotification);
-                console.log('📊 SUPERVISOR - ID del analista eliminado:', lastNotification.analista_id);
-                console.log('📊 SUPERVISOR - Lista actual de analistas antes:', analistas.length);
+                console.log('ðŸ—‘ï¸ SUPERVISOR - Analista eliminado detectado:', lastNotification);
+                console.log('ðŸ“Š SUPERVISOR - ID del analista eliminado:', lastNotification.analista_id);
+                console.log('ðŸ“Š SUPERVISOR - Lista actual de analistas antes:', analistas.length);
 
                 // Remover inmediatamente de la lista local
                 if (lastNotification.analista_id) {
                     setAnalistas(prev => {
                         const analistaEliminado = prev.find(a => a.id === lastNotification.analista_id);
                         if (analistaEliminado) {
-                            console.log('🗑️ SUPERVISOR - Analista eliminado removido de lista:', analistaEliminado.nombre, analistaEliminado.apellido);
+                            console.log('ðŸ—‘ï¸ SUPERVISOR - Analista eliminado removido de lista:', analistaEliminado.nombre, analistaEliminado.apellido);
                         }
                         const newList = prev.filter(analista => analista.id !== lastNotification.analista_id);
-                        console.log('📊 SUPERVISOR - Nueva lista de analistas después de eliminar:', newList.length);
+                        console.log('ðŸ“Š SUPERVISOR - Nueva lista de analistas despuÃ©s de eliminar:', newList.length);
                         return newList;
                     });
                 }
-                // También hacer actualización completa para asegurar consistencia
+                // TambiÃ©n hacer actualizaciÃ³n completa para asegurar consistencia
                 actualizarAnalistas();
             }
 
-            // Sincronización ULTRA RÁPIDA para eventos críticos
+            // SincronizaciÃ³n ULTRA RÃPIDA para eventos crÃ­ticos
             if (lastNotification.tipo === 'escalado' || lastNotification.tipo === 'asignado' || lastNotification.tipo === 'solicitud_reapertura' || lastNotification.tipo === 'creado' || lastNotification.tipo === 'cerrado') {
-                console.log('⚡ SUPERVISOR - SINCRONIZACIÓN INMEDIATA:', lastNotification.tipo);
-                // Actualización inmediata sin debounce para eventos críticos
+                console.log('âš¡ SUPERVISOR - SINCRONIZACIÃ“N INMEDIATA:', lastNotification.tipo);
+                // ActualizaciÃ³n inmediata sin debounce para eventos crÃ­ticos
                 actualizarTodasLasTablas();
             }
 
-            // Manejo específico para tickets cerrados - sincronización inmediata
+            // Manejo especÃ­fico para tickets cerrados - sincronizaciÃ³n inmediata
             if (lastNotification.tipo === 'cerrado' || lastNotification.tipo === 'ticket_cerrado') {
-                console.log('🔒 SUPERVISOR - TICKET CERRADO DETECTADO:', lastNotification);
+                console.log('ðŸ”’ SUPERVISOR - TICKET CERRADO DETECTADO:', lastNotification);
 
-                // Usar la función específica para manejar tickets cerrados
+                // Usar la funciÃ³n especÃ­fica para manejar tickets cerrados
                 if (lastNotification.ticket_id) {
                     manejarTicketCerrado(lastNotification.ticket_id);
                 }
             }
 
-            // Manejo específico para tickets eliminados - sincronización inmediata
+            // Manejo especÃ­fico para tickets eliminados - sincronizaciÃ³n inmediata
             if (lastNotification.tipo === 'eliminado' || lastNotification.tipo === 'ticket_eliminado') {
-                console.log('🗑️ SUPERVISOR - TICKET ELIMINADO DETECTADO:', lastNotification);
+                console.log('ðŸ—‘ï¸ SUPERVISOR - TICKET ELIMINADO DETECTADO:', lastNotification);
 
                 // Remover inmediatamente de la lista de tickets activos
                 if (lastNotification.ticket_id) {
                     setTickets(prev => {
                         const ticketRemovido = prev.find(t => t.id === lastNotification.ticket_id);
                         if (ticketRemovido) {
-                            console.log('🗑️ SUPERVISOR - Ticket eliminado removido de lista activa:', ticketRemovido.titulo);
+                            console.log('ðŸ—‘ï¸ SUPERVISOR - Ticket eliminado removido de lista activa:', ticketRemovido.titulo);
                         }
                         return prev.filter(ticket => ticket.id !== lastNotification.ticket_id);
                     });
 
-                    // También remover de la lista de cerrados si está visible
+                    // TambiÃ©n remover de la lista de cerrados si estÃ¡ visible
                     if (showCerrados) {
                         setTicketsCerrados(prev => {
                             const ticketRemovido = prev.find(t => t.id === lastNotification.ticket_id);
                             if (ticketRemovido) {
-                                console.log('🗑️ SUPERVISOR - Ticket eliminado removido de lista cerrada:', ticketRemovido.titulo);
+                                console.log('ðŸ—‘ï¸ SUPERVISOR - Ticket eliminado removido de lista cerrada:', ticketRemovido.titulo);
                             }
                             return prev.filter(ticket => ticket.id !== lastNotification.ticket_id);
                         });
@@ -501,10 +595,10 @@ export function SupervisorPage() {
 
     const asignarTicket = async (ticketId, analistaId) => {
         try {
-            console.log(`⚡ ASIGNANDO TICKET ${ticketId} A ANALISTA ${analistaId} INMEDIATAMENTE`);
+            console.log(`âš¡ ASIGNANDO TICKET ${ticketId} A ANALISTA ${analistaId} INMEDIATAMENTE`);
             const token = store.auth.token;
 
-            // Buscar el ticket para determinar si es una reasignación
+            // Buscar el ticket para determinar si es una reasignaciÃ³n
             const ticket = tickets.find(t => t.id === ticketId);
             const esReasignacion = ticket && ticket.asignacion_actual && ticket.asignacion_actual.id_analista;
 
@@ -525,14 +619,14 @@ export function SupervisorPage() {
                 throw new Error(`Error al asignar ticket: ${errorData.message || 'Error desconocido'}`);
             }
 
-            console.log('✅ TICKET ASIGNADO EXITOSAMENTE');
+            console.log('âœ… TICKET ASIGNADO EXITOSAMENTE');
 
-            // Emitir acción crítica de asignación
+            // Emitir acciÃ³n crÃ­tica de asignaciÃ³n
             if (store.websocket.socket) {
                 emitCriticalTicketAction(store.websocket.socket, ticketId, `ticket_asignado_${analistaId}`, store.auth.user);
             }
 
-            // Actualización ULTRA RÁPIDA sin esperar
+            // ActualizaciÃ³n ULTRA RÃPIDA sin esperar
             actualizarTodasLasTablas();
         } catch (err) {
             setError(err.message);
@@ -555,12 +649,12 @@ export function SupervisorPage() {
                 throw new Error('Error al cambiar estado del ticket');
             }
 
-            // Emitir acción crítica de cambio de estado
+            // Emitir acciÃ³n crÃ­tica de cambio de estado
             if (store.websocket.socket) {
                 emitCriticalTicketAction(store.websocket.socket, ticketId, `estado_cambiado_${nuevoEstado}`, store.auth.user);
             }
 
-            // Actualizar tickets sin recargar la página
+            // Actualizar tickets sin recargar la pÃ¡gina
             await actualizarTodasLasTablas();
         } catch (err) {
             setError(err.message);
@@ -593,7 +687,7 @@ export function SupervisorPage() {
             });
             if (!response.ok) throw new Error('Error al agregar comentario');
 
-            // Actualizar tickets sin recargar la página
+            // Actualizar tickets sin recargar la pÃ¡gina
             await actualizarTodasLasTablas();
         } catch (err) {
             setError(err.message);
@@ -601,7 +695,7 @@ export function SupervisorPage() {
     };
 
     const generarRecomendacion = (ticket) => {
-        // Redirigir a la vista de recomendación IA
+        // Redirigir a la vista de recomendaciÃ³n IA
         navigate(`/ticket/${ticket.id}/recomendacion-ia`);
     };
 
@@ -616,14 +710,14 @@ export function SupervisorPage() {
 
     const updateInfo = async () => {
         try {
-            // Validar contraseñas si se proporcionan
+            // Validar contraseÃ±as si se proporcionan
             if (infoData.password && infoData.password !== infoData.confirmPassword) {
-                setError('Las contraseñas no coinciden');
+                setError('Las contraseÃ±as no coinciden');
                 return;
             }
 
             if (infoData.password && infoData.password.length < 6) {
-                setError('La contraseña debe tener al menos 6 caracteres');
+                setError('La contraseÃ±a debe tener al menos 6 caracteres');
                 return;
             }
 
@@ -641,7 +735,7 @@ export function SupervisorPage() {
 
             // Solo incluir contraseña si se proporciona
             if (infoData.password) {
-                updateData.contraseña_hash = infoData.password;
+                updateData.password = infoData.password;
             }
 
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/supervisores/${userId}`, {
@@ -655,7 +749,7 @@ export function SupervisorPage() {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || 'Error al actualizar información');
+                throw new Error(errorData.message || 'Error al actualizar informaciÃ³n');
             }
 
             // Actualizar los datos locales
@@ -667,7 +761,7 @@ export function SupervisorPage() {
                 area_responsable: infoData.area_responsable
             }));
 
-            alert('Información actualizada exitosamente');
+            alert('InformaciÃ³n actualizada exitosamente');
             setShowInfoForm(false);
             setError('');
         } catch (err) {
@@ -700,13 +794,13 @@ export function SupervisorPage() {
         }
     };
 
-    // Función para determinar el color del semáforo
+    // FunciÃ³n para determinar el color del semÃ¡foro
     const getSemaforoColor = (ticket, allTickets) => {
         const fechaActual = new Date();
         const fechaCreacion = new Date(ticket.fecha_creacion);
         const diasDiferencia = Math.floor((fechaActual - fechaCreacion) / (1000 * 60 * 60 * 24));
 
-        // Ordenar tickets por fecha de creación (más antiguos primero)
+        // Ordenar tickets por fecha de creaciÃ³n (mÃ¡s antiguos primero)
         const ticketsOrdenados = [...allTickets].sort((a, b) =>
             new Date(a.fecha_creacion) - new Date(b.fecha_creacion)
         );
@@ -715,11 +809,11 @@ export function SupervisorPage() {
             ticketsOrdenados[0].id === ticket.id;
 
         const prioridadAlta = ticket.prioridad.toLowerCase() === 'alta';
-        const esTicketViejo = diasDiferencia >= 3; // Consideramos viejo si tiene 3+ días
+        const esTicketViejo = diasDiferencia >= 3; // Consideramos viejo si tiene 3+ dÃ­as
 
-        // Lógica del semáforo
+        // LÃ³gica del semÃ¡foro
         if (prioridadAlta && esTicketMasViejo) {
-            return 'table-danger'; // Rojo: Prioridad alta y ticket más viejo
+            return 'table-danger'; // Rojo: Prioridad alta y ticket mÃ¡s viejo
         } else if (prioridadAlta || esTicketViejo) {
             return 'table-warning'; // Naranja: Prioridad alta O ticket viejo
         } else {
@@ -727,7 +821,7 @@ export function SupervisorPage() {
         }
     };
 
-    // Función helper para detectar si hay una solicitud de reapertura del cliente
+    // FunciÃ³n helper para detectar si hay una solicitud de reapertura del cliente
     const tieneSolicitudReapertura = (ticket) => {
         if (!ticket.comentarios || !Array.isArray(ticket.comentarios)) {
             return false;
@@ -739,618 +833,909 @@ export function SupervisorPage() {
         );
     };
 
+    const stats = getStats();
+    const filteredTickets = getFilteredTickets();
+
+    if (loading) {
+        return (
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+                <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Cargando...</span>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="container py-4">
-            {/* Header con información del supervisor */}
-            <div className="row mb-4">
-                <div className="col-12">
-                    <div className="card">
-                        <div className="card-body d-flex justify-content-between align-items-center">
-                            <div>
-                                <h2 className="mb-1">
-                                    Bienvenido, {userData?.nombre === 'Pendiente' ? 'Supervisor' : userData?.nombre} {userData?.apellido === 'Pendiente' ? '' : userData?.apellido}
-                                </h2>
-                                <p className="text-muted mb-0">Panel de Supervisor - Gestión de Tickets</p>
-                                <div className="mt-2">
-                                    <span className="badge bg-success">
-                                        <i className="fas fa-wifi me-1"></i>
-                                        Conectado
-                                    </span>
-                                </div>
-                                {userData?.area_responsable && userData.area_responsable !== 'Pendiente' && (
-                                    <div className="mt-2">
-                                        <small className="text-info d-flex align-items-center">
-                                            <i className="fas fa-building me-1"></i>
-                                            <span className="fw-bold">Área:</span>
-                                            <span className="ms-1">{userData.area_responsable}</span>
-                                        </small>
-                                    </div>
-                                )}
-                                {(!userData?.area_responsable || userData.area_responsable === 'Pendiente') && (
-                                    <div className="mt-2">
-                                        <small className="text-warning d-flex align-items-center">
-                                            <i className="fas fa-exclamation-triangle me-1"></i>
-                                            <span>Completa tu información personal para una mejor experiencia</span>
-                                        </small>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="d-flex gap-2">
-                                <button
-                                    className="btn btn-info"
-                                    onClick={() => setShowInfoForm(!showInfoForm)}
-                                >
-                                    <i className="fas fa-user-edit me-1"></i>
-                                    {showInfoForm ? 'Ocultar Información' : 'Actualizar Información'}
-                                </button>
-                                <Link to="/dashboard-calidad" className="btn btn-success">
-                                    <i className="fas fa-chart-line me-1"></i>
-                                    Rendimiento Analistas
-                                </Link>
-                                <Link to="/supervisores" className="btn btn-primary">Ir al CRUD</Link>
-                                <button
-                                    className="btn btn-outline-danger"
-                                    onClick={logout}
-                                >
-                                    Cerrar Sesión
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div className="hyper-layout d-flex">
+            {/* Sidebar central dinÃ¡mico */}
+            <SideBarCentral
+                sidebarHidden={sidebarHidden}
+                activeView={activeView}
+                changeView={changeView}
+            />
 
-            {error && (
-                <div className="alert alert-danger" role="alert">
-                    {error}
-                </div>
-            )}
-
-            {/* Formulario de información personal */}
-            {showInfoForm && (
-                <div className="row mb-4">
-                    <div className="col-12">
-                        <div className="card">
-                            <div className="card-header">
-                                <h5 className="mb-0">
-                                    <i className="fas fa-user-edit me-2"></i>
-                                    Actualizar Mi Información
-                                </h5>
-                            </div>
-                            <div className="card-body">
-                                <div className="row g-3">
-                                    <div className="col-md-6">
-                                        <label htmlFor="nombre" className="form-label">Nombre *</label>
-                                        <input
-                                            type="text"
-                                            className="form-control"
-                                            id="nombre"
-                                            name="nombre"
-                                            value={infoData.nombre}
-                                            onChange={handleInfoChange}
-                                            placeholder="Ingresa tu nombre"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label htmlFor="apellido" className="form-label">Apellido *</label>
-                                        <input
-                                            type="text"
-                                            className="form-control"
-                                            id="apellido"
-                                            name="apellido"
-                                            value={infoData.apellido}
-                                            onChange={handleInfoChange}
-                                            placeholder="Ingresa tu apellido"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label htmlFor="email" className="form-label">Email *</label>
-                                        <input
-                                            type="email"
-                                            className="form-control"
-                                            id="email"
-                                            name="email"
-                                            value={infoData.email}
-                                            onChange={handleInfoChange}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label htmlFor="area_responsable" className="form-label">Área Responsable *</label>
-                                        <input
-                                            type="text"
-                                            className="form-control"
-                                            id="area_responsable"
-                                            name="area_responsable"
-                                            value={infoData.area_responsable}
-                                            onChange={handleInfoChange}
-                                            placeholder="Ingresa tu área responsable"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label htmlFor="password" className="form-label">Nueva Contraseña (opcional)</label>
-                                        <input
-                                            type="password"
-                                            className="form-control"
-                                            id="password"
-                                            name="password"
-                                            value={infoData.password}
-                                            onChange={handleInfoChange}
-                                            minLength="6"
-                                            placeholder="Dejar vacío para mantener la actual"
-                                        />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label htmlFor="confirmPassword" className="form-label">Confirmar Nueva Contraseña</label>
-                                        <input
-                                            type="password"
-                                            className="form-control"
-                                            id="confirmPassword"
-                                            name="confirmPassword"
-                                            value={infoData.confirmPassword}
-                                            onChange={handleInfoChange}
-                                            minLength="6"
-                                            placeholder="Solo si cambias la contraseña"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="mt-3 d-flex gap-2">
-                                    <button
-                                        className="btn btn-success"
-                                        onClick={updateInfo}
-                                        disabled={!infoData.nombre || !infoData.apellido || !infoData.email || !infoData.area_responsable || updatingInfo}
-                                    >
-                                        {updatingInfo ? (
-                                            <>
-                                                <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                                                Actualizando...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <i className="fas fa-save me-1"></i>
-                                                Guardar Información
-                                            </>
-                                        )}
-                                    </button>
-                                    <button
-                                        className="btn btn-secondary"
-                                        onClick={() => setShowInfoForm(false)}
-                                        disabled={updatingInfo}
-                                    >
-                                        <i className="fas fa-times me-1"></i>
-                                        Cancelar
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Lista de tickets */}
-            <div className="row">
-                <div className="col-12">
-                    <div className="card">
-                        <div className="card-header d-flex justify-content-between align-items-center">
-                            <h5 className="mb-0">Todos los Tickets</h5>
-                            <small className="text-muted">
-                                {analistas.length} analista{analistas.length !== 1 ? 's' : ''} disponible{analistas.length !== 1 ? 's' : ''}
-                            </small>
-                        </div>
-                        <div className="card-body">
-                            {loading ? (
-                                <div className="text-center py-4">
-                                    <div className="spinner-border text-primary" role="status">
-                                        <span className="visually-hidden">Cargando tickets...</span>
-                                    </div>
-                                </div>
-                            ) : tickets.length === 0 ? (
-                                <div className="text-center py-4">
-                                    <p className="text-muted">No hay tickets disponibles.</p>
-                                </div>
-                            ) : (
-                                <div className="table-responsive">
-                                    <table className="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Semáforo</th>
-                                                <th>ID</th>
-                                                <th>Cliente</th>
-                                                <th>Título</th>
-                                                <th>Estado</th>
-                                                <th>Prioridad</th>
-                                                <th>Analista Asignado</th>
-                                                <th>Fecha Creación</th>
-                                                <th>Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {tickets
-                                                .sort((a, b) => {
-                                                    const colorA = getSemaforoColor(a, tickets);
-                                                    const colorB = getSemaforoColor(b, tickets);
-
-                                                    // Orden: Rojo (table-danger) -> Naranja (table-warning) -> Verde (table-success)
-                                                    const order = { 'table-danger': 0, 'table-warning': 1, 'table-success': 2 };
-                                                    return order[colorA] - order[colorB];
-                                                })
-                                                .map((ticket) => (
-                                                    <tr key={ticket.id} className={getSemaforoColor(ticket, tickets)}>
-                                                        <td className="text-center">
-                                                            <div className="d-flex justify-content-center">
-                                                                <div
-                                                                    className="rounded-circle d-flex align-items-center justify-content-center"
-                                                                    style={{
-                                                                        width: '20px',
-                                                                        height: '20px',
-                                                                        backgroundColor: getSemaforoColor(ticket, tickets) === 'table-danger' ? '#dc3545' :
-                                                                            getSemaforoColor(ticket, tickets) === 'table-warning' ? '#ffc107' : '#28a745'
-                                                                    }}
-                                                                    title={
-                                                                        getSemaforoColor(ticket, tickets) === 'table-danger' ? '🔴 Rojo: Prioridad alta y ticket más viejo' :
-                                                                            getSemaforoColor(ticket, tickets) === 'table-warning' ? '🟠 Naranja: Prioridad alta o ticket viejo' :
-                                                                                '🟢 Verde: Prioridad media/baja y ticket reciente'
-                                                                    }
-                                                                >
-                                                                    <i className="fas fa-circle" style={{ fontSize: '8px', color: 'white' }}></i>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div className="d-flex align-items-center">
-                                                                <span className="me-2">#{ticket.id}</span>
-                                                                {ticket.url_imagen ? (
-                                                                    <img
-                                                                        src={ticket.url_imagen}
-                                                                        alt="Imagen del ticket"
-                                                                        className="img-thumbnail"
-                                                                        style={{ width: '30px', height: '30px', objectFit: 'cover' }}
-                                                                    />
-                                                                ) : (
-                                                                    <span className="text-muted">
-                                                                        <i className="fas fa-image" style={{ fontSize: '12px' }}></i>
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            {ticket.cliente?.nombre} {ticket.cliente?.apellido}
-                                                        </td>
-                                                        <td>
-                                                            <div>
-                                                                <strong>{ticket.titulo}</strong>
-                                                                <br />
-                                                                <small className="text-muted">
-                                                                    {ticket.descripcion.length > 50
-                                                                        ? `${ticket.descripcion.substring(0, 50)}...`
-                                                                        : ticket.descripcion
-                                                                    }
-                                                                </small>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <span className={getEstadoColor(ticket.estado)}>
-                                                                {ticket.estado}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <span className={getPrioridadColor(ticket.prioridad)}>
-                                                                {ticket.prioridad}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            {ticket.asignacion_actual?.analista ?
-                                                                `${ticket.asignacion_actual.analista.nombre} ${ticket.asignacion_actual.analista.apellido}` :
-                                                                'Sin asignar'
-                                                            }
-                                                        </td>
-                                                        <td>
-                                                            {new Date(ticket.fecha_creacion).toLocaleDateString()}
-                                                        </td>
-                                                        <td>
-                                                            <div className="btn-group" role="group">
-                                                                {ticket.estado.toLowerCase() === 'creado' && (
-                                                                    <select
-                                                                        className="form-select form-select-sm"
-                                                                        onChange={(e) => {
-                                                                            if (e.target.value) {
-                                                                                asignarTicket(ticket.id, e.target.value);
-                                                                            }
-                                                                        }}
-                                                                        defaultValue=""
-                                                                    >
-                                                                        <option value="">
-                                                                            {analistas.length > 0 ? 'Asignar a...' : 'No hay analistas disponibles'}
-                                                                        </option>
-                                                                        {analistas.map(analista => (
-                                                                            <option key={analista.id} value={analista.id}>
-                                                                                {analista.nombre} {analista.apellido} - {analista.especialidad}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                )}
-                                                                {ticket.estado.toLowerCase() === 'en_espera' && !ticket.asignacion_actual && (
-                                                                    <span className="badge bg-warning" title="Ticket escalado por un analista">
-                                                                        <i className="fas fa-arrow-up"></i> Escalado
-                                                                    </span>
-                                                                )}
-                                                                {ticket.estado.toLowerCase() === 'en_espera' && ticket.asignacion_actual && (
-                                                                    <span className="badge bg-success">
-                                                                        <i className="fas fa-user-check"></i> Asignado
-                                                                    </span>
-                                                                )}
-                                                                {ticket.estado.toLowerCase() === 'solucionado' && tieneSolicitudReapertura(ticket) && (
-                                                                    <div className="d-flex gap-1">
-                                                                        <button
-                                                                            className="btn btn-success btn-sm"
-                                                                            onClick={() => cambiarEstadoTicket(ticket.id, 'cerrado')}
-                                                                            title="Cerrar ticket"
-                                                                        >
-                                                                            <i className="fas fa-check"></i> Cerrar
-                                                                        </button>
-                                                                        <button
-                                                                            className="btn btn-danger btn-sm"
-                                                                            onClick={() => cambiarEstadoTicket(ticket.id, 'reabierto')}
-                                                                            title="Reabrir ticket"
-                                                                        >
-                                                                            <i className="fas fa-redo"></i> Reabrir
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-                                                                {ticket.estado.toLowerCase() === 'solucionado' && !tieneSolicitudReapertura(ticket) && (
-                                                                    <span className="badge bg-success">
-                                                                        <i className="fas fa-check-circle"></i> Solucionado
-                                                                    </span>
-                                                                )}
-                                                                {ticket.estado.toLowerCase() === 'reabierto' && (
-                                                                    <select
-                                                                        className="form-select form-select-sm"
-                                                                        onChange={(e) => {
-                                                                            if (e.target.value) {
-                                                                                asignarTicket(ticket.id, e.target.value);
-                                                                            }
-                                                                        }}
-                                                                        defaultValue=""
-                                                                    >
-                                                                        <option value="">
-                                                                            {analistas.length > 0 ? 'Reasignar a...' : 'No hay analistas disponibles'}
-                                                                        </option>
-                                                                        {analistas.map(analista => (
-                                                                            <option key={analista.id} value={analista.id}>
-                                                                                {analista.nombre} {analista.apellido} - {analista.especialidad}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                )}
-                                                                {ticket.estado.toLowerCase() === 'en_espera' && !ticket.asignacion_actual && (
-                                                                    <select
-                                                                        className="form-select form-select-sm"
-                                                                        onChange={(e) => {
-                                                                            if (e.target.value) {
-                                                                                asignarTicket(ticket.id, e.target.value);
-                                                                            }
-                                                                        }}
-                                                                        defaultValue=""
-                                                                    >
-                                                                        <option value="">
-                                                                            Reasignar a...
-                                                                        </option>
-                                                                        {analistas.map(analista => (
-                                                                            <option key={analista.id} value={analista.id}>
-                                                                                {analista.nombre} {analista.apellido} - {analista.especialidad}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                )}
-                                                                <Link
-                                                                    to={`/ticket/${ticket.id}/comentarios`}
-                                                                    className="btn btn-info btn-sm"
-                                                                    title="Ver y agregar comentarios"
-                                                                >
-                                                                    <i className="fas fa-comments"></i> Comentar
-                                                                </Link>
-                                                                <div className="btn-group" role="group">
-                                                                    <button
-                                                                        className="btn btn-warning btn-sm dropdown-toggle"
-                                                                        type="button"
-                                                                        data-bs-toggle="dropdown"
-                                                                        aria-expanded="false"
-                                                                        title="Opciones de IA"
-                                                                    >
-                                                                        <i className="fas fa-robot"></i> IA
-                                                                    </button>
-                                                                    <ul className="dropdown-menu">
-                                                                        <li>
-                                                                            <button
-                                                                                className="dropdown-item"
-                                                                                onClick={() => generarRecomendacion(ticket)}
-                                                                            >
-                                                                                <i className="fas fa-lightbulb me-2"></i>
-                                                                                Generar Recomendación
-                                                                            </button>
-                                                                        </li>
-                                                                        <li>
-                                                                            <Link
-                                                                                to={`/ticket/${ticket.id}/identificar-imagen`}
-                                                                                className="dropdown-item"
-                                                                            >
-                                                                                <i className="fas fa-camera me-2"></i>
-                                                                                Analizar Imagen
-                                                                            </Link>
-                                                                        </li>
-                                                                    </ul>
-                                                                </div>
-                                                                {ticketsConRecomendaciones.has(ticket.id) && (
-                                                                    <Link
-                                                                        to={`/ticket/${ticket.id}/recomendaciones-similares`}
-                                                                        className="btn btn-success btn-sm"
-                                                                        title="Ver tickets similares resueltos"
-                                                                    >
-                                                                        <i className="fas fa-thumbs-up"></i>
-                                                                    </Link>
-                                                                )}
-                                                                <Link
-                                                                    to={`/ticket/${ticket.id}/chat-supervisor-analista`}
-                                                                    className="btn btn-secondary btn-sm"
-                                                                    title="Chat con analista"
-                                                                >
-                                                                    <i className="fas fa-comments"></i> Chat
-                                                                </Link>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Tabla de tickets cerrados */}
-            <div className="row mt-4">
-                <div className="col-12">
-                    <div className="card">
-                        <div className="card-header d-flex justify-content-between align-items-center">
-                            <div className="d-flex align-items-center">
-                                <h5 className="mb-0 me-2">Tickets Cerrados</h5>
-                                {loadingCerrados && (
-                                    <div className="spinner-border spinner-border-sm text-primary" role="status">
-                                        <span className="visually-hidden">Actualizando...</span>
-                                    </div>
-                                )}
-                            </div>
+            {/* Contenido principal */}
+            <div className={`hyper-main-content flex-grow-1 ${sidebarHidden ? 'sidebar-hidden' : ''}`}>
+                {/* Header superior */}
+                <header className="hyper-header bg-white border-bottom p-3">
+                    <div className="d-flex align-items-center justify-content-between w-100">
+                        <div className="d-flex align-items-center gap-3">
                             <button
-                                className="btn btn-outline-secondary btn-sm"
-                                onClick={() => {
-                                    if (!showCerrados) {
-                                        cargarTicketsCerrados();
-                                    }
-                                    setShowCerrados(!showCerrados);
-                                }}
-                                disabled={loadingCerrados}
+                                className="hyper-sidebar-toggle btn btn-link p-2"
+                                onClick={toggleSidebar}
+                                title={sidebarHidden ? "Mostrar menÃº" : "Ocultar menÃº"}
                             >
-                                <i className={`fas ${showCerrados ? 'fa-eye-slash' : 'fa-eye'} me-1`}></i>
-                                {showCerrados ? 'Ocultar' : 'Mostrar'} Cerrados
-                                {ticketsCerrados.length > 0 && (
-                                    <span className="badge bg-secondary ms-2">{ticketsCerrados.length}</span>
-                                )}
+                                <i className={`fas ${sidebarHidden ? 'fa-eye' : 'fa-eye-slash'}`}></i>
                             </button>
-                        </div>
-                        {showCerrados && (
-                            <div className="card-body">
-                                {loadingCerrados ? (
-                                    <div className="text-center py-4">
-                                        <div className="spinner-border text-primary" role="status">
-                                            <span className="visually-hidden">Cargando tickets cerrados...</span>
+
+                            {/* Barra de bÃºsqueda */}
+                            <div className="hyper-search position-relative">
+                                <i className="fas fa-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                                <input
+                                    type="text"
+                                    className="form-control pe-5"
+                                    placeholder="Buscar tickets por tÃ­tulo..."
+                                    value={searchQuery}
+                                    onChange={(e) => handleSearch(e.target.value)}
+                                    onFocus={() => {
+                                        if (searchResults.length > 0) {
+                                            setShowSearchResults(true);
+                                        }
+                                    }}
+                                />
+                                {searchQuery && (
+                                    <button
+                                        className="btn btn-link position-absolute top-50 end-0 translate-middle-y me-3 p-0"
+                                        onClick={() => {
+                                            setSearchQuery('');
+                                            setSearchResults([]);
+                                            setShowSearchResults(false);
+                                        }}
+                                        title="Limpiar bÃºsqueda"
+                                        style={{ zIndex: 10 }}
+                                    >
+                                        <i className="fas fa-times text-muted"></i>
+                                    </button>
+                                )}
+
+                                {/* Resultados de bÃºsqueda */}
+                                {showSearchResults && searchResults.length > 0 && (
+                                    <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg" style={{ top: '100%', zIndex: 1000 }}>
+                                        <div className="p-3">
+                                            <div className="d-flex justify-content-between align-items-center mb-3 w-100">
+                                                <small className="text-muted fw-semibold">
+                                                    Tickets encontrados ({searchResults.length})
+                                                </small>
+                                                <button
+                                                    className="btn btn-sm btn-outline-secondary ms-3"
+                                                    onClick={closeSearchResults}
+                                                    title="Cerrar resultados"
+                                                >
+                                                    <span>X</span>
+                                                </button>
+                                            </div>
+                                            {searchResults.map((ticket) => (
+                                                <div
+                                                    key={ticket.id}
+                                                    className="search-result-item p-2 border-bottom cursor-pointer"
+                                                    onClick={() => selectTicketFromSearch(ticket)}
+                                                >
+                                                    <div className="fw-semibold">#{ticket.id} - {ticket.titulo}</div>
+                                                    <small className="text-muted">
+                                                        {ticket.estado} â€¢ {ticket.prioridad}
+                                                    </small>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
-                                ) : ticketsCerrados.length === 0 ? (
-                                    <div className="text-center py-4">
-                                        <p className="text-muted">No hay tickets cerrados.</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="d-flex align-items-center gap-2">
+                            {/* Dropdown del usuario */}
+                            <div className="position-relative">
+                                <button
+                                    className="btn btn-link d-flex align-items-center gap-2 text-decoration-none"
+                                    onClick={() => setShowUserDropdown(!showUserDropdown)}
+                                >
+                                    <div className="hyper-user-avatar bg-primary d-flex align-items-center justify-content-center rounded-circle" style={{ width: '32px', height: '32px' }}>
+                                        <i className="fas fa-user-shield text-white" style={{ fontSize: '0.8rem' }}></i>
                                     </div>
-                                ) : (
+                                    <span className="fw-semibold">
+                                        {userData?.nombre === 'Pendiente' ? 'Supervisor' : userData?.nombre}
+                                    </span>
+                                    <i className="fas fa-chevron-down"></i>
+                                </button>
+
+                                {showUserDropdown && (
+                                    <div className="position-absolute end-0 mt-2 bg-white border rounded shadow-lg" style={{ minWidth: '200px', zIndex: 1000 }}>
+                                        <div className="p-3 border-bottom">
+                                            <div className="fw-semibold">
+                                                {userData?.nombre === 'Pendiente' ? 'Supervisor' : userData?.nombre}
+                                            </div>
+                                            <small className="text-muted">Supervisor</small>
+                                        </div>
+                                        <div className="p-2">
+                                            <button
+                                                className="btn btn-link w-100 text-start d-flex align-items-center gap-2"
+                                                onClick={() => {
+                                                    setShowInfoForm(true);
+                                                    setShowUserDropdown(false);
+                                                }}
+                                            >
+                                                <i className="fas fa-user-edit"></i>
+                                                Mi Perfil
+                                            </button>
+                                            <div className="d-flex align-items-center justify-content-between p-2">
+                                                <span className="small">Modo Oscuro</span>
+                                                <div className="form-check form-switch">
+                                                    <input
+                                                        className="form-check-input"
+                                                        type="checkbox"
+                                                        checked={isDarkMode}
+                                                        onChange={toggleTheme}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <hr className="my-2" />
+                                            <button
+                                                className="btn btn-link w-100 text-start text-danger d-flex align-items-center gap-2"
+                                                onClick={logout}
+                                            >
+                                                <i className="fas fa-sign-out-alt"></i>
+                                                Cerrar SesiÃ³n
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                {/* Contenido principal */}
+                <div className="p-4">
+                    {error && (
+                        <div className="alert alert-danger" role="alert">
+                            <i className="fas fa-exclamation-triangle me-2"></i>
+                            {error}
+                        </div>
+                    )}
+
+                    {/* Dashboard View */}
+                    {activeView === 'dashboard' && (
+                        <>
+                            <h1 className="hyper-page-title">Dashboard Supervisor</h1>
+
+                            {/* MÃ©tricas principales */}
+                            <div className="row g-4 mb-4">
+                                <div className="col-md-6 col-lg-3">
+                                    <div className="hyper-metric-card card border-0 shadow-sm">
+                                        <div className="card-body">
+                                            <div className="d-flex align-items-center">
+                                                <div className="hyper-metric-icon bg-primary me-3">
+                                                    <i className="fas fa-ticket-alt"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="hyper-metric-value mb-0">{stats.total}</h3>
+                                                    <small className="text-muted">Total Tickets</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-md-6 col-lg-3">
+                                    <div className="hyper-metric-card card border-0 shadow-sm">
+                                        <div className="card-body">
+                                            <div className="d-flex align-items-center">
+                                                <div className="hyper-metric-icon bg-warning me-3">
+                                                    <i className="fas fa-clock"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="hyper-metric-value mb-0">{stats.activos}</h3>
+                                                    <small className="text-muted">Tickets Activos</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-md-6 col-lg-3">
+                                    <div className="hyper-metric-card card border-0 shadow-sm">
+                                        <div className="card-body">
+                                            <div className="d-flex align-items-center">
+                                                <div className="hyper-metric-icon bg-success me-3">
+                                                    <i className="fas fa-check-circle"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="hyper-metric-value mb-0">{stats.resueltos}</h3>
+                                                    <small className="text-muted">Tickets Resueltos</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-md-6 col-lg-3">
+                                    <div className="hyper-metric-card card border-0 shadow-sm">
+                                        <div className="card-body">
+                                            <div className="d-flex align-items-center">
+                                                <div className="hyper-metric-icon bg-danger me-3">
+                                                    <i className="fas fa-exclamation-triangle"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="hyper-metric-value mb-0">{stats.escalados}</h3>
+                                                    <small className="text-muted">Tickets Escalados</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Widgets del dashboard */}
+                            <div className="row g-4">
+                                <div className="col-lg-8">
+                                    <div className="hyper-widget card border-0 shadow-sm">
+                                        <div className="hyper-widget-header card-header bg-white border-bottom">
+                                            <h3 className="hyper-widget-title mb-0">Tickets Recientes</h3>
+                                        </div>
+                                        <div className="hyper-widget-body card-body">
+                                            {tickets.slice(0, 5).map((ticket) => (
+                                                <div key={ticket.id} className="d-flex align-items-center py-2 border-bottom">
+                                                    <div className="hyper-activity-icon bg-primary me-3">
+                                                        <i className="fas fa-ticket-alt"></i>
+                                                    </div>
+                                                    <div className="flex-grow-1">
+                                                        <div className="fw-semibold">#{ticket.id} - {ticket.titulo}</div>
+                                                        <small className="text-muted">
+                                                            {ticket.estado} â€¢ {ticket.prioridad} â€¢ {new Date(ticket.fecha_creacion).toLocaleDateString()}
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-lg-4">
+                                    <div className="hyper-widget card border-0 shadow-sm">
+                                        <div className="hyper-widget-header card-header bg-white border-bottom">
+                                            <h3 className="hyper-widget-title mb-0">Acciones RÃ¡pidas</h3>
+                                        </div>
+                                        <div className="hyper-widget-body card-body">
+                                            <div className="d-grid gap-2">
+                                                <button
+                                                    className="btn btn-primary"
+                                                    onClick={() => changeView('tickets')}
+                                                >
+                                                    <i className="fas fa-list me-2"></i>
+                                                    Ver Todos los Tickets
+                                                </button>
+                                                <button
+                                                    className="btn btn-outline-primary"
+                                                    onClick={() => changeView('analistas')}
+                                                >
+                                                    <i className="fas fa-users me-2"></i>
+                                                    Gestionar Analistas
+                                                </button>
+                                                <button
+                                                    className="btn btn-outline-primary"
+                                                    onClick={() => changeView('asignaciones')}
+                                                >
+                                                    <i className="fas fa-tasks me-2"></i>
+                                                    Ver Asignaciones
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Tickets View */}
+                    {/* Tickets View */}
+                    {activeView === 'tickets' && (
+                        <>
+                            <h1 className="hyper-page-title">Todos los Tickets</h1>
+
+                            {/* Lista de tickets activos */}
+                            <div className="hyper-widget card border-0 shadow-sm mb-4">
+                                <div className="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                                    <h5 className="card-title mb-0">Gestión de Tickets</h5>
+                                    <div className="d-flex gap-2 align-items-center">
+                                        <small className="text-muted">
+                                            {analistas.length} analista{analistas.length !== 1 ? 's' : ''} disponible{analistas.length !== 1 ? 's' : ''}
+                                        </small>
+                                        <div className="dropdown filter-dropdown">
+                                            <button
+                                                className="btn btn-outline-primary btn-sm dropdown-toggle"
+                                                type="button"
+                                                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                                            >
+                                                <i className="fas fa-filter me-1"></i>
+                                                Filtrar
+                                                {(filterEstado || filterAsignado || filterPrioridad) && (
+                                                    <span className="badge bg-primary ms-1">{(filterEstado ? 1 : 0) + (filterAsignado ? 1 : 0) + (filterPrioridad ? 1 : 0)}</span>
+                                                )}
+                                            </button>
+
+                                            {showFilterDropdown && (
+                                                <div className="dropdown-menu show position-absolute" style={{ right: 0, top: '100%', minWidth: '250px' }}>
+                                                    <div className="dropdown-header">
+                                                        <h6 className="mb-0">Filtrar Tickets</h6>
+                                                    </div>
+
+                                                    <div className="px-3 py-2">
+                                                        <label className="form-label small">Por Estado:</label>
+                                                        <select
+                                                            className="form-select form-select-sm"
+                                                            value={filterEstado}
+                                                            onChange={(e) => setFilterEstado(e.target.value)}
+                                                        >
+                                                            <option value="">Todos los estados</option>
+                                                            <option value="activo">Activo</option>
+                                                            <option value="en_progreso">En Progreso</option>
+                                                            <option value="resuelto">Resuelto</option>
+                                                            <option value="escalado">Escalado</option>
+                                                            <option value="cerrado">Cerrado</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="px-3 py-2">
+                                                        <label className="form-label small">Por AsignaciÃ³n:</label>
+                                                        <select
+                                                            className="form-select form-select-sm"
+                                                            value={filterAsignado}
+                                                            onChange={(e) => setFilterAsignado(e.target.value)}
+                                                        >
+                                                            <option value="">Todos</option>
+                                                            <option value="asignados">Con Analista Asignado</option>
+                                                            <option value="no-asignados">Sin Asignar</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="px-3 py-2">
+                                                        <label className="form-label small">Por Prioridad:</label>
+                                                        <select
+                                                            className="form-select form-select-sm"
+                                                            value={filterPrioridad}
+                                                            onChange={(e) => setFilterPrioridad(e.target.value)}
+                                                        >
+                                                            <option value="">Todas las prioridades</option>
+                                                            <option value="baja">Baja</option>
+                                                            <option value="media">Media</option>
+                                                            <option value="alta">Alta</option>
+                                                            <option value="critica">CrÃ­tica</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="dropdown-divider"></div>
+                                                    <div className="px-3 py-2">
+                                                        <button
+                                                            className="btn btn-outline-secondary btn-sm w-100"
+                                                            onClick={() => {
+                                                                setFilterEstado('');
+                                                                setFilterAsignado('');
+                                                                setFilterPrioridad('');
+                                                            }}
+                                                        >
+                                                            <i className="fas fa-times me-1"></i>
+                                                            Limpiar filtros
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button
+                                            className="btn btn-outline-secondary btn-sm"
+                                            onClick={() => setShowCerrados(!showCerrados)}
+                                        >
+                                            <i className="fas fa-archive me-1"></i>
+                                            {showCerrados ? 'Ocultar' : 'Ver'} Cerrados
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="card-body p-0">
+                                    {filteredTickets.length === 0 ? (
+                                        <div className="text-center py-5">
+                                            <i className="fas fa-ticket-alt fa-3x text-muted mb-3"></i>
+                                            <p className="text-muted">No hay tickets que coincidan con los filtros</p>
+                                            <button
+                                                className="btn btn-outline-secondary"
+                                                onClick={() => {
+                                                    setFilterEstado('');
+                                                    setFilterAsignado('');
+                                                    setFilterPrioridad('');
+                                                }}
+                                            >
+                                                <i className="fas fa-times me-1"></i>
+                                                Limpiar filtros
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="table-responsive">
+                                            <table className="table table-hover mb-0">
+                                                <thead className="table-light">
+                                                    <tr>
+                                                        <th className="text-center px-3">Semáforo</th>
+                                                        <th className="text-center px-3">ID</th>
+                                                        <th className="px-4">Cliente</th>
+                                                        <th className="px-4">Título</th>
+                                                        <th className="text-center px-3">Estado</th>
+                                                        <th className="text-center px-3">Prioridad</th>
+                                                        <th className="text-center px-3">Analista</th>
+                                                        <th className="text-center px-3">Fecha</th>
+                                                        <th className="text-center px-4">Acciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {tickets
+                                                        .sort((a, b) => {
+                                                            const colorA = getSemaforoColor(a, tickets);
+                                                            const colorB = getSemaforoColor(b, tickets);
+                                                            const order = { 'table-danger': 0, 'table-warning': 1, 'table-success': 2 };
+                                                            return order[colorA] - order[colorB];
+                                                        })
+                                                        .map((ticket) => (
+                                                            <tr key={ticket.id} className={getSemaforoColor(ticket, tickets)}>
+                                                                <td className="text-center px-3">
+                                                                    <div className="d-flex justify-content-center">
+                                                                        <div
+                                                                            className="rounded-circle d-flex align-items-center justify-content-center"
+                                                                            style={{
+                                                                                width: '20px',
+                                                                                height: '20px',
+                                                                                backgroundColor: getSemaforoColor(ticket, tickets) === 'table-danger' ? '#dc3545' :
+                                                                                    getSemaforoColor(ticket, tickets) === 'table-warning' ? '#ffc107' : '#28a745'
+                                                                            }}
+                                                                            title={
+                                                                                getSemaforoColor(ticket, tickets) === 'table-danger' ? '🔴 Rojo: Prioridad alta y ticket más viejo' :
+                                                                                    getSemaforoColor(ticket, tickets) === 'table-warning' ? '🟠 Naranja: Prioridad alta o ticket viejo' :
+                                                                                        '🟢 Verde: Prioridad media/baja y ticket reciente'
+                                                                            }
+                                                                        >
+                                                                            <i className="fas fa-circle" style={{ fontSize: '8px', color: 'white' }}></i>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="text-center px-3">
+                                                                    <div className="d-flex align-items-center justify-content-center">
+                                                                        <span className="me-2">#{ticket.id}</span>
+                                                                        {ticket.url_imagen ? (
+                                                                            <img
+                                                                                src={ticket.url_imagen}
+                                                                                alt="Imagen del ticket"
+                                                                                className="img-thumbnail"
+                                                                                style={{ width: '30px', height: '30px', objectFit: 'cover' }}
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="text-muted">
+                                                                                <i className="fas fa-image" style={{ fontSize: '12px' }}></i>
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4">
+                                                                    {ticket.cliente?.nombre} {ticket.cliente?.apellido}
+                                                                </td>
+                                                                <td className="px-4">
+                                                                    <div>
+                                                                        <div className="fw-semibold mb-1">{ticket.titulo}</div>
+                                                                        <small className="text-muted">
+                                                                            {ticket.descripcion && ticket.descripcion.length > 50
+                                                                                ? `${ticket.descripcion.substring(0, 50)}...`
+                                                                                : ticket.descripcion || 'Sin descripción'
+                                                                            }
+                                                                        </small>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="text-center px-3">
+                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                        <span
+                                                                            className="rounded-circle d-inline-block"
+                                                                            style={{
+                                                                                width: '8px',
+                                                                                height: '8px',
+                                                                                backgroundColor: ticket.estado === 'activo' ? '#ffc107' :
+                                                                                    ticket.estado === 'en_progreso' ? '#17a2b8' :
+                                                                                        ticket.estado === 'resuelto' ? '#28a745' :
+                                                                                            ticket.estado === 'escalado' ? '#dc3545' :
+                                                                                                '#6c757d'
+                                                                            }}
+                                                                        ></span>
+                                                                        <span className="text-dark dark-theme:text-white">
+                                                                            {ticket.estado}
+                                                                        </span>
+                                                                    </span>
+                                                                </td>
+                                                                <td className="text-center px-3">
+                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                        <span
+                                                                            className="rounded-circle d-inline-block"
+                                                                            style={{
+                                                                                width: '8px',
+                                                                                height: '8px',
+                                                                                backgroundColor: ticket.prioridad === 'baja' ? '#28a745' :
+                                                                                    ticket.prioridad === 'media' ? '#ffc107' :
+                                                                                        ticket.prioridad === 'alta' ? '#dc3545' :
+                                                                                            ticket.prioridad === 'critica' ? '#343a40' :
+                                                                                                '#6c757d'
+                                                                            }}
+                                                                        ></span>
+                                                                        <span className="text-dark dark-theme:text-white">
+                                                                            {ticket.prioridad || 'Normal'}
+                                                                        </span>
+                                                                    </span>
+                                                                </td>
+                                                                <td className="text-center px-3">
+                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                        <span
+                                                                            className="rounded-circle d-inline-block"
+                                                                            style={{
+                                                                                width: '8px',
+                                                                                height: '8px',
+                                                                                backgroundColor: '#17a2b8'
+                                                                            }}
+                                                                        ></span>
+                                                                        <span className="text-dark dark-theme:text-white">
+                                                                            {ticket.cliente?.nombre || 'N/A'}
+                                                                        </span>
+                                                                    </span>
+                                                                </td>
+                                                                <td className="text-center px-3">
+                                                                    {ticket.asignacion_actual && ticket.asignacion_actual.analista ? (
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#28a745'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.asignacion_actual.analista.nombre}
+                                                                            </span>
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#6c757d'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                Sin asignar
+                                                                            </span>
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="text-center px-3">
+                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                        <span
+                                                                            className="rounded-circle d-inline-block"
+                                                                            style={{
+                                                                                width: '8px',
+                                                                                height: '8px',
+                                                                                backgroundColor: '#17a2b8'
+                                                                            }}
+                                                                        ></span>
+                                                                        <small className="text-dark dark-theme:text-white">
+                                                                            {new Date(ticket.fecha_creacion).toLocaleDateString('es-ES', {
+                                                                                year: 'numeric',
+                                                                                month: 'short',
+                                                                                day: 'numeric',
+                                                                                hour: '2-digit',
+                                                                                minute: '2-digit',
+                                                                                hour12: true
+                                                                            })}
+                                                                        </small>
+                                                                    </span>
+                                                                </td>
+                                                                <td className="text-center px-4">
+                                                                    <div className="d-flex flex-column gap-2">
+                                                                        {/* Fila superior: Ver detalles, Comentarios, Chat */}
+                                                                        <div className="d-flex gap-1">
+                                                                            <button
+                                                                                className="btn btn-outline-primary btn-sm"
+                                                                                title="Ver detalles"
+                                                                                onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                                            >
+                                                                                <i className="fas fa-eye"></i>
+                                                                            </button>
+                                                                            <button
+                                                                                className="btn btn-info btn-sm"
+                                                                                title="Ver y agregar comentarios"
+                                                                                onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
+                                                                            >
+                                                                                <i className="fas fa-comments"></i>
+                                                                            </button>
+                                                                            <button
+                                                                                className="btn btn-success btn-sm"
+                                                                                title="Chat con analista"
+                                                                                onClick={() => window.open(`/ticket/${ticket.id}/chat`, '_self')}
+                                                                            >
+                                                                                <i className="fas fa-comments"></i>
+                                                                            </button>
+                                                                        </div>
+
+                                                                        {/* Fila inferior: IA, Asignar, Escalar */}
+                                                                        <div className="d-flex gap-1">
+                                                                            <div className="btn-group" role="group">
+                                                                                <button
+                                                                                    className="btn btn-warning btn-sm dropdown-toggle"
+                                                                                    type="button"
+                                                                                    data-bs-toggle="dropdown"
+                                                                                    aria-expanded="false"
+                                                                                    title="Opciones de IA"
+                                                                                >
+                                                                                    <i className="fas fa-robot"></i> IA
+                                                                                </button>
+                                                                                <ul className="dropdown-menu">
+                                                                                    <li>
+                                                                                        <button
+                                                                                            className="dropdown-item"
+                                                                                            onClick={() => generarRecomendacion(ticket.id)}
+                                                                                        >
+                                                                                            <i className="fas fa-lightbulb me-2"></i>
+                                                                                            Generar RecomendaciÃ³n
+                                                                                        </button>
+                                                                                    </li>
+                                                                                    <li>
+                                                                                        <button
+                                                                                            className="dropdown-item"
+                                                                                            onClick={() => window.open(`/ticket/${ticket.id}/identificar-imagen`, '_self')}
+                                                                                        >
+                                                                                            <i className="fas fa-camera me-2"></i>
+                                                                                            Analizar Imagen
+                                                                                        </button>
+                                                                                    </li>
+                                                                                </ul>
+                                                                            </div>
+                                                                            {ticketsConRecomendaciones.has(ticket.id) && (
+                                                                                <button
+                                                                                    className="btn btn-outline-success btn-sm"
+                                                                                    title="Ver sugerencias disponibles"
+                                                                                    onClick={() => window.open(`/ticket/${ticket.id}/recomendaciones-similares`, '_self')}
+                                                                                >
+                                                                                    <i className="fas fa-lightbulb"></i>
+                                                                                </button>
+                                                                            )}
+                                                                            <div className="btn-group" role="group">
+                                                                                <button
+                                                                                    className="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                                                                    type="button"
+                                                                                    data-bs-toggle="dropdown"
+                                                                                    aria-expanded="false"
+                                                                                    title="Acciones de gestiÃ³n"
+                                                                                >
+                                                                                    <i className="fas fa-cog"></i>
+                                                                                </button>
+                                                                                <ul className="dropdown-menu">
+                                                                                    <li>
+                                                                                        <button
+                                                                                            className="dropdown-item"
+                                                                                            onClick={() => escalarTicket(ticket.id)}
+                                                                                        >
+                                                                                            <i className="fas fa-arrow-up me-2"></i>
+                                                                                            Escalar Ticket
+                                                                                        </button>
+                                                                                    </li>
+                                                                                    <li>
+                                                                                        <button
+                                                                                            className="dropdown-item"
+                                                                                            onClick={() => changeView('asignaciones')}
+                                                                                        >
+                                                                                            <i className="fas fa-user-plus me-2"></i>
+                                                                                            Asignar Analista
+                                                                                        </button>
+                                                                                    </li>
+                                                                                </ul>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Tabla de tickets cerrados */}
+                            <div className="hyper-widget card border-0 shadow-sm mt-4">
+                                <div className="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                                    <div className="d-flex align-items-center">
+                                        <h5 className="mb-0 me-2">Tickets Cerrados</h5>
+                                        {loadingCerrados && (
+                                            <div className="spinner-border spinner-border-sm text-primary" role="status">
+                                                <span className="visually-hidden">Actualizando...</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button
+                                        className="btn btn-outline-secondary btn-sm"
+                                        onClick={() => {
+                                            if (!showCerrados) {
+                                                cargarTicketsCerrados();
+                                            }
+                                            setShowCerrados(!showCerrados);
+                                        }}
+                                        disabled={loadingCerrados}
+                                    >
+                                        <i className={`fas ${showCerrados ? 'fa-eye-slash' : 'fa-eye'} me-1`}></i>
+                                        {showCerrados ? 'Ocultar' : 'Mostrar'} Cerrados
+                                        {ticketsCerrados.length > 0 && (
+                                            <span className="badge bg-secondary ms-2">{ticketsCerrados.length}</span>
+                                        )}
+                                    </button>
+                                </div>
+                                {showCerrados && (
+                                    <div className="card-body">
+                                        {loadingCerrados ? (
+                                            <div className="text-center py-4">
+                                                <div className="spinner-border text-primary" role="status">
+                                                    <span className="visually-hidden">Cargando tickets cerrados...</span>
+                                                </div>
+                                            </div>
+                                        ) : ticketsCerrados.length === 0 ? (
+                                            <div className="text-center py-4">
+                                                <p className="text-muted">No hay tickets cerrados.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="table-responsive">
+                                                <table className="table table-hover">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>ID</th>
+                                                            <th>Cliente</th>
+                                                            <th>Título</th>
+                                                            <th>Estado</th>
+                                                            <th>Prioridad</th>
+                                                            <th>Analista Asignado</th>
+                                                            <th>Fecha Cierre</th>
+                                                            <th>Calificación</th>
+                                                            <th>Acciones</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {ticketsCerrados.map((ticket) => (
+                                                            <tr key={ticket.id}>
+                                                                <td>
+                                                                    <div className="d-flex align-items-center">
+                                                                        <span className="me-2">#{ticket.id}</span>
+                                                                        {ticket.url_imagen ? (
+                                                                            <img
+                                                                                src={ticket.url_imagen}
+                                                                                alt="Imagen del ticket"
+                                                                                className="img-thumbnail"
+                                                                                style={{ width: '30px', height: '30px', objectFit: 'cover' }}
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="text-muted">
+                                                                                <i className="fas fa-image" style={{ fontSize: '12px' }}></i>
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    {ticket.cliente?.nombre} {ticket.cliente?.apellido}
+                                                                </td>
+                                                                <td>
+                                                                    <div>
+                                                                        <strong>{ticket.titulo}</strong>
+                                                                        <br />
+                                                                        <small className="text-muted">
+                                                                            {ticket.descripcion.length > 50
+                                                                                ? `${ticket.descripcion.substring(0, 50)}...`
+                                                                                : ticket.descripcion
+                                                                            }
+                                                                        </small>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <span className={getEstadoColor(ticket.estado)}>
+                                                                        {ticket.estado === 'cerrado_por_supervisor' ? 'Cerrado por Supervisor' : 'Cerrado por Cliente'}
+                                                                    </span>
+                                                                </td>
+                                                                <td>
+                                                                    <span className={getPrioridadColor(ticket.prioridad)}>
+                                                                        {ticket.prioridad}
+                                                                    </span>
+                                                                </td>
+                                                                <td>
+                                                                    {ticket.asignacion_actual?.analista ?
+                                                                        `${ticket.asignacion_actual.analista.nombre} ${ticket.asignacion_actual.analista.apellido}` :
+                                                                        'Sin asignar'
+                                                                    }
+                                                                </td>
+                                                                <td>
+                                                                    {ticket.fecha_cierre ? new Date(ticket.fecha_cierre).toLocaleDateString() : 'N/A'}
+                                                                </td>
+                                                                <td>
+                                                                    {ticket.calificacion ? (
+                                                                        <div className="d-flex align-items-center">
+                                                                            {[...Array(5)].map((_, i) => (
+                                                                                <i
+                                                                                    key={i}
+                                                                                    className={`fas fa-star ${i < ticket.calificacion ? 'text-warning' : 'text-muted'
+                                                                                        }`}
+                                                                                ></i>
+                                                                            ))}
+                                                                            {ticket.comentario && (
+                                                                                <small className="text-muted ms-2" title={ticket.comentario}>
+                                                                                    <i className="fas fa-comment"></i>
+                                                                                </small>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="text-muted">Sin calificar</span>
+                                                                    )}
+                                                                </td>
+                                                                <td>
+                                                                    <Link
+                                                                        to={`/ticket/${ticket.id}/comentarios-cerrado`}
+                                                                        className="btn btn-info btn-sm"
+                                                                        title="Ver comentarios y recomendaciones (solo lectura)"
+                                                                    >
+                                                                        <i className="fas fa-comments"></i> Comentarios
+                                                                    </Link>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
+
+                    {/* Analistas View */}
+                    {activeView === 'analistas' && (
+                        <>
+                            <h1 className="hyper-page-title">GestiÃ³n de Analistas</h1>
+                            <div className="hyper-widget card border-0 shadow-sm">
+                                <div className="hyper-widget-body">
                                     <div className="table-responsive">
-                                        <table className="table table-hover">
-                                            <thead>
+                                        <table className="table table-hover mb-0">
+                                            <thead className="table-light">
                                                 <tr>
                                                     <th>ID</th>
-                                                    <th>Cliente</th>
-                                                    <th>Título</th>
-                                                    <th>Estado</th>
-                                                    <th>Prioridad</th>
-                                                    <th>Analista Asignado</th>
-                                                    <th>Fecha Cierre</th>
-                                                    <th>Calificación</th>
+                                                    <th>Nombre</th>
+                                                    <th>Email</th>
+                                                    <th>Especialidad</th>
+                                                    <th>Tickets Asignados</th>
                                                     <th>Acciones</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {ticketsCerrados.map((ticket) => (
-                                                    <tr key={ticket.id}>
+                                                {analistas.map((analista) => (
+                                                    <tr key={analista.id}>
+                                                        <td>#{analista.id}</td>
+                                                        <td>{analista.nombre} {analista.apellido}</td>
+                                                        <td>{analista.email}</td>
+                                                        <td>{analista.especialidad}</td>
                                                         <td>
-                                                            <div className="d-flex align-items-center">
-                                                                <span className="me-2">#{ticket.id}</span>
-                                                                {ticket.url_imagen ? (
-                                                                    <img
-                                                                        src={ticket.url_imagen}
-                                                                        alt="Imagen del ticket"
-                                                                        className="img-thumbnail"
-                                                                        style={{ width: '30px', height: '30px', objectFit: 'cover' }}
-                                                                    />
-                                                                ) : (
-                                                                    <span className="text-muted">
-                                                                        <i className="fas fa-image" style={{ fontSize: '12px' }}></i>
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            {ticket.cliente?.nombre} {ticket.cliente?.apellido}
-                                                        </td>
-                                                        <td>
-                                                            <div>
-                                                                <strong>{ticket.titulo}</strong>
-                                                                <br />
-                                                                <small className="text-muted">
-                                                                    {ticket.descripcion.length > 50
-                                                                        ? `${ticket.descripcion.substring(0, 50)}...`
-                                                                        : ticket.descripcion
-                                                                    }
-                                                                </small>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <span className={getEstadoColor(ticket.estado)}>
-                                                                {ticket.estado === 'cerrado_por_supervisor' ? 'Cerrado por Supervisor' : 'Cerrado por Cliente'}
+                                                            <span className="badge bg-primary">
+                                                                {tickets.filter(t => t.asignacion_actual && t.asignacion_actual.analista && t.asignacion_actual.analista.id === analista.id).length}
                                                             </span>
-                                                        </td>
-                                                        <td>
-                                                            <span className={getPrioridadColor(ticket.prioridad)}>
-                                                                {ticket.prioridad}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            {ticket.asignacion_actual?.analista ?
-                                                                `${ticket.asignacion_actual.analista.nombre} ${ticket.asignacion_actual.analista.apellido}` :
-                                                                'Sin asignar'
-                                                            }
-                                                        </td>
-                                                        <td>
-                                                            {ticket.fecha_cierre ? new Date(ticket.fecha_cierre).toLocaleDateString() : 'N/A'}
-                                                        </td>
-                                                        <td>
-                                                            {ticket.calificacion ? (
-                                                                <div className="d-flex align-items-center">
-                                                                    {[...Array(5)].map((_, i) => (
-                                                                        <i
-                                                                            key={i}
-                                                                            className={`fas fa-star ${i < ticket.calificacion ? 'text-warning' : 'text-muted'
-                                                                                }`}
-                                                                        ></i>
-                                                                    ))}
-                                                                    {ticket.comentario && (
-                                                                        <small className="text-muted ms-2" title={ticket.comentario}>
-                                                                            <i className="fas fa-comment"></i>
-                                                                        </small>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-muted">Sin calificar</span>
-                                                            )}
                                                         </td>
                                                         <td>
                                                             <Link
-                                                                to={`/ticket/${ticket.id}/comentarios-cerrado`}
-                                                                className="btn btn-info btn-sm"
-                                                                title="Ver comentarios y recomendaciones (solo lectura)"
+                                                                to={`/ver-analista/${analista.id}`}
+                                                                className="btn btn-sm btn-outline-primary"
                                                             >
-                                                                <i className="fas fa-comments"></i> Comentarios
+                                                                <i className="fas fa-eye"></i>
                                                             </Link>
                                                         </td>
                                                     </tr>
@@ -1358,16 +1743,244 @@ export function SupervisorPage() {
                                             </tbody>
                                         </table>
                                     </div>
-                                )}
+                                </div>
                             </div>
-                        )}
-                    </div>
+                        </>
+                    )}
+
+                    {/* Asignaciones View */}
+                    {activeView === 'asignaciones' && (
+                        <>
+                            <h1 className="hyper-page-title">Asignaciones</h1>
+                            <div className="hyper-widget card border-0 shadow-sm">
+                                <div className="hyper-widget-body">
+                                    <div className="table-responsive">
+                                        <table className="table table-hover mb-0">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th>Ticket</th>
+                                                    <th>Analista</th>
+                                                    <th>Fecha AsignaciÃ³n</th>
+                                                    <th>Estado</th>
+                                                    <th>Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {tickets.filter(t => t.asignacion_actual && t.asignacion_actual.analista).map((ticket) => (
+                                                    <tr key={ticket.id}>
+                                                        <td>#{ticket.id} - {ticket.titulo}</td>
+                                                        <td>{ticket.asignacion_actual.analista.nombre}</td>
+                                                        <td>{new Date(ticket.asignacion_actual.fecha_asignacion).toLocaleDateString()}</td>
+                                                        <td>
+                                                            <span className={`badge bg-${ticket.estado === 'activo' ? 'warning' : ticket.estado === 'resuelto' ? 'success' : 'danger'}`}>
+                                                                {ticket.estado}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <button
+                                                                className="btn btn-sm btn-outline-primary"
+                                                                onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                            >
+                                                                <i className="fas fa-eye"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Escalaciones View */}
+                    {activeView === 'escalaciones' && (
+                        <>
+                            <h1 className="hyper-page-title">Escalaciones</h1>
+                            <div className="hyper-widget card border-0 shadow-sm">
+                                <div className="hyper-widget-body">
+                                    <div className="table-responsive">
+                                        <table className="table table-hover mb-0">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>TÃ­tulo</th>
+                                                    <th>Prioridad</th>
+                                                    <th>Fecha EscalaciÃ³n</th>
+                                                    <th>Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {tickets.filter(t => t.estado === 'escalado').map((ticket) => (
+                                                    <tr key={ticket.id}>
+                                                        <td>#{ticket.id}</td>
+                                                        <td>{ticket.titulo}</td>
+                                                        <td>
+                                                            <span className={`badge bg-${ticket.prioridad === 'baja' ? 'secondary' : ticket.prioridad === 'media' ? 'primary' : ticket.prioridad === 'alta' ? 'warning' : 'danger'}`}>
+                                                                {ticket.prioridad}
+                                                            </span>
+                                                        </td>
+                                                        <td>{new Date(ticket.fecha_creacion).toLocaleDateString()}</td>
+                                                        <td>
+                                                            <button
+                                                                className="btn btn-sm btn-outline-primary"
+                                                                onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                            >
+                                                                <i className="fas fa-eye"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Reportes View */}
+                    {activeView === 'reportes' && (
+                        <>
+                            <h1 className="hyper-page-title">Reportes</h1>
+                            <div className="hyper-widget card border-0 shadow-sm">
+                                <div className="hyper-widget-body">
+                                    <div className="text-center py-4">
+                                        <i className="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                                        <p className="text-muted">MÃ³dulo de reportes en desarrollo</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Dashboard de Calidad View */}
+                    {activeView === 'dashboard-calidad' && (
+                        <DashboardCalidad />
+                    )}
+
+                    {/* ConfiguraciÃ³n View */}
+                    {activeView === 'configuracion' && (
+                        <>
+                            <h1 className="hyper-page-title">ConfiguraciÃ³n</h1>
+                            <div className="hyper-widget card border-0 shadow-sm">
+                                <div className="hyper-widget-body">
+                                    <div className="text-center py-4">
+                                        <i className="fas fa-cog fa-3x text-muted mb-3"></i>
+                                        <p className="text-muted">MÃ³dulo de configuraciÃ³n en desarrollo</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Formulario de informaciÃ³n del supervisor */}
+                    {showInfoForm && (
+                        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                            <div className="modal-dialog">
+                                <div className="modal-content">
+                                    <div className="modal-header">
+                                        <h5 className="modal-title">Actualizar InformaciÃ³n</h5>
+                                        <button
+                                            type="button"
+                                            className="btn-close"
+                                            onClick={() => setShowInfoForm(false)}
+                                        ></button>
+                                    </div>
+                                    <form onSubmit={actualizarInformacion}>
+                                        <div className="modal-body">
+                                            <div className="row">
+                                                <div className="col-md-6">
+                                                    <div className="mb-3">
+                                                        <label className="form-label">Nombre</label>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            value={infoData.nombre}
+                                                            onChange={(e) => setInfoData({ ...infoData, nombre: e.target.value })}
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="col-md-6">
+                                                    <div className="mb-3">
+                                                        <label className="form-label">Apellido</label>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            value={infoData.apellido}
+                                                            onChange={(e) => setInfoData({ ...infoData, apellido: e.target.value })}
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="mb-3">
+                                                <label className="form-label">Email</label>
+                                                <input
+                                                    type="email"
+                                                    className="form-control"
+                                                    value={infoData.email}
+                                                    onChange={(e) => setInfoData({ ...infoData, email: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+                                            <div className="mb-3">
+                                                <label className="form-label">Ãrea Responsable</label>
+                                                <input
+                                                    type="text"
+                                                    className="form-control"
+                                                    value={infoData.area_responsable}
+                                                    onChange={(e) => setInfoData({ ...infoData, area_responsable: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+                                            <div className="mb-3">
+                                                <label className="form-label">Nueva ContraseÃ±a (opcional)</label>
+                                                <input
+                                                    type="password"
+                                                    className="form-control"
+                                                    value={infoData.password}
+                                                    onChange={(e) => setInfoData({ ...infoData, password: e.target.value })}
+                                                />
+                                            </div>
+                                            {infoData.password && (
+                                                <div className="mb-3">
+                                                    <label className="form-label">Confirmar ContraseÃ±a</label>
+                                                    <input
+                                                        type="password"
+                                                        className="form-control"
+                                                        value={infoData.confirmPassword}
+                                                        onChange={(e) => setInfoData({ ...infoData, confirmPassword: e.target.value })}
+                                                        required={infoData.password}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="modal-footer">
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={() => setShowInfoForm(false)}
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className="btn btn-primary"
+                                                disabled={updatingInfo}
+                                            >
+                                                {updatingInfo ? 'Actualizando...' : 'Actualizar'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
-
         </div>
     );
 }
-//Go
-export default SupervisorPage;
-

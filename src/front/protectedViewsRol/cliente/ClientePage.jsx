@@ -1248,25 +1248,74 @@ export function ClientePage() {
                                                         <tbody>
                                                             {tickets.slice(0, 5).map((ticket) => (
                                                                 <tr key={ticket.id}>
-                                                                    <td>#{ticket.id}</td>
-                                                                    <td>{ticket.titulo}</td>
                                                                     <td>
-                                                                        <span className={`badge ${ticket.estado.toLowerCase() === 'solucionado' ? 'bg-success' :
-                                                                            ticket.estado.toLowerCase() === 'en_proceso' ? 'bg-warning' :
-                                                                                'bg-primary'
-                                                                            }`}>
-                                                                            {ticket.estado}
+                                                                        <span className="d-flex align-items-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#007bff'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="fw-bold text-dark dark-theme:text-white">
+                                                                                #{ticket.id}
+                                                                            </span>
                                                                         </span>
                                                                     </td>
                                                                     <td>
-                                                                        {new Date(ticket.fecha_creacion).toLocaleDateString('es-ES', {
-                                                                            year: 'numeric',
-                                                                            month: 'short',
-                                                                            day: 'numeric',
-                                                                            hour: '2-digit',
-                                                                            minute: '2-digit',
-                                                                            hour12: true
-                                                                        })}
+                                                                        <span className="d-flex align-items-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#6f42c1'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.titulo}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td>
+                                                                        <span className="d-flex align-items-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: ticket.estado.toLowerCase() === 'solucionado' ? '#28a745' :
+                                                                                        ticket.estado.toLowerCase() === 'en_proceso' ? '#ffc107' :
+                                                                                            '#007bff'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.estado}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td>
+                                                                        <span className="d-flex align-items-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#17a2b8'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {new Date(ticket.fecha_creacion).toLocaleDateString('es-ES', {
+                                                                                    year: 'numeric',
+                                                                                    month: 'short',
+                                                                                    day: 'numeric',
+                                                                                    hour: '2-digit',
+                                                                                    minute: '2-digit',
+                                                                                    hour12: true
+                                                                                })}
+                                                                            </span>
+                                                                        </span>
                                                                     </td>
                                                                 </tr>
                                                             ))}
@@ -1481,75 +1530,163 @@ export function ClientePage() {
                                                     {getFilteredTickets().map((ticket) => (
                                                         <tr key={ticket.id}>
                                                             <td className="text-center px-3">
-                                                                <span className="fw-bold text-primary">#{ticket.id}</span>
+                                                                <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                    <span
+                                                                        className="rounded-circle d-inline-block"
+                                                                        style={{
+                                                                            width: '8px',
+                                                                            height: '8px',
+                                                                            backgroundColor: '#007bff'
+                                                                        }}
+                                                                    ></span>
+                                                                    <span className="fw-bold text-dark dark-theme:text-white">
+                                                                        #{ticket.id}
+                                                                    </span>
+                                                                </span>
                                                             </td>
                                                             <td className="px-4">
-                                                                <div>
-                                                                    <div className="fw-semibold mb-1">{ticket.titulo}</div>
-                                                                    <small className="text-muted">
-                                                                        {ticket.descripcion.length > 50
-                                                                            ? `${ticket.descripcion.substring(0, 50)}...`
-                                                                            : ticket.descripcion
-                                                                        }
-                                                                    </small>
+                                                                <div className="d-flex align-items-start gap-2">
+                                                                    <span
+                                                                        className="rounded-circle d-inline-block mt-1"
+                                                                        style={{
+                                                                            width: '8px',
+                                                                            height: '8px',
+                                                                            backgroundColor: '#6f42c1'
+                                                                        }}
+                                                                    ></span>
+                                                                    <div>
+                                                                        <div className="fw-semibold mb-1 text-dark dark-theme:text-white">{ticket.titulo}</div>
+                                                                        <small className="text-muted dark-theme:text-white">
+                                                                            {ticket.descripcion.length > 50
+                                                                                ? `${ticket.descripcion.substring(0, 50)}...`
+                                                                                : ticket.descripcion
+                                                                            }
+                                                                        </small>
+                                                                    </div>
                                                                 </div>
                                                             </td>
                                                             <td className="text-center px-3">
-                                                                <span className={`badge ${ticket.estado.toLowerCase() === 'solucionado' ? 'bg-success' :
-                                                                    ticket.estado.toLowerCase() === 'en_proceso' ? 'bg-warning' :
-                                                                        ticket.estado.toLowerCase() === 'en_espera' ? 'bg-info' :
-                                                                            'bg-primary'
-                                                                    }`}>
-                                                                    {ticket.estado}
+                                                                <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                    <span
+                                                                        className="rounded-circle d-inline-block"
+                                                                        style={{
+                                                                            width: '8px',
+                                                                            height: '8px',
+                                                                            backgroundColor: ticket.estado.toLowerCase() === 'solucionado' ? '#28a745' :
+                                                                                ticket.estado.toLowerCase() === 'en_proceso' ? '#ffc107' :
+                                                                                    ticket.estado.toLowerCase() === 'en_espera' ? '#17a2b8' :
+                                                                                        '#007bff'
+                                                                        }}
+                                                                    ></span>
+                                                                    <span className="text-dark dark-theme:text-white">
+                                                                        {ticket.estado}
+                                                                    </span>
                                                                 </span>
                                                             </td>
                                                             <td className="text-center px-3">
-                                                                <span className={`badge ${ticket.prioridad === 'alta' ? 'bg-danger' :
-                                                                    ticket.prioridad === 'media' ? 'bg-warning' :
-                                                                        'bg-success'
-                                                                    }`}>
-                                                                    {ticket.prioridad || 'Normal'}
+                                                                <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                    <span
+                                                                        className="rounded-circle d-inline-block"
+                                                                        style={{
+                                                                            width: '8px',
+                                                                            height: '8px',
+                                                                            backgroundColor: ticket.prioridad === 'alta' ? '#dc3545' :
+                                                                                ticket.prioridad === 'media' ? '#ffc107' :
+                                                                                    '#28a745'
+                                                                        }}
+                                                                    ></span>
+                                                                    <span className="text-dark dark-theme:text-white">
+                                                                        {ticket.prioridad || 'Normal'}
+                                                                    </span>
                                                                 </span>
                                                             </td>
                                                             <td className="text-center px-3">
                                                                 {tieneAnalistaAsignado(ticket) ? (
-                                                                    <span className="badge bg-success">
-                                                                        <i className="fas fa-user-tie me-1"></i>
-                                                                        {getAnalistaAsignado(ticket)}
+                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                        <span
+                                                                            className="rounded-circle d-inline-block"
+                                                                            style={{
+                                                                                width: '8px',
+                                                                                height: '8px',
+                                                                                backgroundColor: '#28a745'
+                                                                            }}
+                                                                        ></span>
+                                                                        <span className="text-dark dark-theme:text-white">
+                                                                            {getAnalistaAsignado(ticket)}
+                                                                        </span>
                                                                     </span>
                                                                 ) : (
-                                                                    <span className="text-muted">
-                                                                        <i className="fas fa-clock me-1"></i>
-                                                                        Sin asignar
+                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                        <span
+                                                                            className="rounded-circle d-inline-block"
+                                                                            style={{
+                                                                                width: '8px',
+                                                                                height: '8px',
+                                                                                backgroundColor: '#6c757d'
+                                                                            }}
+                                                                        ></span>
+                                                                        <span className="text-dark dark-theme:text-white">
+                                                                            Sin asignar
+                                                                        </span>
                                                                     </span>
                                                                 )}
                                                             </td>
                                                             <td className="text-center px-3">
-                                                                <small className="text-muted">
-                                                                    {new Date(ticket.fecha_creacion).toLocaleDateString('es-ES', {
-                                                                        year: 'numeric',
-                                                                        month: 'short',
-                                                                        day: 'numeric',
-                                                                        hour: '2-digit',
-                                                                        minute: '2-digit',
-                                                                        hour12: true
-                                                                    })}
-                                                                </small>
+                                                                <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                    <span
+                                                                        className="rounded-circle d-inline-block"
+                                                                        style={{
+                                                                            width: '8px',
+                                                                            height: '8px',
+                                                                            backgroundColor: '#17a2b8'
+                                                                        }}
+                                                                    ></span>
+                                                                    <small className="text-dark dark-theme:text-white">
+                                                                        {new Date(ticket.fecha_creacion).toLocaleDateString('es-ES', {
+                                                                            year: 'numeric',
+                                                                            month: 'short',
+                                                                            day: 'numeric',
+                                                                            hour: '2-digit',
+                                                                            minute: '2-digit',
+                                                                            hour12: true
+                                                                        })}
+                                                                    </small>
+                                                                </span>
                                                             </td>
                                                             <td className="text-center px-3">
                                                                 {ticket.calificacion ? (
-                                                                    <div className="d-flex align-items-center justify-content-center">
-                                                                        {[...Array(5)].map((_, i) => (
-                                                                            <i
-                                                                                key={i}
-                                                                                className={`fas fa-star ${i < ticket.calificacion ? 'text-warning' : 'text-muted'}`}
-                                                                                style={{ fontSize: '0.8rem' }}
-                                                                            ></i>
-                                                                        ))}
-                                                                        <small className="ms-1 text-muted">({ticket.calificacion}/5)</small>
-                                                                    </div>
+                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                        <span
+                                                                            className="rounded-circle d-inline-block"
+                                                                            style={{
+                                                                                width: '8px',
+                                                                                height: '8px',
+                                                                                backgroundColor: '#ffc107'
+                                                                            }}
+                                                                        ></span>
+                                                                        <div className="d-flex align-items-center">
+                                                                            {[...Array(5)].map((_, i) => (
+                                                                                <i
+                                                                                    key={i}
+                                                                                    className={`fas fa-star ${i < ticket.calificacion ? 'text-warning' : 'text-muted'}`}
+                                                                                    style={{ fontSize: '0.8rem' }}
+                                                                                ></i>
+                                                                            ))}
+                                                                            <small className="ms-1 text-dark dark-theme:text-white">({ticket.calificacion}/5)</small>
+                                                                        </div>
+                                                                    </span>
                                                                 ) : (
-                                                                    <span className="text-muted">Sin calificar</span>
+                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                        <span
+                                                                            className="rounded-circle d-inline-block"
+                                                                            style={{
+                                                                                width: '8px',
+                                                                                height: '8px',
+                                                                                backgroundColor: '#6c757d'
+                                                                            }}
+                                                                        ></span>
+                                                                        <span className="text-dark dark-theme:text-white">Sin calificar</span>
+                                                                    </span>
                                                                 )}
                                                             </td>
                                                             <td className="text-center px-4">
@@ -1557,7 +1694,7 @@ export function ClientePage() {
                                                                     {/* Fila superior: Ver detalles, Comentarios, Chat */}
                                                                     <div className="d-flex gap-1">
                                                                         <button
-                                                                            className="btn btn-outline-primary btn-sm"
+                                                                            className="btn btn-sidebar-primary btn-sm"
                                                                             title="Ver detalles"
                                                                             onClick={() => {
                                                                                 changeView(`ticket-${ticket.id}`);
@@ -1566,14 +1703,14 @@ export function ClientePage() {
                                                                             <i className="fas fa-eye"></i>
                                                                         </button>
                                                                         <button
-                                                                            className="btn btn-info btn-sm"
+                                                                            className="btn btn-sidebar-accent btn-sm"
                                                                             title="Ver y agregar comentarios"
                                                                             onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
                                                                         >
                                                                             <i className="fas fa-comments"></i>
                                                                         </button>
                                                                         <button
-                                                                            className={`btn btn-sm ${tieneAnalistaAsignado(ticket) ? 'btn-success' : 'btn-primary'}`}
+                                                                            className="btn btn-sidebar-secondary btn-sm"
                                                                             title={tieneAnalistaAsignado(ticket) ? `Chat con ${getAnalistaAsignado(ticket)}` : "Chat con analista"}
                                                                             onClick={() => window.open(`/ticket/${ticket.id}/chat-analista-cliente`, '_self')}
                                                                         >
@@ -1585,7 +1722,7 @@ export function ClientePage() {
                                                                     <div className="d-flex gap-1">
                                                                         <div className="btn-group" role="group">
                                                                             <button
-                                                                                className="btn btn-warning btn-sm dropdown-toggle"
+                                                                                className="btn btn-sidebar-warning btn-sm dropdown-toggle"
                                                                                 type="button"
                                                                                 data-bs-toggle="dropdown"
                                                                                 aria-expanded="false"
@@ -1616,7 +1753,7 @@ export function ClientePage() {
                                                                         </div>
                                                                         {ticketsConRecomendaciones.has(ticket.id) && (
                                                                             <button
-                                                                                className="btn btn-outline-success btn-sm"
+                                                                                className="btn btn-sidebar-success btn-sm"
                                                                                 title="Ver sugerencias disponibles"
                                                                                 onClick={() => window.open(`/ticket/${ticket.id}/recomendaciones-similares`, '_self')}
                                                                             >

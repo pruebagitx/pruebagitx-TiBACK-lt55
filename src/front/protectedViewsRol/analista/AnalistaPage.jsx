@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useGlobalReducer from '../../hooks/useGlobalReducer';
+import { SideBarCentral } from '../../components/SideBarCentral';
 
 // Utilidades de token seguras
 const tokenUtils = {
@@ -26,7 +27,7 @@ const tokenUtils = {
 
 export function AnalistaPage() {
     const navigate = useNavigate();
-    const { store, logout, connectWebSocket, disconnectWebSocket, joinRoom, startRealtimeSync, emitCriticalTicketAction, joinCriticalRooms, joinAllCriticalRooms } = useGlobalReducer();
+    const { store, logout, dispatch, connectWebSocket, disconnectWebSocket, joinRoom, startRealtimeSync, emitCriticalTicketAction, joinCriticalRooms, joinAllCriticalRooms } = useGlobalReducer();
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -43,7 +44,58 @@ export function AnalistaPage() {
     });
     const [ticketsConRecomendaciones, setTicketsConRecomendaciones] = useState(new Set());
 
-    // Función helper para actualizar tickets sin recargar la página
+    // Estados para el nuevo diseÃ±o
+    const [sidebarHidden, setSidebarHidden] = useState(false);
+    const [activeView, setActiveView] = useState('dashboard');
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+    const [filterEstado, setFilterEstado] = useState('');
+    const [filterPrioridad, setFilterPrioridad] = useState('');
+
+    // Funciones para el nuevo diseÃ±o
+    const toggleSidebar = () => {
+        setSidebarHidden(!sidebarHidden);
+    };
+
+    const changeView = (view) => {
+        setActiveView(view);
+    };
+
+    const toggleTheme = () => {
+        setIsDarkMode(!isDarkMode);
+        document.body.classList.toggle('dark-theme');
+    };
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        if (query.trim()) {
+            const results = tickets.filter(ticket =>
+                ticket.titulo.toLowerCase().includes(query.toLowerCase())
+            );
+            setSearchResults(results);
+            setShowSearchResults(true);
+        } else {
+            setSearchResults([]);
+            setShowSearchResults(false);
+        }
+    };
+
+    const closeSearchResults = () => {
+        setShowSearchResults(false);
+        setSearchQuery('');
+        setSearchResults([]);
+    };
+
+    const selectTicketFromSearch = (ticket) => {
+        setActiveView(`ticket-${ticket.id}`);
+        closeSearchResults();
+    };
+
+    // FunciÃ³n helper para actualizar tickets sin recargar la pÃ¡gina
     const actualizarTickets = async () => {
         try {
             const token = store.auth.token;
@@ -60,6 +112,30 @@ export function AnalistaPage() {
         } catch (err) {
             console.error('Error al actualizar tickets:', err);
         }
+    };
+
+    // Funciones de filtrado y estadÃ­sticas
+    const getFilteredTickets = () => {
+        let filtered = tickets;
+
+        if (filterEstado) {
+            filtered = filtered.filter(ticket => ticket.estado === filterEstado);
+        }
+
+        if (filterPrioridad) {
+            filtered = filtered.filter(ticket => ticket.prioridad === filterPrioridad);
+        }
+
+        return filtered;
+    };
+
+    const getStats = () => {
+        const total = tickets.length;
+        const activos = tickets.filter(t => t.estado === 'activo').length;
+        const resueltos = tickets.filter(t => t.estado === 'resuelto').length;
+        const enProgreso = tickets.filter(t => t.estado === 'en_progreso').length;
+
+        return { total, activos, resueltos, enProgreso };
     };
 
     // Cargar datos del usuario
@@ -88,6 +164,12 @@ export function AnalistaPage() {
                             password: '',
                             confirmPassword: ''
                         });
+
+                        // Actualizar el store global con los datos del usuario
+                        dispatch({
+                            type: 'SET_USER',
+                            payload: data
+                        });
                     } else {
                         const errorText = await response.text();
                         console.error('Error al cargar datos del analista:', response.status, errorText);
@@ -98,15 +180,15 @@ export function AnalistaPage() {
             }
         };
 
-        if (store.auth.isAuthenticated && store.auth.token) {
+        if (store.auth.isAuthenticated && store.auth.token && !store.auth.user) {
             cargarDatosUsuario();
         }
-    }, [store.auth.isAuthenticated, store.auth.token]);
+    }, [store.auth.isAuthenticated, store.auth.token, store.auth.user, dispatch]);
 
     // Verificar recomendaciones para todos los tickets
     useEffect(() => {
         if (tickets.length > 0 && store.auth.token && store.auth.isAuthenticated) {
-            // Agregar un pequeño delay para evitar llamadas múltiples
+            // Agregar un pequeÃ±o delay para evitar llamadas mÃºltiples
             const timeoutId = setTimeout(() => {
                 verificarRecomendaciones();
             }, 500);
@@ -121,22 +203,22 @@ export function AnalistaPage() {
 
             // Validaciones robustas
             if (!tickets || tickets.length === 0) {
-                console.log('⚠️ No hay tickets para verificar recomendaciones');
+                console.log('âš ï¸ No hay tickets para verificar recomendaciones');
                 return;
             }
 
             if (!token) {
-                console.log('⚠️ No hay token para verificar recomendaciones');
+                console.log('âš ï¸ No hay token para verificar recomendaciones');
                 return;
             }
 
-            console.log(`🔍 Verificando recomendaciones para ${tickets.length} tickets...`);
+            console.log(`ðŸ” Verificando recomendaciones para ${tickets.length} tickets...`);
 
             const recomendacionesPromises = tickets.map(async (ticket) => {
                 try {
-                    // Validar que el ticket tenga contenido válido
+                    // Validar que el ticket tenga contenido vÃ¡lido
                     if (!ticket.titulo || !ticket.descripcion || ticket.titulo.trim() === '' || ticket.descripcion.trim() === '') {
-                        console.log(`⚠️ Ticket ${ticket.id} sin contenido suficiente para recomendaciones`);
+                        console.log(`âš ï¸ Ticket ${ticket.id} sin contenido suficiente para recomendaciones`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'sin_contenido' };
                     }
 
@@ -145,14 +227,14 @@ export function AnalistaPage() {
                             'Authorization': `Bearer ${token}`,
                             'Content-Type': 'application/json'
                         },
-                        // Aumentar timeout para requests más robustos
+                        // Aumentar timeout para requests mÃ¡s robustos
                         signal: AbortSignal.timeout(15000) // 15 segundos timeout
                     });
 
                     if (response.ok) {
                         const data = await response.json();
                         const tieneRecomendaciones = data.total_encontrados > 0;
-                        console.log(`✅ Ticket ${ticket.id}: ${data.total_encontrados} recomendaciones encontradas`);
+                        console.log(`âœ… Ticket ${ticket.id}: ${data.total_encontrados} recomendaciones encontradas`);
                         return {
                             ticketId: ticket.id,
                             tieneRecomendaciones,
@@ -160,20 +242,20 @@ export function AnalistaPage() {
                             algoritmo: data.algoritmo || 'legacy'
                         };
                     } else {
-                        // Log del error específico pero no fallar
-                        console.warn(`⚠️ Error ${response.status} verificando recomendaciones para ticket ${ticket.id}`);
+                        // Log del error especÃ­fico pero no fallar
+                        console.warn(`âš ï¸ Error ${response.status} verificando recomendaciones para ticket ${ticket.id}`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: `error_${response.status}` };
                     }
                 } catch (fetchError) {
-                    // Manejar errores individuales sin fallar toda la operación
+                    // Manejar errores individuales sin fallar toda la operaciÃ³n
                     if (fetchError.name === 'AbortError') {
-                        console.warn(`⏰ Timeout verificando recomendaciones para ticket ${ticket.id}`);
+                        console.warn(`â° Timeout verificando recomendaciones para ticket ${ticket.id}`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'timeout' };
                     } else if (fetchError.name === 'TypeError' && fetchError.message.includes('Failed to fetch')) {
-                        console.warn(`🌐 Error de red verificando recomendaciones para ticket ${ticket.id}`);
+                        console.warn(`ðŸŒ Error de red verificando recomendaciones para ticket ${ticket.id}`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'network_error' };
                     } else {
-                        console.warn(`❌ Error verificando recomendaciones para ticket ${ticket.id}:`, fetchError.message);
+                        console.warn(`âŒ Error verificando recomendaciones para ticket ${ticket.id}:`, fetchError.message);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'unknown_error' };
                     }
                 }
@@ -181,20 +263,20 @@ export function AnalistaPage() {
 
             const resultados = await Promise.all(recomendacionesPromises);
 
-            // Análisis detallado de resultados
+            // AnÃ¡lisis detallado de resultados
             const ticketsConRecomendaciones = resultados.filter(r => r.tieneRecomendaciones);
             const ticketsSinRecomendaciones = resultados.filter(r => !r.tieneRecomendaciones);
 
-            console.log('📊 Resultados de recomendaciones:', {
+            console.log('ðŸ“Š Resultados de recomendaciones:', {
                 total: resultados.length,
                 conRecomendaciones: ticketsConRecomendaciones.length,
                 sinRecomendaciones: ticketsSinRecomendaciones.length,
                 detalles: resultados
             });
 
-            // Log específico para tickets sin recomendaciones
+            // Log especÃ­fico para tickets sin recomendaciones
             if (ticketsSinRecomendaciones.length > 0) {
-                console.log('⚠️ Tickets sin recomendaciones:', ticketsSinRecomendaciones.map(t => ({
+                console.log('âš ï¸ Tickets sin recomendaciones:', ticketsSinRecomendaciones.map(t => ({
                     id: t.ticketId,
                     razon: t.razon
                 })));
@@ -209,15 +291,15 @@ export function AnalistaPage() {
             });
             setTicketsConRecomendaciones(ticketsConRecomendacionesSet);
 
-            console.log(`✅ Verificación de recomendaciones completada para ${tickets.length} tickets`);
+            console.log(`âœ… VerificaciÃ³n de recomendaciones completada para ${tickets.length} tickets`);
         } catch (error) {
-            console.error('❌ Error general verificando recomendaciones:', error);
+            console.error('âŒ Error general verificando recomendaciones:', error);
             // En caso de error general, limpiar el estado
             setTicketsConRecomendaciones(new Set());
         }
     };
 
-    // Conectar WebSocket cuando el usuario esté autenticado
+    // Conectar WebSocket cuando el usuario estÃ© autenticado
     useEffect(() => {
         if (store.auth.isAuthenticated && store.auth.token && !store.websocket.connected && !store.websocket.connecting) {
             const socket = connectWebSocket(store.auth.token);
@@ -236,24 +318,24 @@ export function AnalistaPage() {
         };
     }, [store.auth.isAuthenticated, store.auth.token, store.websocket.connected, store.websocket.connecting]);
 
-    // Configurar sincronización crítica en tiempo real
+    // Configurar sincronizaciÃ³n crÃ­tica en tiempo real
     useEffect(() => {
         if (store.auth.user && store.websocket.connected && store.websocket.socket) {
-            // Unirse a todas las rooms críticas inmediatamente
+            // Unirse a todas las rooms crÃ­ticas inmediatamente
             joinAllCriticalRooms(store.websocket.socket, store.auth.user);
 
-            // Configurar sincronización crítica
+            // Configurar sincronizaciÃ³n crÃ­tica
             const syncConfig = startRealtimeSync({
                 syncTypes: ['tickets', 'comentarios', 'asignaciones'],
                 onSyncTriggered: (data) => {
-                    console.log('🚨 Sincronización crítica activada en AnalistaPage:', data);
+                    console.log('ðŸš¨ SincronizaciÃ³n crÃ­tica activada en AnalistaPage:', data);
                     if (data.type === 'tickets' || data.priority === 'critical') {
                         actualizarTickets();
                     }
                 }
             });
 
-            // Unirse a rooms críticos de todos los tickets asignados
+            // Unirse a rooms crÃ­ticos de todos los tickets asignados
             const ticketIds = tickets.map(ticket => ticket.id);
             if (ticketIds.length > 0) {
                 joinCriticalRooms(store.websocket.socket, ticketIds, store.auth.user);
@@ -261,10 +343,10 @@ export function AnalistaPage() {
         }
     }, [store.auth.user, store.websocket.connected, tickets.length]);
 
-    // Efecto para manejar sincronización manual desde Footer
+    // Efecto para manejar sincronizaciÃ³n manual desde Footer
     useEffect(() => {
         const handleManualSync = (event) => {
-            console.log('🔄 Sincronización manual recibida en AnalistaPage:', event.detail);
+            console.log('ðŸ”„ SincronizaciÃ³n manual recibida en AnalistaPage:', event.detail);
             if (event.detail.role === 'analista') {
                 actualizarTickets();
             }
@@ -274,21 +356,21 @@ export function AnalistaPage() {
         return () => window.removeEventListener('manualSyncTriggered', handleManualSync);
     }, []);
 
-    // Efecto para manejar actualizaciones críticas de tickets
+    // Efecto para manejar actualizaciones crÃ­ticas de tickets
     useEffect(() => {
         if (store.websocket.criticalTicketUpdate) {
             const criticalUpdate = store.websocket.criticalTicketUpdate;
-            console.log('🚨 ACTUALIZACIÓN CRÍTICA RECIBIDA EN ANALISTA:', criticalUpdate);
+            console.log('ðŸš¨ ACTUALIZACIÃ“N CRÃTICA RECIBIDA EN ANALISTA:', criticalUpdate);
 
-            // Actualizar inmediatamente para acciones críticas
+            // Actualizar inmediatamente para acciones crÃ­ticas
             if (criticalUpdate.priority === 'critical') {
                 actualizarTickets();
 
-                // Mostrar notificación visual si es necesario
+                // Mostrar notificaciÃ³n visual si es necesario
                 if (criticalUpdate.action === 'comentario_agregado' ||
                     criticalUpdate.action === 'ticket_actualizado' ||
                     criticalUpdate.action === 'ticket_creado') {
-                    console.log(`🚨 Acción crítica: ${criticalUpdate.action} en ticket ${criticalUpdate.ticket_id}`);
+                    console.log(`ðŸš¨ AcciÃ³n crÃ­tica: ${criticalUpdate.action} en ticket ${criticalUpdate.ticket_id}`);
                 }
             }
         }
@@ -299,7 +381,7 @@ export function AnalistaPage() {
         if (store.websocket.notifications.length > 0) {
             const lastNotification = store.websocket.notifications[store.websocket.notifications.length - 1];
 
-            // Manejo específico para tickets eliminados - sincronización inmediata
+            // Manejo especÃ­fico para tickets eliminados - sincronizaciÃ³n inmediata
             if (lastNotification.tipo === 'eliminado' || lastNotification.tipo === 'ticket_eliminado') {
 
                 // Remover inmediatamente de la lista de tickets
@@ -311,7 +393,7 @@ export function AnalistaPage() {
                         return prev.filter(ticket => ticket.id !== lastNotification.ticket_id);
                     });
                 }
-                return; // No continuar con el resto de la lógica
+                return; // No continuar con el resto de la lÃ³gica
             }
 
             // Solo actualizar para eventos relevantes para analistas
@@ -321,10 +403,10 @@ export function AnalistaPage() {
                 if (lastNotification.tipo === 'escalado' || lastNotification.tipo === 'asignado' || lastNotification.tipo === 'iniciado') {
                     actualizarTickets();
                 } else {
-                    // Debounce mínimo para otros eventos
+                    // Debounce mÃ­nimo para otros eventos
                     const timeoutId = setTimeout(() => {
                         actualizarTickets();
-                    }, 500); // 0.5 segundos de debounce mínimo
+                    }, 500); // 0.5 segundos de debounce mÃ­nimo
 
                     return () => clearTimeout(timeoutId);
                 }
@@ -378,12 +460,12 @@ export function AnalistaPage() {
                 throw new Error('Error al cambiar estado del ticket');
             }
 
-            // Emitir acción crítica de cambio de estado
+            // Emitir acciÃ³n crÃ­tica de cambio de estado
             if (store.websocket.socket) {
                 emitCriticalTicketAction(store.websocket.socket, ticketId, `estado_cambiado_${nuevoEstado}`, store.auth.user);
             }
 
-            // Actualizar tickets sin recargar la página
+            // Actualizar tickets sin recargar la pÃ¡gina
             await actualizarTickets();
         } catch (err) {
             setError(err.message);
@@ -425,12 +507,12 @@ export function AnalistaPage() {
                 throw new Error('Error al agregar comentario');
             }
 
-            // Emitir acción crítica de comentario agregado
+            // Emitir acciÃ³n crÃ­tica de comentario agregado
             if (store.websocket.socket) {
                 emitCriticalTicketAction(store.websocket.socket, ticketId, 'comentario_agregado', store.auth.user);
             }
 
-            // Actualizar tickets sin recargar la página
+            // Actualizar tickets sin recargar la pÃ¡gina
             await actualizarTickets();
         } catch (err) {
             setError(err.message);
@@ -459,7 +541,7 @@ export function AnalistaPage() {
     };
 
     const generarRecomendacion = (ticket) => {
-        // Redirigir a la vista de recomendación IA
+        // Redirigir a la vista de recomendaciÃ³n IA
         navigate(`/ticket/${ticket.id}/recomendacion-ia`);
     };
 
@@ -474,14 +556,14 @@ export function AnalistaPage() {
 
     const updateInfo = async () => {
         try {
-            // Validar contraseñas si se proporcionan
+            // Validar contraseÃ±as si se proporcionan
             if (infoData.password && infoData.password !== infoData.confirmPassword) {
-                setError('Las contraseñas no coinciden');
+                setError('Las contraseÃ±as no coinciden');
                 return;
             }
 
             if (infoData.password && infoData.password.length < 6) {
-                setError('La contraseña debe tener al menos 6 caracteres');
+                setError('La contraseÃ±a debe tener al menos 6 caracteres');
                 return;
             }
 
@@ -499,7 +581,7 @@ export function AnalistaPage() {
 
             // Solo incluir contraseña si se proporciona
             if (infoData.password) {
-                updateData.contraseña_hash = infoData.password;
+                updateData.password = infoData.password;
             }
 
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/analistas/${userId}`, {
@@ -513,7 +595,7 @@ export function AnalistaPage() {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || 'Error al actualizar información');
+                throw new Error(errorData.message || 'Error al actualizar informaciÃ³n');
             }
 
             // Actualizar los datos locales
@@ -525,7 +607,7 @@ export function AnalistaPage() {
                 especialidad: infoData.especialidad
             }));
 
-            alert('Información actualizada exitosamente');
+            alert('InformaciÃ³n actualizada exitosamente');
             setShowInfoForm(false);
             setError('');
         } catch (err) {
@@ -557,387 +639,694 @@ export function AnalistaPage() {
         }
     };
 
-    return (
-        <div className="container py-4">
-            {/* Header con información del analista */}
-            <div className="row mb-4">
-                <div className="col-12">
-                    <div className="card">
-                        <div className="card-body d-flex justify-content-between align-items-center">
-                            <div>
-                                <h2 className="mb-1">
-                                    Bienvenido, {userData?.nombre === 'Pendiente' ? 'Analista' : userData?.nombre} {userData?.apellido === 'Pendiente' ? '' : userData?.apellido}
-                                </h2>
-                                <p className="text-muted mb-0">Panel de Analista - Gestión de Tickets</p>
-                                <div className="mt-2">
-                                    <span className="badge bg-success">
-                                        <i className="fas fa-wifi me-1"></i>
-                                        Conectado
-                                    </span>
-                                </div>
-                                {userData?.especialidad && userData.especialidad !== 'Pendiente' && (
-                                    <div className="mt-2">
-                                        <small className="text-info d-flex align-items-center">
-                                            <i className="fas fa-cog me-1"></i>
-                                            <span className="fw-bold">Especialidad:</span>
-                                            <span className="ms-1">{userData.especialidad}</span>
-                                        </small>
-                                    </div>
-                                )}
-                                {(!userData?.especialidad || userData.especialidad === 'Pendiente') && (
-                                    <div className="mt-2">
-                                        <small className="text-warning d-flex align-items-center">
-                                            <i className="fas fa-exclamation-triangle me-1"></i>
-                                            <span>Completa tu información personal para una mejor experiencia</span>
-                                        </small>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="d-flex gap-2">
-                                <button
-                                    className="btn btn-info"
-                                    onClick={() => setShowInfoForm(!showInfoForm)}
-                                >
-                                    <i className="fas fa-user-edit me-1"></i>
-                                    {showInfoForm ? 'Ocultar Información' : 'Actualizar Información'}
-                                </button>
-                                <Link to="/analistas" className="btn btn-primary">Ir al CRUD</Link>
-                                <button
-                                    className="btn btn-outline-danger"
-                                    onClick={logout}
-                                >
-                                    Cerrar Sesión
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+    const stats = getStats();
+    const filteredTickets = getFilteredTickets();
+
+    if (loading) {
+        return (
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+                <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Cargando...</span>
                 </div>
             </div>
+        );
+    }
 
-            {error && (
-                <div className="alert alert-danger" role="alert">
-                    {error}
-                </div>
-            )}
+    return (
+        <div className="hyper-layout d-flex">
+            {/* Sidebar central dinÃ¡mico */}
+            <SideBarCentral
+                sidebarHidden={sidebarHidden}
+                activeView={activeView}
+                changeView={changeView}
+            />
 
-            {/* Formulario de información personal */}
-            {showInfoForm && (
-                <div className="row mb-4">
-                    <div className="col-12">
-                        <div className="card">
-                            <div className="card-header">
-                                <h5 className="mb-0">
-                                    <i className="fas fa-user-edit me-2"></i>
-                                    Actualizar Mi Información
-                                </h5>
+            {/* Contenido principal */}
+            <div className={`hyper-main-content flex-grow-1 ${sidebarHidden ? 'sidebar-hidden' : ''}`}>
+                {/* Header superior */}
+                <header className="hyper-header bg-white border-bottom p-3">
+                    <div className="d-flex align-items-center justify-content-between w-100">
+                        <div className="d-flex align-items-center gap-3">
+                            <button
+                                className="hyper-sidebar-toggle btn btn-link p-2"
+                                onClick={toggleSidebar}
+                                title={sidebarHidden ? "Mostrar menÃº" : "Ocultar menÃº"}
+                            >
+                                <i className={`fas ${sidebarHidden ? 'fa-eye' : 'fa-eye-slash'}`}></i>
+                            </button>
+
+                            {/* Barra de bÃºsqueda */}
+                            <div className="hyper-search position-relative">
+                                <i className="fas fa-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                                <input
+                                    type="text"
+                                    className="form-control pe-5"
+                                    placeholder="Buscar tickets por tÃ­tulo..."
+                                    value={searchQuery}
+                                    onChange={(e) => handleSearch(e.target.value)}
+                                    onFocus={() => {
+                                        if (searchResults.length > 0) {
+                                            setShowSearchResults(true);
+                                        }
+                                    }}
+                                />
+                                {searchQuery && (
+                                    <button
+                                        className="btn btn-link position-absolute top-50 end-0 translate-middle-y me-3 p-0"
+                                        onClick={() => {
+                                            setSearchQuery('');
+                                            setSearchResults([]);
+                                            setShowSearchResults(false);
+                                        }}
+                                        title="Limpiar bÃºsqueda"
+                                        style={{ zIndex: 10 }}
+                                    >
+                                        <i className="fas fa-times text-muted"></i>
+                                    </button>
+                                )}
+
+                                {/* Resultados de bÃºsqueda */}
+                                {showSearchResults && searchResults.length > 0 && (
+                                    <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg" style={{ top: '100%', zIndex: 1000 }}>
+                                        <div className="p-3">
+                                            <div className="d-flex justify-content-between align-items-center mb-3 w-100">
+                                                <small className="text-muted fw-semibold">
+                                                    Tickets encontrados ({searchResults.length})
+                                                </small>
+                                                <button
+                                                    className="btn btn-sm btn-outline-secondary ms-3"
+                                                    onClick={closeSearchResults}
+                                                    title="Cerrar resultados"
+                                                >
+                                                    <span>X</span>
+                                                </button>
+                                            </div>
+                                            {searchResults.map((ticket) => (
+                                                <div
+                                                    key={ticket.id}
+                                                    className="search-result-item p-2 border-bottom cursor-pointer"
+                                                    onClick={() => selectTicketFromSearch(ticket)}
+                                                >
+                                                    <div className="fw-semibold">#{ticket.id} - {ticket.titulo}</div>
+                                                    <small className="text-muted">
+                                                        {ticket.estado} â€¢ {ticket.prioridad}
+                                                    </small>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="card-body">
-                                <div className="row g-3">
-                                    <div className="col-md-6">
-                                        <label htmlFor="nombre" className="form-label">Nombre *</label>
-                                        <input
-                                            type="text"
-                                            className="form-control"
-                                            id="nombre"
-                                            name="nombre"
-                                            value={infoData.nombre}
-                                            onChange={handleInfoChange}
-                                            placeholder="Ingresa tu nombre"
-                                            required
-                                        />
+                        </div>
+
+                        <div className="d-flex align-items-center gap-2">
+                            {/* Dropdown del usuario */}
+                            <div className="position-relative">
+                                <button
+                                    className="btn btn-link d-flex align-items-center gap-2 text-decoration-none"
+                                    onClick={() => setShowUserDropdown(!showUserDropdown)}
+                                >
+                                    <div className="hyper-user-avatar bg-primary d-flex align-items-center justify-content-center rounded-circle" style={{ width: '32px', height: '32px' }}>
+                                        <i className="fas fa-user-cog text-white" style={{ fontSize: '0.8rem' }}></i>
                                     </div>
-                                    <div className="col-md-6">
-                                        <label htmlFor="apellido" className="form-label">Apellido *</label>
-                                        <input
-                                            type="text"
-                                            className="form-control"
-                                            id="apellido"
-                                            name="apellido"
-                                            value={infoData.apellido}
-                                            onChange={handleInfoChange}
-                                            placeholder="Ingresa tu apellido"
-                                            required
-                                        />
+                                    <span className="fw-semibold">
+                                        {userData?.nombre === 'Pendiente' ? 'Analista' : userData?.nombre}
+                                    </span>
+                                    <i className="fas fa-chevron-down"></i>
+                                </button>
+
+                                {showUserDropdown && (
+                                    <div className="position-absolute end-0 mt-2 bg-white border rounded shadow-lg" style={{ minWidth: '200px', zIndex: 1000 }}>
+                                        <div className="p-3 border-bottom">
+                                            <div className="fw-semibold">
+                                                {userData?.nombre === 'Pendiente' ? 'Analista' : userData?.nombre}
+                                            </div>
+                                            <small className="text-muted">Analista</small>
+                                        </div>
+                                        <div className="p-2">
+                                            <button
+                                                className="btn btn-link w-100 text-start d-flex align-items-center gap-2"
+                                                onClick={() => {
+                                                    setShowInfoForm(true);
+                                                    setShowUserDropdown(false);
+                                                }}
+                                            >
+                                                <i className="fas fa-user-edit"></i>
+                                                Mi Perfil
+                                            </button>
+                                            <div className="d-flex align-items-center justify-content-between p-2">
+                                                <span className="small">Modo Oscuro</span>
+                                                <div className="form-check form-switch">
+                                                    <input
+                                                        className="form-check-input"
+                                                        type="checkbox"
+                                                        checked={isDarkMode}
+                                                        onChange={toggleTheme}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <hr className="my-2" />
+                                            <button
+                                                className="btn btn-link w-100 text-start text-danger d-flex align-items-center gap-2"
+                                                onClick={logout}
+                                            >
+                                                <i className="fas fa-sign-out-alt"></i>
+                                                Cerrar SesiÃ³n
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="col-md-6">
-                                        <label htmlFor="email" className="form-label">Email *</label>
-                                        <input
-                                            type="email"
-                                            className="form-control"
-                                            id="email"
-                                            name="email"
-                                            value={infoData.email}
-                                            onChange={handleInfoChange}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label htmlFor="especialidad" className="form-label">Especialidad *</label>
-                                        <input
-                                            type="text"
-                                            className="form-control"
-                                            id="especialidad"
-                                            name="especialidad"
-                                            value={infoData.especialidad}
-                                            onChange={handleInfoChange}
-                                            placeholder="Ingresa tu especialidad"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label htmlFor="password" className="form-label">Nueva Contraseña (opcional)</label>
-                                        <input
-                                            type="password"
-                                            className="form-control"
-                                            id="password"
-                                            name="password"
-                                            value={infoData.password}
-                                            onChange={handleInfoChange}
-                                            minLength="6"
-                                            placeholder="Dejar vacío para mantener la actual"
-                                        />
-                                    </div>
-                                    <div className="col-md-6">
-                                        <label htmlFor="confirmPassword" className="form-label">Confirmar Nueva Contraseña</label>
-                                        <input
-                                            type="password"
-                                            className="form-control"
-                                            id="confirmPassword"
-                                            name="confirmPassword"
-                                            value={infoData.confirmPassword}
-                                            onChange={handleInfoChange}
-                                            minLength="6"
-                                            placeholder="Solo si cambias la contraseña"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="mt-3 d-flex gap-2">
-                                    <button
-                                        className="btn btn-success"
-                                        onClick={updateInfo}
-                                        disabled={!infoData.nombre || !infoData.apellido || !infoData.email || !infoData.especialidad || updatingInfo}
-                                    >
-                                        {updatingInfo ? (
-                                            <>
-                                                <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                                                Actualizando...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <i className="fas fa-save me-1"></i>
-                                                Guardar Información
-                                            </>
-                                        )}
-                                    </button>
-                                    <button
-                                        className="btn btn-secondary"
-                                        onClick={() => setShowInfoForm(false)}
-                                        disabled={updatingInfo}
-                                    >
-                                        <i className="fas fa-times me-1"></i>
-                                        Cancelar
-                                    </button>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                </header>
 
-            {/* Lista de tickets asignados */}
-            <div className="row">
-                <div className="col-12">
-                    <div className="card">
-                        <div className="card-header">
-                            <h5 className="mb-0">Mis Tickets Asignados</h5>
+                {/* Contenido principal */}
+                <div className="p-4">
+                    {error && (
+                        <div className="alert alert-danger" role="alert">
+                            <i className="fas fa-exclamation-triangle me-2"></i>
+                            {error}
                         </div>
-                        <div className="card-body">
-                            {loading ? (
-                                <div className="text-center py-4">
-                                    <div className="spinner-border text-primary" role="status">
-                                        <span className="visually-hidden">Cargando tickets...</span>
+                    )}
+
+                    {/* Dashboard View */}
+                    {activeView === 'dashboard' && (
+                        <>
+                            <h1 className="hyper-page-title">Dashboard Analista</h1>
+
+                            {/* MÃ©tricas principales */}
+                            <div className="row g-4 mb-4">
+                                <div className="col-md-6 col-lg-3">
+                                    <div className="hyper-metric-card card border-0 shadow-sm">
+                                        <div className="card-body">
+                                            <div className="d-flex align-items-center">
+                                                <div className="hyper-metric-icon bg-primary me-3">
+                                                    <i className="fas fa-ticket-alt"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="hyper-metric-value mb-0">{stats.total}</h3>
+                                                    <small className="text-muted">Total Tickets</small>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            ) : tickets.length === 0 ? (
-                                <div className="text-center py-4">
-                                    <p className="text-muted">No tienes tickets asignados.</p>
+                                <div className="col-md-6 col-lg-3">
+                                    <div className="hyper-metric-card card border-0 shadow-sm">
+                                        <div className="card-body">
+                                            <div className="d-flex align-items-center">
+                                                <div className="hyper-metric-icon bg-warning me-3">
+                                                    <i className="fas fa-clock"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="hyper-metric-value mb-0">{stats.activos}</h3>
+                                                    <small className="text-muted">Tickets Activos</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="table-responsive">
-                                    <table className="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>ID</th>
-                                                <th>Cliente</th>
-                                                <th>Título</th>
-                                                <th>Estado</th>
-                                                <th>Prioridad</th>
-                                                <th>Fecha Creación</th>
-                                                <th>Acciones</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {tickets.map((ticket) => (
-                                                <tr key={ticket.id}>
-                                                    <td>
-                                                        <div className="d-flex align-items-center">
-                                                            <span className="me-2">#{ticket.id}</span>
-                                                            {ticket.url_imagen && !ticket.url_imagen.includes('placeholder.com') && !ticket.url_imagen.includes('data:image/svg+xml') ? (
-                                                                <img
-                                                                    src={ticket.url_imagen}
-                                                                    alt="Imagen del ticket"
-                                                                    className="img-thumbnail"
-                                                                    style={{ width: '40px', height: '40px', objectFit: 'cover' }}
-                                                                />
-                                                            ) : (
-                                                                <span className="text-muted">
-                                                                    <i className="fas fa-image" style={{ fontSize: '12px' }}></i>
+                                <div className="col-md-6 col-lg-3">
+                                    <div className="hyper-metric-card card border-0 shadow-sm">
+                                        <div className="card-body">
+                                            <div className="d-flex align-items-center">
+                                                <div className="hyper-metric-icon bg-info me-3">
+                                                    <i className="fas fa-play-circle"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="hyper-metric-value mb-0">{stats.enProgreso}</h3>
+                                                    <small className="text-muted">En Progreso</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-md-6 col-lg-3">
+                                    <div className="hyper-metric-card card border-0 shadow-sm">
+                                        <div className="card-body">
+                                            <div className="d-flex align-items-center">
+                                                <div className="hyper-metric-icon bg-success me-3">
+                                                    <i className="fas fa-check-circle"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="hyper-metric-value mb-0">{stats.resueltos}</h3>
+                                                    <small className="text-muted">Tickets Resueltos</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Widgets del dashboard */}
+                            <div className="row g-4">
+                                <div className="col-lg-8">
+                                    <div className="hyper-widget card border-0 shadow-sm">
+                                        <div className="hyper-widget-header card-header bg-white border-bottom">
+                                            <h3 className="hyper-widget-title mb-0">Mis Tickets Recientes</h3>
+                                        </div>
+                                        <div className="hyper-widget-body card-body">
+                                            {tickets.slice(0, 5).map((ticket) => (
+                                                <div key={ticket.id} className="d-flex align-items-center py-2 border-bottom">
+                                                    <div className="hyper-activity-icon bg-primary me-3">
+                                                        <i className="fas fa-ticket-alt"></i>
+                                                    </div>
+                                                    <div className="flex-grow-1">
+                                                        <div className="fw-semibold">#{ticket.id} - {ticket.titulo}</div>
+                                                        <small className="text-muted">
+                                                            {ticket.estado} â€¢ {ticket.prioridad} â€¢ {new Date(ticket.fecha_creacion).toLocaleDateString()}
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-lg-4">
+                                    <div className="hyper-widget card border-0 shadow-sm">
+                                        <div className="hyper-widget-header card-header bg-white border-bottom">
+                                            <h3 className="hyper-widget-title mb-0">Acciones RÃ¡pidas</h3>
+                                        </div>
+                                        <div className="hyper-widget-body card-body">
+                                            <div className="d-grid gap-2">
+                                                <button
+                                                    className="btn btn-primary"
+                                                    onClick={() => changeView('tickets')}
+                                                >
+                                                    <i className="fas fa-list me-2"></i>
+                                                    Ver Mis Tickets
+                                                </button>
+                                                <button
+                                                    className="btn btn-outline-primary"
+                                                    onClick={() => changeView('resueltos')}
+                                                >
+                                                    <i className="fas fa-check-circle me-2"></i>
+                                                    Tickets Resueltos
+                                                </button>
+                                                <button
+                                                    className="btn btn-outline-primary"
+                                                    onClick={() => changeView('estadisticas')}
+                                                >
+                                                    <i className="fas fa-chart-bar me-2"></i>
+                                                    Mis EstadÃ­sticas
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Tickets View */}
+                    {activeView === 'tickets' && (
+                        <>
+                            <div className="d-flex justify-content-between align-items-center mb-4">
+                                <h1 className="hyper-page-title">Mis Tickets</h1>
+                                <div className="d-flex gap-2">
+                                    <div className="position-relative">
+                                        <button
+                                            className="btn btn-outline-secondary"
+                                            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                                        >
+                                            <i className="fas fa-filter me-2"></i>
+                                            Filtrar
+                                        </button>
+                                        {showFilterDropdown && (
+                                            <div className="position-absolute end-0 mt-2 bg-white border rounded shadow-lg p-3" style={{ minWidth: '250px', zIndex: 1000 }}>
+                                                <div className="mb-3">
+                                                    <label className="form-label small">Estado</label>
+                                                    <select
+                                                        className="form-select form-select-sm"
+                                                        value={filterEstado}
+                                                        onChange={(e) => setFilterEstado(e.target.value)}
+                                                    >
+                                                        <option value="">Todos</option>
+                                                        <option value="activo">Activo</option>
+                                                        <option value="en_progreso">En Progreso</option>
+                                                        <option value="resuelto">Resuelto</option>
+                                                    </select>
+                                                </div>
+                                                <div className="mb-3">
+                                                    <label className="form-label small">Prioridad</label>
+                                                    <select
+                                                        className="form-select form-select-sm"
+                                                        value={filterPrioridad}
+                                                        onChange={(e) => setFilterPrioridad(e.target.value)}
+                                                    >
+                                                        <option value="">Todas</option>
+                                                        <option value="baja">Baja</option>
+                                                        <option value="media">Media</option>
+                                                        <option value="alta">Alta</option>
+                                                        <option value="critica">CrÃ­tica</option>
+                                                    </select>
+                                                </div>
+                                                <button
+                                                    className="btn btn-sm btn-outline-secondary w-100"
+                                                    onClick={() => {
+                                                        setFilterEstado('');
+                                                        setFilterPrioridad('');
+                                                    }}
+                                                >
+                                                    Limpiar Filtros
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="hyper-widget card border-0 shadow-sm">
+                                <div className="hyper-widget-body">
+                                    <div className="table-responsive">
+                                        <table className="table table-hover mb-0">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>TÃ­tulo</th>
+                                                    <th>Estado</th>
+                                                    <th>Prioridad</th>
+                                                    <th>Cliente</th>
+                                                    <th>Fecha</th>
+                                                    <th>Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {filteredTickets.map((ticket) => (
+                                                    <tr key={ticket.id}>
+                                                        <td>#{ticket.id}</td>
+                                                        <td>
+                                                            <div className="fw-semibold">{ticket.titulo}</div>
+                                                            <small className="text-muted">{ticket.descripcion}</small>
+                                                        </td>
+                                                        <td>
+                                                            <span className="d-flex align-items-center gap-2">
+                                                                <span
+                                                                    className="rounded-circle d-inline-block"
+                                                                    style={{
+                                                                        width: '8px',
+                                                                        height: '8px',
+                                                                        backgroundColor: ticket.estado === 'activo' ? '#ffc107' :
+                                                                            ticket.estado === 'en_progreso' ? '#17a2b8' : '#28a745'
+                                                                    }}
+                                                                ></span>
+                                                                <span className="text-dark dark-theme:text-white">
+                                                                    {ticket.estado}
                                                                 </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        {ticket.cliente?.nombre} {ticket.cliente?.apellido}
-                                                    </td>
-                                                    <td>
-                                                        <div>
-                                                            <strong>{ticket.titulo}</strong>
-                                                            <br />
-                                                            <small className="text-muted">
-                                                                {ticket.descripcion.length > 50
-                                                                    ? `${ticket.descripcion.substring(0, 50)}...`
-                                                                    : ticket.descripcion
-                                                                }
-                                                            </small>
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <span className={getEstadoColor(ticket.estado)}>
-                                                            {ticket.estado}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        <span className={getPrioridadColor(ticket.prioridad)}>
-                                                            {ticket.prioridad}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        {new Date(ticket.fecha_creacion).toLocaleDateString()}
-                                                    </td>
-                                                    <td>
-                                                        <div className="btn-group" role="group">
-                                                            {ticket.estado.toLowerCase() === 'en_espera' && (
-                                                                <>
-                                                                    <button
-                                                                        className="btn btn-primary btn-sm"
-                                                                        onClick={() => cambiarEstadoTicket(ticket.id, 'en_proceso')}
-                                                                        title="Comenzar a trabajar"
-                                                                    >
-                                                                        <i className="fas fa-play"></i> Iniciar
-                                                                    </button>
-                                                                    <button
-                                                                        className="btn btn-warning btn-sm"
-                                                                        onClick={() => cambiarEstadoTicket(ticket.id, 'en_espera')}
-                                                                        title="Escalar al supervisor sin iniciar"
-                                                                    >
-                                                                        <i className="fas fa-arrow-up"></i> Escalar
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                            {ticket.estado.toLowerCase() === 'en_proceso' && (
-                                                                <>
-                                                                    <button
-                                                                        className="btn btn-success btn-sm"
-                                                                        onClick={() => cambiarEstadoTicket(ticket.id, 'solucionado')}
-                                                                        title="Marcar como solucionado"
-                                                                    >
-                                                                        <i className="fas fa-check"></i> Solucionar
-                                                                    </button>
-                                                                    <button
-                                                                        className="btn btn-warning btn-sm"
-                                                                        onClick={() => cambiarEstadoTicket(ticket.id, 'en_espera')}
-                                                                        title="Escalar al supervisor"
-                                                                    >
-                                                                        <i className="fas fa-arrow-up"></i> Escalar
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                            <Link
-                                                                to={`/ticket/${ticket.id}/comentarios`}
-                                                                className="btn btn-info btn-sm"
-                                                                title="Ver y agregar comentarios"
-                                                            >
-                                                                <i className="fas fa-comments"></i> Comentar
-                                                            </Link>
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span className="d-flex align-items-center gap-2">
+                                                                <span
+                                                                    className="rounded-circle d-inline-block"
+                                                                    style={{
+                                                                        width: '8px',
+                                                                        height: '8px',
+                                                                        backgroundColor: ticket.prioridad === 'baja' ? '#6c757d' :
+                                                                            ticket.prioridad === 'media' ? '#007bff' :
+                                                                                ticket.prioridad === 'alta' ? '#ffc107' : '#dc3545'
+                                                                    }}
+                                                                ></span>
+                                                                <span className="text-dark dark-theme:text-white">
+                                                                    {ticket.prioridad}
+                                                                </span>
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span className="d-flex align-items-center gap-2">
+                                                                <span
+                                                                    className="rounded-circle d-inline-block"
+                                                                    style={{
+                                                                        width: '8px',
+                                                                        height: '8px',
+                                                                        backgroundColor: '#17a2b8'
+                                                                    }}
+                                                                ></span>
+                                                                <span className="text-dark dark-theme:text-white">
+                                                                    {ticket.cliente?.nombre || 'N/A'}
+                                                                </span>
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span className="d-flex align-items-center gap-2">
+                                                                <span
+                                                                    className="rounded-circle d-inline-block"
+                                                                    style={{
+                                                                        width: '8px',
+                                                                        height: '8px',
+                                                                        backgroundColor: '#17a2b8'
+                                                                    }}
+                                                                ></span>
+                                                                <span className="text-dark dark-theme:text-white">
+                                                                    {new Date(ticket.fecha_creacion).toLocaleDateString()}
+                                                                </span>
+                                                            </span>
+                                                        </td>
+                                                        <td>
                                                             <div className="btn-group" role="group">
                                                                 <button
-                                                                    className="btn btn-info btn-sm dropdown-toggle"
-                                                                    type="button"
-                                                                    data-bs-toggle="dropdown"
-                                                                    aria-expanded="false"
-                                                                    title="Opciones de IA"
+                                                                    className="btn btn-sm btn-outline-primary"
+                                                                    onClick={() => changeView(`ticket-${ticket.id}`)}
                                                                 >
-                                                                    <i className="fas fa-robot"></i> IA
+                                                                    <i className="fas fa-eye"></i>
                                                                 </button>
-                                                                <ul className="dropdown-menu">
-                                                                    <li>
-                                                                        <button
-                                                                            className="dropdown-item"
-                                                                            onClick={() => generarRecomendacion(ticket)}
-                                                                        >
-                                                                            <i className="fas fa-lightbulb me-2"></i>
-                                                                            Generar Recomendación
-                                                                        </button>
-                                                                    </li>
-                                                                    <li>
-                                                                        <Link
-                                                                            to={`/ticket/${ticket.id}/identificar-imagen`}
-                                                                            className="dropdown-item"
-                                                                        >
-                                                                            <i className="fas fa-camera me-2"></i>
-                                                                            Analizar Imagen
-                                                                        </Link>
-                                                                    </li>
-                                                                </ul>
+                                                                <div className="btn-group" role="group">
+                                                                    <button
+                                                                        className="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                                                        data-bs-toggle="dropdown"
+                                                                    >
+                                                                        <i className="fas fa-cog"></i>
+                                                                    </button>
+                                                                    <ul className="dropdown-menu">
+                                                                        <li>
+                                                                            <button
+                                                                                className="dropdown-item"
+                                                                                onClick={() => actualizarEstadoTicket(ticket.id, 'en_progreso')}
+                                                                            >
+                                                                                <i className="fas fa-play me-2"></i>
+                                                                                Iniciar Trabajo
+                                                                            </button>
+                                                                        </li>
+                                                                        <li>
+                                                                            <button
+                                                                                className="dropdown-item"
+                                                                                onClick={() => actualizarEstadoTicket(ticket.id, 'resuelto')}
+                                                                            >
+                                                                                <i className="fas fa-check me-2"></i>
+                                                                                Marcar Resuelto
+                                                                            </button>
+                                                                        </li>
+                                                                        <li>
+                                                                            <button
+                                                                                className="dropdown-item"
+                                                                                onClick={() => generarRecomendacion(ticket.id)}
+                                                                            >
+                                                                                <i className="fas fa-robot me-2"></i>
+                                                                                Generar RecomendaciÃ³n
+                                                                            </button>
+                                                                        </li>
+                                                                    </ul>
+                                                                </div>
                                                             </div>
-                                                            {ticketsConRecomendaciones.has(ticket.id) && (
-                                                                <Link
-                                                                    to={`/ticket/${ticket.id}/recomendaciones-similares`}
-                                                                    className="btn btn-success btn-sm"
-                                                                    title="Ver tickets similares resueltos"
-                                                                >
-                                                                    <i className="fas fa-thumbs-up"></i>
-                                                                </Link>
-                                                            )}
-                                                            <Link
-                                                                to={`/ticket/${ticket.id}/chat-supervisor-analista`}
-                                                                className="btn btn-secondary btn-sm"
-                                                                title="Chat con supervisor"
-                                                            >
-                                                                <i className="fas fa-user-shield"></i> Chat Sup
-                                                            </Link>
-                                                            <Link
-                                                                to={`/ticket/${ticket.id}/chat-analista-cliente`}
-                                                                className="btn btn-success btn-sm"
-                                                                title="Chat con cliente"
-                                                            >
-                                                                <i className="fas fa-user"></i> Chat Cliente
-                                                            </Link>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            )}
+                            </div>
+                        </>
+                    )}
+
+                    {/* Resueltos View */}
+                    {activeView === 'resueltos' && (
+                        <>
+                            <h1 className="hyper-page-title">Tickets Resueltos</h1>
+                            <div className="hyper-widget card border-0 shadow-sm">
+                                <div className="hyper-widget-body">
+                                    <div className="table-responsive">
+                                        <table className="table table-hover mb-0">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>TÃ­tulo</th>
+                                                    <th>Cliente</th>
+                                                    <th>Fecha ResoluciÃ³n</th>
+                                                    <th>Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {tickets.filter(t => t.estado === 'resuelto').map((ticket) => (
+                                                    <tr key={ticket.id}>
+                                                        <td>#{ticket.id}</td>
+                                                        <td>{ticket.titulo}</td>
+                                                        <td>
+                                                            <span className="badge bg-info">
+                                                                {ticket.cliente?.nombre || 'N/A'}
+                                                            </span>
+                                                        </td>
+                                                        <td>{new Date(ticket.fecha_actualizacion).toLocaleDateString()}</td>
+                                                        <td>
+                                                            <button
+                                                                className="btn btn-sm btn-outline-primary"
+                                                                onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                            >
+                                                                <i className="fas fa-eye"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* EstadÃ­sticas View */}
+                    {activeView === 'estadisticas' && (
+                        <>
+                            <h1 className="hyper-page-title">Mis EstadÃ­sticas</h1>
+                            <div className="row g-4">
+                                <div className="col-md-6">
+                                    <div className="hyper-widget card border-0 shadow-sm">
+                                        <div className="hyper-widget-header card-header bg-white border-bottom">
+                                            <h3 className="hyper-widget-title mb-0">Resumen de Actividad</h3>
+                                        </div>
+                                        <div className="hyper-widget-body card-body">
+                                            <div className="text-center py-4">
+                                                <i className="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+                                                <p className="text-muted">EstadÃ­sticas detalladas en desarrollo</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-md-6">
+                                    <div className="hyper-widget card border-0 shadow-sm">
+                                        <div className="hyper-widget-header card-header bg-white border-bottom">
+                                            <h3 className="hyper-widget-title mb-0">Rendimiento</h3>
+                                        </div>
+                                        <div className="hyper-widget-body card-body">
+                                            <div className="text-center py-4">
+                                                <i className="fas fa-trophy fa-3x text-muted mb-3"></i>
+                                                <p className="text-muted">MÃ©tricas de rendimiento en desarrollo</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Formulario de informaciÃ³n del analista */}
+                    {showInfoForm && (
+                        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                            <div className="modal-dialog">
+                                <div className="modal-content">
+                                    <div className="modal-header">
+                                        <h5 className="modal-title">Actualizar InformaciÃ³n</h5>
+                                        <button
+                                            type="button"
+                                            className="btn-close"
+                                            onClick={() => setShowInfoForm(false)}
+                                        ></button>
+                                    </div>
+                                    <form onSubmit={actualizarInformacion}>
+                                        <div className="modal-body">
+                                            <div className="row">
+                                                <div className="col-md-6">
+                                                    <div className="mb-3">
+                                                        <label className="form-label">Nombre</label>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            value={infoData.nombre}
+                                                            onChange={(e) => setInfoData({ ...infoData, nombre: e.target.value })}
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="col-md-6">
+                                                    <div className="mb-3">
+                                                        <label className="form-label">Apellido</label>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control"
+                                                            value={infoData.apellido}
+                                                            onChange={(e) => setInfoData({ ...infoData, apellido: e.target.value })}
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="mb-3">
+                                                <label className="form-label">Email</label>
+                                                <input
+                                                    type="email"
+                                                    className="form-control"
+                                                    value={infoData.email}
+                                                    onChange={(e) => setInfoData({ ...infoData, email: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+                                            <div className="mb-3">
+                                                <label className="form-label">Especialidad</label>
+                                                <input
+                                                    type="text"
+                                                    className="form-control"
+                                                    value={infoData.especialidad}
+                                                    onChange={(e) => setInfoData({ ...infoData, especialidad: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+                                            <div className="mb-3">
+                                                <label className="form-label">Nueva ContraseÃ±a (opcional)</label>
+                                                <input
+                                                    type="password"
+                                                    className="form-control"
+                                                    value={infoData.password}
+                                                    onChange={(e) => setInfoData({ ...infoData, password: e.target.value })}
+                                                />
+                                            </div>
+                                            {infoData.password && (
+                                                <div className="mb-3">
+                                                    <label className="form-label">Confirmar ContraseÃ±a</label>
+                                                    <input
+                                                        type="password"
+                                                        className="form-control"
+                                                        value={infoData.confirmPassword}
+                                                        onChange={(e) => setInfoData({ ...infoData, confirmPassword: e.target.value })}
+                                                        required={infoData.password}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="modal-footer">
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={() => setShowInfoForm(false)}
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className="btn btn-primary"
+                                                disabled={updatingInfo}
+                                            >
+                                                {updatingInfo ? 'Actualizando...' : 'Actualizar'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
-
         </div>
     );
 }
-
-export default AnalistaPage;

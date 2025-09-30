@@ -64,6 +64,7 @@ export const SideBarCentral = ({ sidebarHidden, activeView, changeView }) => {
         };
     }, [userData?.id]);
 
+
     // Verificar si el usuario está autenticado
     if (!userData || !userRole) {
         return null;
@@ -155,34 +156,10 @@ export const SideBarCentral = ({ sidebarHidden, activeView, changeView }) => {
                         view: 'tickets'
                     },
                     {
-                        id: 'analistas',
-                        label: 'Gestión de Analistas',
-                        icon: 'fas fa-users',
-                        view: 'analistas'
-                    },
-                    {
-                        id: 'asignaciones',
-                        label: 'Asignaciones',
-                        icon: 'fas fa-tasks',
-                        view: 'asignaciones'
-                    },
-                    {
-                        id: 'escalaciones',
-                        label: 'Escalaciones',
-                        icon: 'fas fa-exclamation-triangle',
-                        view: 'escalaciones'
-                    },
-                    {
-                        id: 'reportes',
-                        label: 'Reportes',
-                        icon: 'fas fa-chart-bar',
-                        view: 'reportes'
-                    },
-                    {
-                        id: 'configuracion',
-                        label: 'Configuración',
-                        icon: 'fas fa-cog',
-                        view: 'configuracion'
+                        id: 'dashboard-calidad',
+                        label: 'Dashboard de Calidad',
+                        icon: 'fas fa-chart-line',
+                        view: 'dashboard-calidad'
                     }
                 ];
 
@@ -301,6 +278,7 @@ export const SideBarCentral = ({ sidebarHidden, activeView, changeView }) => {
                         ))}
                     </div>
                 )}
+
 
                 {/* Información del usuario */}
                 {!sidebarHidden && (
