@@ -199,21 +199,21 @@ export function AdministradorPage() {
                                 <h2 className="mb-1">Panel de Administración</h2>
                                 <p className="text-muted mb-0">Bienvenido, {store.auth.user?.email}</p>
                                 <div className="mt-2">
-                                    <span className="badge bg-success">
+                                    <span className="badge badge-ct-success">
                                         <i className="fas fa-wifi me-1"></i>
                                         Conectado
                                     </span>
                                 </div>
                             </div>
                             <div className="d-flex gap-2">
-                                <Link to="/administradores" className="btn btn-primary">
+                                <Link to="/administradores" className="btn btn-ct-primary">
                                     Ir al CRUD
                                 </Link>
-                                <Link to="/tickets" className="btn btn-secondary">
+                                <Link to="/tickets" className="btn btn-ct-secondary">
                                     <i className="fas fa-ticket-alt me-2"></i>Tickets
                                 </Link>
                                 <button
-                                    className="btn btn-outline-danger"
+                                    className="btn btn-ct-danger-outline"
                                     onClick={logout}
                                 >
                                     Cerrar Sesión
@@ -238,7 +238,7 @@ export function AdministradorPage() {
 
                 {loading ? (
                     <div className="col-12 text-center py-4">
-                        <div className="spinner-border text-primary" role="status">
+                        <div className="spinner-border spinner-ct-primary" role="status">
                             <span className="visually-hidden">Cargando estadísticas...</span>
                         </div>
                     </div>
@@ -246,7 +246,7 @@ export function AdministradorPage() {
                     <>
                         {/* Estadísticas de Tickets */}
                         <div className="col-md-6 col-lg-3 mb-3">
-                            <div className="card bg-primary text-white">
+                            <div className="card text-white card-ct-primary">
                                 <div className="card-body">
                                     <div className="d-flex justify-content-between">
                                         <div>
@@ -262,7 +262,7 @@ export function AdministradorPage() {
                         </div>
 
                         <div className="col-md-6 col-lg-3 mb-3">
-                            <div className="card bg-secondary text-white">
+                            <div className="card text-white card-ct-secondary">
                                 <div className="card-body">
                                     <div className="d-flex justify-content-between">
                                         <div>
@@ -278,7 +278,7 @@ export function AdministradorPage() {
                         </div>
 
                         <div className="col-md-6 col-lg-3 mb-3">
-                            <div className="card bg-warning text-white">
+                            <div className="card text-white card-ct-warning">
                                 <div className="card-body">
                                     <div className="d-flex justify-content-between">
                                         <div>
@@ -294,7 +294,7 @@ export function AdministradorPage() {
                         </div>
 
                         <div className="col-md-6 col-lg-3 mb-3">
-                            <div className="card bg-success text-white">
+                            <div className="card text-white card-ct-success">
                                 <div className="card-body">
                                     <div className="d-flex justify-content-between">
                                         <div>
@@ -311,7 +311,7 @@ export function AdministradorPage() {
 
                         {/* Estadísticas de Usuarios */}
                         <div className="col-md-4 mb-3">
-                            <div className="card bg-info text-white">
+                            <div className="card text-white card-ct-info">
                                 <div className="card-body">
                                     <div className="d-flex justify-content-between">
                                         <div>
@@ -327,7 +327,7 @@ export function AdministradorPage() {
                         </div>
 
                         <div className="col-md-4 mb-3">
-                            <div className="card bg-dark text-white">
+                            <div className="card text-white card-ct-dark">
                                 <div className="card-body">
                                     <div className="d-flex justify-content-between">
                                         <div>
@@ -343,7 +343,7 @@ export function AdministradorPage() {
                         </div>
 
                         <div className="col-md-4 mb-3">
-                            <div className="card bg-danger text-white">
+                            <div className="card text-white card-ct-danger">
                                 <div className="card-body">
                                     <div className="d-flex justify-content-between">
                                         <div>
@@ -370,7 +370,7 @@ export function AdministradorPage() {
                 <div className="col-md-6 col-lg-3 mb-3">
                     <Link to="/clientes" className="card text-decoration-none h-100">
                         <div className="card-body text-center">
-                            <i className="fas fa-users fa-3x text-primary mb-3"></i>
+                            <i className="fas fa-users fa-3x mb-3 icon-ct-primary"></i>
                             <h5 className="card-title">Gestionar Clientes</h5>
                             <p className="card-text text-muted">Administrar cuentas de clientes</p>
                         </div>
@@ -380,7 +380,7 @@ export function AdministradorPage() {
                 <div className="col-md-6 col-lg-3 mb-3">
                     <Link to="/analistas" className="card text-decoration-none h-100">
                         <div className="card-body text-center">
-                            <i className="fas fa-user-tie fa-3x text-success mb-3"></i>
+                            <i className="fas fa-user-tie fa-3x mb-3 icon-ct-success"></i>
                             <h5 className="card-title">Gestionar Analistas</h5>
                             <p className="card-text text-muted">Administrar cuentas de analistas</p>
                         </div>
@@ -390,7 +390,7 @@ export function AdministradorPage() {
                 <div className="col-md-6 col-lg-3 mb-3">
                     <Link to="/supervisores" className="card text-decoration-none h-100">
                         <div className="card-body text-center">
-                            <i className="fas fa-user-shield fa-3x text-warning mb-3"></i>
+                            <i className="fas fa-user-shield fa-3x mb-3 icon-ct-warning"></i>
                             <h5 className="card-title">Gestionar Supervisores</h5>
                             <p className="card-text text-muted">Administrar cuentas de supervisores</p>
                         </div>
@@ -401,7 +401,7 @@ export function AdministradorPage() {
                 <div className="col-md-6 col-lg-3 mb-3">
                     <Link to="/tickets" className="card text-decoration-none h-100">
                         <div className="card-body text-center">
-                            <i className="fas fa-ticket-alt fa-3x text-info mb-3"></i>
+                            <i className="fas fa-ticket-alt fa-3x mb-3 icon-ct-info"></i>
                             <h5 className="card-title">Gestionar Tickets</h5>
                             <p className="card-text text-muted">Ver y administrar todos los tickets</p>
                         </div>
@@ -411,7 +411,7 @@ export function AdministradorPage() {
                 <div className="col-md-6 col-lg-3 mb-3">
                     <Link to="/comentarios" className="card text-decoration-none h-100">
                         <div className="card-body text-center">
-                            <i className="fas fa-comments fa-3x text-dark mb-3"></i>
+                            <i className="fas fa-comments fa-3x mb-3 icon-ct-dark"></i>
                             <h5 className="card-title">Gestionar Comentarios</h5>
                             <p className="card-text text-muted">Ver y administrar comentarios</p>
                         </div>
@@ -422,11 +422,11 @@ export function AdministradorPage() {
                 <div className="col-md-6 col-lg-3 mb-3">
                     <div className="card h-100">
                         <div className="card-body text-center">
-                            <i className="fas fa-map-marked-alt fa-3x text-success mb-3"></i>
+                            <i className="fas fa-map-marked-alt fa-3x mb-3 icon-ct-success"></i>
                             <h5 className="card-title">Mapa de Calor</h5>
                             <p className="card-text text-muted">Visualizar tickets por ubicación del cliente</p>
                             <button
-                                className="btn btn-outline-success btn-sm"
+                                className="btn btn-sm btn-ct-success-outline"
                                 onClick={() => setShowMapaDistribucion(!showMapaDistribucion)}
                             >
                                 {showMapaDistribucion ? 'Ocultar Mapa' : 'Ver Mapa'}

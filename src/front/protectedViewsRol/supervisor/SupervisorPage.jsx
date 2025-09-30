@@ -921,7 +921,7 @@ export function SupervisorPage() {
 
     if (loading) {
         return (
-            <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+            <div className="d-flex justify-content-center align-items-center full-height">
                 <div className="spinner-border text-primary" role="status">
                     <span className="visually-hidden">Cargando...</span>
                 </div>
@@ -969,14 +969,13 @@ export function SupervisorPage() {
                                 />
                                 {searchQuery && (
                                     <button
-                                        className="btn btn-link position-absolute top-50 end-0 translate-middle-y me-3 p-0"
+                                        className="btn btn-link position-absolute top-50 end-0 translate-middle-y me-3 p-0 z-index-10"
                                         onClick={() => {
                                             setSearchQuery('');
                                             setSearchResults([]);
                                             setShowSearchResults(false);
                                         }}
                                         title="Limpiar bÃºsqueda"
-                                        style={{ zIndex: 10 }}
                                     >
                                         <i className="fas fa-times text-muted"></i>
                                     </button>
@@ -984,7 +983,7 @@ export function SupervisorPage() {
 
                                 {/* Resultados de bÃºsqueda */}
                                 {showSearchResults && searchResults.length > 0 && (
-                                    <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg" style={{ top: '100%', zIndex: 1000 }}>
+                                    <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg dropdown-menu-custom">
                                         <div className="p-3">
                                             <div className="d-flex justify-content-between align-items-center mb-3 w-100">
                                                 <small className="text-muted fw-semibold">
@@ -1023,8 +1022,8 @@ export function SupervisorPage() {
                                     className="btn btn-link d-flex align-items-center gap-2 text-decoration-none"
                                     onClick={() => setShowUserDropdown(!showUserDropdown)}
                                 >
-                                    <div className="hyper-user-avatar bg-primary d-flex align-items-center justify-content-center rounded-circle" style={{ width: '32px', height: '32px' }}>
-                                        <i className="fas fa-user-shield text-white" style={{ fontSize: '0.8rem' }}></i>
+                                    <div className="hyper-user-avatar bg-primary d-flex align-items-center justify-content-center rounded-circle avatar-small">
+                                        <i className="fas fa-user-shield text-white icon-small"></i>
                                     </div>
                                     <span className="fw-semibold">
                                         {userData?.nombre === 'Pendiente' ? 'Supervisor' : userData?.nombre}
@@ -1033,7 +1032,7 @@ export function SupervisorPage() {
                                 </button>
 
                                 {showUserDropdown && (
-                                    <div className="position-absolute end-0 mt-2 bg-white border rounded shadow-lg" style={{ minWidth: '200px', zIndex: 1000 }}>
+                                    <div className="position-absolute end-0 mt-2 bg-white border rounded shadow-lg dropdown-menu-min-width">
                                         <div className="p-3 border-bottom">
                                             <div className="fw-semibold">
                                                 {userData?.nombre === 'Pendiente' ? 'Supervisor' : userData?.nombre}
@@ -1235,12 +1234,7 @@ export function SupervisorPage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: '#007bff'
-                                                                                }}
+                                                                                className="rounded-circle d-inline-block dot-ct-blue"
                                                                             ></span>
                                                                             <span className="fw-bold text-dark dark-theme:text-white">
                                                                                 #{ticket.id}
@@ -1250,12 +1244,7 @@ export function SupervisorPage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: '#6f42c1'
-                                                                                }}
+                                                                                className="rounded-circle d-inline-block dot-ct-purple"
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
                                                                                 {ticket.titulo}
@@ -1265,14 +1254,10 @@ export function SupervisorPage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: ticket.estado.toLowerCase() === 'solucionado' ? '#28a745' :
-                                                                                        ticket.estado.toLowerCase() === 'en_proceso' ? '#ffc107' :
-                                                                                            '#007bff'
-                                                                                }}
+                                                                                className={`rounded-circle d-inline-block ${ticket.estado.toLowerCase() === 'solucionado' ? 'dot-estado-solucionado' :
+                                                                                        ticket.estado.toLowerCase() === 'en_proceso' ? 'dot-estado-en-proceso' :
+                                                                                            'dot-ct-blue'
+                                                                                    }`}
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
                                                                                 {ticket.estado}
@@ -1286,7 +1271,7 @@ export function SupervisorPage() {
                                                                                 style={{
                                                                                     width: '8px',
                                                                                     height: '8px',
-                                                                                    backgroundColor: '#17a2b8'
+                                                                                    backgroundColor: 'var(--ct-info)'
                                                                                 }}
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
@@ -1347,7 +1332,7 @@ export function SupervisorPage() {
                                             </button>
 
                                             {showFilterDropdown && (
-                                                <div className="dropdown-menu show position-absolute" style={{ right: 0, top: '100%', minWidth: '250px' }}>
+                                                <div className="dropdown-menu show position-absolute dropdown-menu-positioned">
                                                     <div className="dropdown-header">
                                                         <h6 className="mb-0">Filtrar Tickets</h6>
                                                     </div>
@@ -1472,12 +1457,11 @@ export function SupervisorPage() {
                                                                             <img
                                                                                 src={ticket.url_imagen}
                                                                                 alt="Imagen del ticket"
-                                                                                className="img-thumbnail"
-                                                                                style={{ width: '30px', height: '30px', objectFit: 'cover' }}
+                                                                                className="img-thumbnail thumbnail-small"
                                                                             />
                                                                         ) : (
                                                                             <span className="text-muted">
-                                                                                <i className="fas fa-image" style={{ fontSize: '12px' }}></i>
+                                                                                <i className="fas fa-image icon-tiny"></i>
                                                                             </span>
                                                                         )}
                                                                     </div>
@@ -1489,7 +1473,7 @@ export function SupervisorPage() {
                                                                             style={{
                                                                                 width: '8px',
                                                                                 height: '8px',
-                                                                                backgroundColor: '#17a2b8'
+                                                                                backgroundColor: 'var(--ct-info)'
                                                                             }}
                                                                         ></span>
                                                                         <span className="text-dark dark-theme:text-white">
@@ -1511,16 +1495,12 @@ export function SupervisorPage() {
                                                                 <td className="text-center px-3">
                                                                     <span className="d-flex align-items-center justify-content-center gap-2">
                                                                         <span
-                                                                            className="rounded-circle d-inline-block"
-                                                                            style={{
-                                                                                width: '8px',
-                                                                                height: '8px',
-                                                                                backgroundColor: ticket.estado === 'activo' ? '#ffc107' :
-                                                                                    ticket.estado === 'en_progreso' ? '#17a2b8' :
-                                                                                        ticket.estado === 'resuelto' ? '#28a745' :
-                                                                                            ticket.estado === 'escalado' ? '#dc3545' :
-                                                                                                '#6c757d'
-                                                                            }}
+                                                                            className={`rounded-circle d-inline-block ${ticket.estado === 'activo' ? 'dot-estado-activo' :
+                                                                                    ticket.estado === 'en_progreso' ? 'dot-estado-en-proceso' :
+                                                                                        ticket.estado === 'resuelto' ? 'dot-estado-solucionado' :
+                                                                                            ticket.estado === 'escalado' ? 'dot-estado-escalado' :
+                                                                                                'dot-ct-secondary'
+                                                                                }`}
                                                                         ></span>
                                                                         <span className="text-dark dark-theme:text-white">
                                                                             {ticket.estado}
@@ -1584,7 +1564,7 @@ export function SupervisorPage() {
                                                                             style={{
                                                                                 width: '8px',
                                                                                 height: '8px',
-                                                                                backgroundColor: '#17a2b8'
+                                                                                backgroundColor: 'var(--ct-info)'
                                                                             }}
                                                                         ></span>
                                                                         <small className="text-dark dark-theme:text-white">
@@ -1788,12 +1768,11 @@ export function SupervisorPage() {
                                                                             <img
                                                                                 src={ticket.url_imagen}
                                                                                 alt="Imagen del ticket"
-                                                                                className="img-thumbnail"
-                                                                                style={{ width: '30px', height: '30px', objectFit: 'cover' }}
+                                                                                className="img-thumbnail thumbnail-small"
                                                                             />
                                                                         ) : (
                                                                             <span className="text-muted">
-                                                                                <i className="fas fa-image" style={{ fontSize: '12px' }}></i>
+                                                                                <i className="fas fa-image icon-tiny"></i>
                                                                             </span>
                                                                         )}
                                                                     </div>

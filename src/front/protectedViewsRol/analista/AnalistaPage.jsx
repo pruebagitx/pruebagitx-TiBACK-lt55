@@ -670,7 +670,7 @@ export function AnalistaPage() {
 
     if (loading) {
         return (
-            <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+            <div className="d-flex justify-content-center align-items-center full-height">
                 <div className="spinner-border text-primary" role="status">
                     <span className="visually-hidden">Cargando...</span>
                 </div>
@@ -718,14 +718,13 @@ export function AnalistaPage() {
                                 />
                                 {searchQuery && (
                                     <button
-                                        className="btn btn-link position-absolute top-50 end-0 translate-middle-y me-3 p-0"
+                                        className="btn btn-link position-absolute top-50 end-0 translate-middle-y me-3 p-0 z-index-10"
                                         onClick={() => {
                                             setSearchQuery('');
                                             setSearchResults([]);
                                             setShowSearchResults(false);
                                         }}
                                         title="Limpiar bÃºsqueda"
-                                        style={{ zIndex: 10 }}
                                     >
                                         <i className="fas fa-times text-muted"></i>
                                     </button>
@@ -733,7 +732,7 @@ export function AnalistaPage() {
 
                                 {/* Resultados de bÃºsqueda */}
                                 {showSearchResults && searchResults.length > 0 && (
-                                    <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg" style={{ top: '100%', zIndex: 1000 }}>
+                                    <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg dropdown-menu-custom">
                                         <div className="p-3">
                                             <div className="d-flex justify-content-between align-items-center mb-3 w-100">
                                                 <small className="text-muted fw-semibold">
@@ -772,8 +771,8 @@ export function AnalistaPage() {
                                     className="btn btn-link d-flex align-items-center gap-2 text-decoration-none"
                                     onClick={() => setShowUserDropdown(!showUserDropdown)}
                                 >
-                                    <div className="hyper-user-avatar bg-primary d-flex align-items-center justify-content-center rounded-circle" style={{ width: '32px', height: '32px' }}>
-                                        <i className="fas fa-user-cog text-white" style={{ fontSize: '0.8rem' }}></i>
+                                    <div className="hyper-user-avatar bg-primary d-flex align-items-center justify-content-center rounded-circle avatar-small">
+                                        <i className="fas fa-user-cog text-white icon-small"></i>
                                     </div>
                                     <span className="fw-semibold">
                                         {userData?.nombre === 'Pendiente' ? 'Analista' : userData?.nombre}
@@ -782,7 +781,7 @@ export function AnalistaPage() {
                                 </button>
 
                                 {showUserDropdown && (
-                                    <div className="position-absolute end-0 mt-2 bg-white border rounded shadow-lg" style={{ minWidth: '200px', zIndex: 1000 }}>
+                                    <div className="position-absolute end-0 mt-2 bg-white border rounded shadow-lg dropdown-menu-min-width">
                                         <div className="p-3 border-bottom">
                                             <div className="fw-semibold">
                                                 {userData?.nombre === 'Pendiente' ? 'Analista' : userData?.nombre}
@@ -985,12 +984,7 @@ export function AnalistaPage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: '#007bff'
-                                                                                }}
+                                                                                className="rounded-circle d-inline-block dot-ct-blue"
                                                                             ></span>
                                                                             <span className="fw-bold text-dark dark-theme:text-white">
                                                                                 #{ticket.id}
@@ -1000,12 +994,7 @@ export function AnalistaPage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: '#6f42c1'
-                                                                                }}
+                                                                                className="rounded-circle d-inline-block dot-ct-purple"
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
                                                                                 {ticket.titulo}
@@ -1015,15 +1004,11 @@ export function AnalistaPage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: ticket.estado === 'solucionado' ? '#28a745' :
-                                                                                        ticket.estado === 'en_proceso' ? '#ffc107' :
-                                                                                            ticket.estado === 'en_espera' ? '#17a2b8' :
-                                                                                                ticket.estado === 'escalado' ? '#dc3545' : '#6c757d'
-                                                                                }}
+                                                                                className={`rounded-circle d-inline-block ${ticket.estado === 'solucionado' ? 'dot-estado-solucionado' :
+                                                                                    ticket.estado === 'en_proceso' ? 'dot-estado-en-proceso' :
+                                                                                        ticket.estado === 'en_espera' ? 'dot-estado-en-espera' :
+                                                                                            ticket.estado === 'escalado' ? 'dot-estado-escalado' : 'dot-ct-secondary'
+                                                                                    }`}
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
                                                                                 {ticket.estado}
@@ -1033,15 +1018,11 @@ export function AnalistaPage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: ticket.prioridad === 'critica' ? '#343a40' :
-                                                                                        ticket.prioridad === 'alta' ? '#dc3545' :
-                                                                                            ticket.prioridad === 'media' ? '#ffc107' :
-                                                                                                ticket.prioridad === 'baja' ? '#28a745' : '#6c757d'
-                                                                                }}
+                                                                                className={`rounded-circle d-inline-block ${ticket.prioridad === 'critica' ? 'dot-prioridad-critica' :
+                                                                                    ticket.prioridad === 'alta' ? 'dot-prioridad-alta' :
+                                                                                        ticket.prioridad === 'media' ? 'dot-prioridad-media' :
+                                                                                            ticket.prioridad === 'baja' ? 'dot-prioridad-baja' : 'dot-ct-secondary'
+                                                                                    }`}
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
                                                                                 {ticket.prioridad || 'Normal'}
@@ -1051,12 +1032,7 @@ export function AnalistaPage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: '#20c997'
-                                                                                }}
+                                                                                className="rounded-circle d-inline-block dot-ct-teal"
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
                                                                                 {ticket.cliente?.nombre} {ticket.cliente?.apellido}
@@ -1066,12 +1042,7 @@ export function AnalistaPage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: '#fd7e14'
-                                                                                }}
+                                                                                className="rounded-circle d-inline-block dot-ct-orange"
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
                                                                                 {new Date(ticket.fecha_creacion).toLocaleDateString()}
@@ -1193,8 +1164,8 @@ export function AnalistaPage() {
                                                                     style={{
                                                                         width: '8px',
                                                                         height: '8px',
-                                                                        backgroundColor: ticket.estado === 'activo' ? '#ffc107' :
-                                                                            ticket.estado === 'en_progreso' ? '#17a2b8' : '#28a745'
+                                                                        backgroundColor: ticket.estado === 'activo' ? 'var(--ct-warning)' :
+                                                                            ticket.estado === 'en_progreso' ? 'var(--ct-info)' : 'var(--ct-success)'
                                                                     }}
                                                                 ></span>
                                                                 <span className="text-dark dark-theme:text-white">
@@ -1209,9 +1180,9 @@ export function AnalistaPage() {
                                                                     style={{
                                                                         width: '8px',
                                                                         height: '8px',
-                                                                        backgroundColor: ticket.prioridad === 'baja' ? '#6c757d' :
-                                                                            ticket.prioridad === 'media' ? '#007bff' :
-                                                                                ticket.prioridad === 'alta' ? '#ffc107' : '#dc3545'
+                                                                        backgroundColor: ticket.prioridad === 'baja' ? 'var(--ct-secondary)' :
+                                                                            ticket.prioridad === 'media' ? 'var(--ct-blue)' :
+                                                                                ticket.prioridad === 'alta' ? 'var(--ct-warning)' : 'var(--ct-danger)'
                                                                     }}
                                                                 ></span>
                                                                 <span className="text-dark dark-theme:text-white">
@@ -1226,7 +1197,7 @@ export function AnalistaPage() {
                                                                     style={{
                                                                         width: '8px',
                                                                         height: '8px',
-                                                                        backgroundColor: '#17a2b8'
+                                                                        backgroundColor: 'var(--ct-info)'
                                                                     }}
                                                                 ></span>
                                                                 <span className="text-dark dark-theme:text-white">
@@ -1241,7 +1212,7 @@ export function AnalistaPage() {
                                                                     style={{
                                                                         width: '8px',
                                                                         height: '8px',
-                                                                        backgroundColor: '#17a2b8'
+                                                                        backgroundColor: 'var(--ct-info)'
                                                                     }}
                                                                 ></span>
                                                                 <span className="text-dark dark-theme:text-white">

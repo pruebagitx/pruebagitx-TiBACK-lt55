@@ -213,9 +213,9 @@ export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaci
 
     if (loading) {
         return (
-            <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
+            <div className="d-flex justify-content-center align-items-center loading-container">
                 <div className="text-center">
-                    <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+                    <div className="spinner-border text-primary mb-3 spinner-large" role="status">
                         <span className="visually-hidden">Cargando ticket...</span>
                     </div>
                     <h5 className="text-muted">Cargando ticket...</h5>
@@ -226,7 +226,7 @@ export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaci
 
     if (error || !ticket) {
         return (
-            <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
+            <div className="d-flex justify-content-center align-items-center loading-container">
                 <div className="text-center">
                     <i className="fas fa-exclamation-triangle fa-4x text-warning mb-3"></i>
                     <h4 className="text-muted">{error || 'Ticket no encontrado'}</h4>
@@ -304,8 +304,7 @@ export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaci
                                         <img
                                             src={ticket.url_imagen}
                                             alt="Imagen del ticket"
-                                            className="img-fluid rounded shadow-sm"
-                                            style={{ maxHeight: '400px' }}
+                                            className="img-fluid rounded shadow-sm image-responsive"
                                         />
                                     </div>
                                 </div>
@@ -377,8 +376,7 @@ export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaci
                             {tieneAnalistaAsignado(ticket) ? (
                                 <div>
                                     <div className="mb-3">
-                                        <div className="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center"
-                                            style={{ width: '60px', height: '60px' }}>
+                                        <div className="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center avatar-large">
                                             <i className="fas fa-user-tie text-white fs-4"></i>
                                         </div>
                                     </div>
@@ -404,8 +402,7 @@ export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaci
                             ) : (
                                 <div>
                                     <div className="mb-3">
-                                        <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center"
-                                            style={{ width: '60px', height: '60px' }}>
+                                        <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center avatar-large">
                                             <i className="fas fa-clock text-muted fs-4"></i>
                                         </div>
                                     </div>
@@ -607,7 +604,7 @@ export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaci
 
             {/* Modal para Asignar Analista */}
             {showAsignarModal && (
-                <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                <div className="modal show d-block modal-backdrop-custom" tabIndex="-1">
                     <div className="modal-dialog">
                         <div className="modal-content">
                             <div className="modal-header">

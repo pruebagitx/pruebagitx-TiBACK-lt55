@@ -177,9 +177,9 @@ export const VerTicketHDAnalista = ({ ticketId, tickets, ticketsConRecomendacion
 
     if (loading) {
         return (
-            <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
+            <div className="d-flex justify-content-center align-items-center loading-container">
                 <div className="text-center">
-                    <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+                    <div className="spinner-border text-primary mb-3 spinner-large" role="status">
                         <span className="visually-hidden">Cargando ticket...</span>
                     </div>
                     <h5 className="text-muted">Cargando ticket...</h5>
@@ -190,7 +190,7 @@ export const VerTicketHDAnalista = ({ ticketId, tickets, ticketsConRecomendacion
 
     if (error || !ticket) {
         return (
-            <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
+            <div className="d-flex justify-content-center align-items-center loading-container">
                 <div className="text-center">
                     <i className="fas fa-exclamation-triangle fa-4x text-warning mb-3"></i>
                     <h4 className="text-muted">{error || 'Ticket no encontrado'}</h4>
@@ -268,8 +268,7 @@ export const VerTicketHDAnalista = ({ ticketId, tickets, ticketsConRecomendacion
                                         <img
                                             src={ticket.url_imagen}
                                             alt="Imagen del ticket"
-                                            className="img-fluid rounded shadow-sm"
-                                            style={{ maxHeight: '400px' }}
+                                            className="img-fluid rounded shadow-sm image-responsive"
                                         />
                                     </div>
                                 </div>
@@ -339,8 +338,7 @@ export const VerTicketHDAnalista = ({ ticketId, tickets, ticketsConRecomendacion
                         </div>
                         <div className="card-body text-center">
                             <div className="mb-3">
-                                <div className="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center"
-                                    style={{ width: '60px', height: '60px' }}>
+                                <div className="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center avatar-large">
                                     <i className="fas fa-user text-white fs-4"></i>
                                 </div>
                             </div>

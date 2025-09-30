@@ -932,7 +932,7 @@ export function ClientePage() {
 
                                 {/* Resultados de búsqueda */}
                                 {showSearchResults && searchResults.length > 0 && (
-                                    <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg" style={{ top: '100%', zIndex: 1000 }}>
+                                    <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg dropdown-menu-custom">
                                         <div className="p-3">
                                             <div className="d-flex justify-content-between align-items-center mb-3 w-100">
                                                 <small className="text-muted fw-semibold">
@@ -952,8 +952,7 @@ export function ClientePage() {
                                                     key={ticket.id}
                                                     className="search-result-item p-2 border-bottom cursor-pointer"
                                                     onClick={() => selectTicketFromSearch(ticket)}
-                                                    style={{ cursor: 'pointer' }}
-                                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
+                                                    onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--ct-gray-100)'}
                                                     onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                                                 >
                                                     <div className="d-flex justify-content-between align-items-start">
@@ -989,9 +988,8 @@ export function ClientePage() {
 
                             <div className="dropdown">
                                 <div
-                                    className="hyper-user-profile d-flex align-items-center gap-3 p-2 rounded"
+                                    className="hyper-user-profile d-flex align-items-center gap-3 p-2 rounded cursor-pointer"
                                     onClick={() => setShowUserDropdown(!showUserDropdown)}
-                                    style={{ cursor: 'pointer' }}
                                 >
                                     {userData?.url_imagen ? (
                                         <img
@@ -1016,7 +1014,7 @@ export function ClientePage() {
                                 </div>
 
                                 {showUserDropdown && (
-                                    <div className="dropdown-menu show position-absolute" style={{ right: 0, top: '100%', minWidth: '200px' }}>
+                                    <div className="dropdown-menu show position-absolute dropdown-menu-min-width">
                                         <div className="dropdown-header">
                                             <h6 className="mb-0">Mi Cuenta</h6>
                                         </div>
@@ -1251,12 +1249,7 @@ export function ClientePage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: '#007bff'
-                                                                                }}
+                                                                                className="rounded-circle d-inline-block dot-ct-blue"
                                                                             ></span>
                                                                             <span className="fw-bold text-dark dark-theme:text-white">
                                                                                 #{ticket.id}
@@ -1266,12 +1259,7 @@ export function ClientePage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: '#6f42c1'
-                                                                                }}
+                                                                                className="rounded-circle d-inline-block dot-ct-purple"
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
                                                                                 {ticket.titulo}
@@ -1281,14 +1269,10 @@ export function ClientePage() {
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: ticket.estado.toLowerCase() === 'solucionado' ? '#28a745' :
-                                                                                        ticket.estado.toLowerCase() === 'en_proceso' ? '#ffc107' :
-                                                                                            '#007bff'
-                                                                                }}
+                                                                                className={`rounded-circle d-inline-block ${ticket.estado.toLowerCase() === 'solucionado' ? 'dot-estado-solucionado' :
+                                                                                    ticket.estado.toLowerCase() === 'en_proceso' ? 'dot-estado-en-proceso' :
+                                                                                        'dot-ct-blue'
+                                                                                    }`}
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
                                                                                 {ticket.estado}
@@ -1302,7 +1286,7 @@ export function ClientePage() {
                                                                                 style={{
                                                                                     width: '8px',
                                                                                     height: '8px',
-                                                                                    backgroundColor: '#17a2b8'
+                                                                                    backgroundColor: 'var(--ct-info)'
                                                                                 }}
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
@@ -1404,7 +1388,7 @@ export function ClientePage() {
                                             </button>
 
                                             {showFilterDropdown && (
-                                                <div className="dropdown-menu show position-absolute" style={{ right: 0, top: '100%', minWidth: '250px' }}>
+                                                <div className="dropdown-menu show position-absolute dropdown-menu-positioned">
                                                     <div className="dropdown-header">
                                                         <h6 className="mb-0">Filtrar Tickets</h6>
                                                     </div>
@@ -1568,15 +1552,11 @@ export function ClientePage() {
                                                             <td className="text-center px-3">
                                                                 <span className="d-flex align-items-center justify-content-center gap-2">
                                                                     <span
-                                                                        className="rounded-circle d-inline-block"
-                                                                        style={{
-                                                                            width: '8px',
-                                                                            height: '8px',
-                                                                            backgroundColor: ticket.estado.toLowerCase() === 'solucionado' ? '#28a745' :
-                                                                                ticket.estado.toLowerCase() === 'en_proceso' ? '#ffc107' :
-                                                                                    ticket.estado.toLowerCase() === 'en_espera' ? '#17a2b8' :
-                                                                                        '#007bff'
-                                                                        }}
+                                                                        className={`rounded-circle d-inline-block ${ticket.estado.toLowerCase() === 'solucionado' ? 'dot-estado-solucionado' :
+                                                                            ticket.estado.toLowerCase() === 'en_proceso' ? 'dot-estado-en-proceso' :
+                                                                                ticket.estado.toLowerCase() === 'en_espera' ? 'dot-estado-en-espera' :
+                                                                                    'dot-ct-blue'
+                                                                            }`}
                                                                     ></span>
                                                                     <span className="text-dark dark-theme:text-white">
                                                                         {ticket.estado}
@@ -1586,14 +1566,10 @@ export function ClientePage() {
                                                             <td className="text-center px-3">
                                                                 <span className="d-flex align-items-center justify-content-center gap-2">
                                                                     <span
-                                                                        className="rounded-circle d-inline-block"
-                                                                        style={{
-                                                                            width: '8px',
-                                                                            height: '8px',
-                                                                            backgroundColor: ticket.prioridad === 'alta' ? '#dc3545' :
-                                                                                ticket.prioridad === 'media' ? '#ffc107' :
-                                                                                    '#28a745'
-                                                                        }}
+                                                                        className={`rounded-circle d-inline-block ${ticket.prioridad === 'alta' ? 'dot-prioridad-alta' :
+                                                                            ticket.prioridad === 'media' ? 'dot-prioridad-media' :
+                                                                                'dot-prioridad-baja'
+                                                                            }`}
                                                                     ></span>
                                                                     <span className="text-dark dark-theme:text-white">
                                                                         {ticket.prioridad || 'Normal'}
