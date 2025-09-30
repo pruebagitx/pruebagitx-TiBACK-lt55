@@ -63,7 +63,10 @@ export function AnalistaPage() {
     };
 
     const changeView = (view) => {
+        console.log('AnalistaPage - changeView called with:', view);
+        console.log('AnalistaPage - Current activeView:', activeView);
         setActiveView(view);
+        console.log('AnalistaPage - activeView set to:', view);
     };
 
     const toggleTheme = () => {
@@ -792,8 +795,10 @@ export function AnalistaPage() {
                                             <button
                                                 className="btn btn-link w-100 text-start d-flex align-items-center gap-2"
                                                 onClick={() => {
-                                                    setShowInfoForm(true);
+                                                    console.log('AnalistaPage - Mi Perfil button clicked');
+                                                    changeView('profile');
                                                     setShowUserDropdown(false);
+                                                    console.log('AnalistaPage - Dropdown closed, view changed to profile');
                                                 }}
                                             >
                                                 <i className="fas fa-user-edit"></i>
@@ -1152,7 +1157,22 @@ export function AnalistaPage() {
                                             <tbody>
                                                 {filteredTickets.map((ticket) => (
                                                     <tr key={ticket.id}>
-                                                        <td>#{ticket.id}</td>
+                                                        <td>
+                                                            <div className="d-flex align-items-center justify-content-center">
+                                                                <span className="me-2">#{ticket.id}</span>
+                                                                {ticket.url_imagen ? (
+                                                                    <img
+                                                                        src={ticket.url_imagen}
+                                                                        alt="Imagen del ticket"
+                                                                        className="img-thumbnail thumbnail-small"
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-muted">
+                                                                        <i className="fas fa-image icon-tiny"></i>
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
                                                         <td>
                                                             <div className="fw-semibold">{ticket.titulo}</div>
                                                             <small className="text-muted">{ticket.descripcion}</small>
@@ -1340,6 +1360,98 @@ export function AnalistaPage() {
                         </>
                     )}
 
+                    {/* Profile View */}
+                    {activeView === 'profile' && (
+                        <>
+                            {console.log('AnalistaPage - Rendering profile view, activeView:', activeView)}
+                            <h1 className="hyper-page-title">Mi Perfil</h1>
+
+                            <div className="hyper-widget">
+                                <div className="hyper-widget-header">
+                                    <h3 className="hyper-widget-title">Información Personal</h3>
+                                </div>
+
+                                <div className="row g-3">
+                                    <div className="col-md-6">
+                                        <label htmlFor="nombre" className="form-label">Nombre *</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            id="nombre"
+                                            name="nombre"
+                                            value={infoData.nombre}
+                                            onChange={handleInfoChange}
+                                            placeholder="Ingresa tu nombre"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label htmlFor="apellido" className="form-label">Apellido *</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            id="apellido"
+                                            name="apellido"
+                                            value={infoData.apellido}
+                                            onChange={handleInfoChange}
+                                            placeholder="Ingresa tu apellido"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label htmlFor="email" className="form-label">Email *</label>
+                                        <input
+                                            type="email"
+                                            className="form-control"
+                                            id="email"
+                                            name="email"
+                                            value={infoData.email}
+                                            onChange={handleInfoChange}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label htmlFor="telefono" className="form-label">Teléfono</label>
+                                        <input
+                                            type="tel"
+                                            className="form-control"
+                                            id="telefono"
+                                            name="telefono"
+                                            value={infoData.telefono}
+                                            onChange={handleInfoChange}
+                                            placeholder="Ingresa tu teléfono"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="d-flex justify-content-end gap-2 mt-4">
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-secondary"
+                                        onClick={() => setActiveView('dashboard')}
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={updateInfo}
+                                        disabled={updatingInfo}
+                                    >
+                                        {updatingInfo ? (
+                                            <>
+                                                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                                Actualizando...
+                                            </>
+                                        ) : (
+                                            'Actualizar Información'
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
                     {/* Formulario de informaciÃ³n del analista */}
                     {showInfoForm && (
                         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -1353,7 +1465,7 @@ export function AnalistaPage() {
                                             onClick={() => setShowInfoForm(false)}
                                         ></button>
                                     </div>
-                                    <form onSubmit={actualizarInformacion}>
+                                    <form onSubmit={updateInfo}>
                                         <div className="modal-body">
                                             <div className="row">
                                                 <div className="col-md-6">

@@ -758,8 +758,10 @@ export function ClientePage() {
 
     // FunciÃ³n para cambiar vista
     const changeView = (view) => {
-        console.log('changeView called with:', view);
+        console.log('ClientePage - changeView called with:', view);
+        console.log('ClientePage - Current activeView:', activeView);
         setActiveView(view);
+        console.log('ClientePage - activeView set to:', view);
         if (view.startsWith('ticket-')) {
             const ticketId = view.replace('ticket-', '');
             console.log('Setting selectedTicketId to:', parseInt(ticketId));
@@ -806,7 +808,10 @@ export function ClientePage() {
 
     // FunciÃ³n para alternar tema
     const toggleTheme = () => {
+        console.log('ClientePage - toggleTheme called, current isDarkMode:', isDarkMode);
         setIsDarkMode(!isDarkMode);
+        document.body.classList.toggle('dark-theme');
+        console.log('ClientePage - isDarkMode set to:', !isDarkMode);
     };
 
     // Función para aplicar filtros
@@ -984,74 +989,79 @@ export function ClientePage() {
                             </div>
                         </div>
 
-                        <div className="d-flex align-items-center gap-3">
-
-                            <div className="dropdown">
-                                <div
-                                    className="hyper-user-profile d-flex align-items-center gap-3 p-2 rounded cursor-pointer"
-                                    onClick={() => setShowUserDropdown(!showUserDropdown)}
+                        <div className="d-flex align-items-center gap-2">
+                            {/* Dropdown del usuario */}
+                            <div className="position-relative dropdown">
+                                <button
+                                    className="btn btn-link d-flex align-items-center gap-2 text-decoration-none"
+                                    onClick={() => {
+                                        console.log('ClientePage - Dropdown toggle clicked, current state:', showUserDropdown);
+                                        setShowUserDropdown(!showUserDropdown);
+                                        console.log('ClientePage - Dropdown state set to:', !showUserDropdown);
+                                    }}
                                 >
                                     {userData?.url_imagen ? (
                                         <img
                                             src={userData.url_imagen}
                                             alt="Avatar"
-                                            className="hyper-user-avatar rounded-circle"
+                                            className="avatar-header-normal rounded-circle"
                                         />
                                     ) : (
-                                        <div className="hyper-user-avatar bg-light d-flex align-items-center justify-content-center rounded-circle">
-                                            <i className="fas fa-user text-muted"></i>
+                                        <div className="avatar-header-normal bg-primary d-flex align-items-center justify-content-center rounded-circle">
+                                            <i className="fas fa-user text-white"></i>
                                         </div>
                                     )}
-                                    <div className="hyper-user-info">
-                                        <p className="hyper-user-name mb-0 fw-semibold">
-                                            {userData?.nombre === 'Pendiente' ? 'Cliente' : userData?.nombre} {userData?.apellido === 'Pendiente' ? '' : userData?.apellido}
-                                        </p>
-                                        <p className="hyper-user-role mb-0 small text-muted">Cliente</p>
-                                    </div>
-                                    <button className="hyper-header-btn btn btn-link p-1">
-                                        <i className={`fas fa-chevron-down ${showUserDropdown ? 'rotate-180' : ''}`}></i>
-                                    </button>
-                                </div>
+                                    <span className="fw-semibold">
+                                        {userData?.nombre === 'Pendiente' ? 'Cliente' : userData?.nombre}
+                                    </span>
+                                    <i className="fas fa-chevron-down"></i>
+                                </button>
 
                                 {showUserDropdown && (
-                                    <div className="dropdown-menu show position-absolute dropdown-menu-min-width">
-                                        <div className="dropdown-header">
-                                            <h6 className="mb-0">Mi Cuenta</h6>
-                                        </div>
-                                        <button
-                                            className="dropdown-item d-flex align-items-center gap-2"
-                                            onClick={() => {
-                                                changeView('profile');
-                                                setShowUserDropdown(false);
-                                            }}
-                                        >
-                                            <i className="fas fa-user"></i>
-                                            Mi Perfil
-                                        </button>
-                                        <div className="dropdown-item d-flex align-items-center justify-content-between">
-                                            <div className="d-flex align-items-center gap-2">
-                                                <i className={`fas ${isDarkMode ? 'fa-moon' : 'fa-sun'}`}></i>
-                                                <span>{isDarkMode ? 'Tema Oscuro' : 'Tema Claro'}</span>
+                                    <>
+                                        {console.log('ClientePage - Rendering dropdown, showUserDropdown:', showUserDropdown)}
+                                        <div className="position-absolute end-0 mt-2 bg-white border rounded shadow-lg dropdown-menu-min-width" style={{ zIndex: 9999, minWidth: '200px' }}>
+                                            <div className="p-3 border-bottom">
+                                                <div className="fw-semibold">
+                                                    {userData?.nombre === 'Pendiente' ? 'Cliente' : userData?.nombre}
+                                                </div>
+                                                <small className="text-muted">Cliente</small>
                                             </div>
-                                            <div className="form-check form-switch">
-                                                <input
-                                                    className="form-check-input"
-                                                    type="checkbox"
-                                                    id="themeSwitch"
-                                                    checked={isDarkMode}
-                                                    onChange={toggleTheme}
-                                                />
+                                            <div className="p-2">
+                                                <button
+                                                    className="btn btn-link w-100 text-start d-flex align-items-center gap-2"
+                                                    onClick={() => {
+                                                        console.log('ClientePage - Mi Perfil button clicked');
+                                                        changeView('profile');
+                                                        setShowUserDropdown(false);
+                                                        console.log('ClientePage - Dropdown closed, view changed to profile');
+                                                    }}
+                                                >
+                                                    <i className="fas fa-user-edit"></i>
+                                                    Mi Perfil
+                                                </button>
+                                                <div className="d-flex align-items-center justify-content-between p-2">
+                                                    <span className="small">Modo Oscuro</span>
+                                                    <div className="form-check form-switch">
+                                                        <input
+                                                            className="form-check-input"
+                                                            type="checkbox"
+                                                            checked={isDarkMode}
+                                                            onChange={toggleTheme}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <hr className="my-2" />
+                                                <button
+                                                    className="btn btn-link w-100 text-start text-danger d-flex align-items-center gap-2"
+                                                    onClick={logout}
+                                                >
+                                                    <i className="fas fa-sign-out-alt"></i>
+                                                    Cerrar Sesión
+                                                </button>
                                             </div>
                                         </div>
-                                        <div className="dropdown-divider"></div>
-                                        <button
-                                            className="dropdown-item d-flex align-items-center gap-2 text-danger"
-                                            onClick={logout}
-                                        >
-                                            <i className="fas fa-sign-out-alt"></i>
-                                            Cerrar Sesión
-                                        </button>
-                                    </div>
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -1514,19 +1524,20 @@ export function ClientePage() {
                                                     {getFilteredTickets().map((ticket) => (
                                                         <tr key={ticket.id}>
                                                             <td className="text-center px-3">
-                                                                <span className="d-flex align-items-center justify-content-center gap-2">
-                                                                    <span
-                                                                        className="rounded-circle d-inline-block"
-                                                                        style={{
-                                                                            width: '8px',
-                                                                            height: '8px',
-                                                                            backgroundColor: '#007bff'
-                                                                        }}
-                                                                    ></span>
-                                                                    <span className="fw-bold text-dark dark-theme:text-white">
-                                                                        #{ticket.id}
-                                                                    </span>
-                                                                </span>
+                                                                <div className="d-flex align-items-center justify-content-center">
+                                                                    <span className="me-2">#{ticket.id}</span>
+                                                                    {ticket.url_imagen ? (
+                                                                        <img
+                                                                            src={ticket.url_imagen}
+                                                                            alt="Imagen del ticket"
+                                                                            className="img-thumbnail thumbnail-small"
+                                                                        />
+                                                                    ) : (
+                                                                        <span className="text-muted">
+                                                                            <i className="fas fa-image icon-tiny"></i>
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                             <td className="px-4">
                                                                 <div className="d-flex align-items-start gap-2">
@@ -1823,6 +1834,7 @@ export function ClientePage() {
                     {/* Profile View */}
                     {activeView === 'profile' && (
                         <>
+                            {console.log('ClientePage - Rendering profile view, activeView:', activeView)}
                             <h1 className="hyper-page-title">Mi Perfil</h1>
 
                             <div className="hyper-widget">

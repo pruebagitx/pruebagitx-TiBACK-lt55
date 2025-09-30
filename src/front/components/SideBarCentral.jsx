@@ -92,12 +92,6 @@ export const SideBarCentral = ({ sidebarHidden, activeView, changeView }) => {
                         label: 'Crear Ticket',
                         icon: 'fas fa-plus',
                         view: 'create'
-                    },
-                    {
-                        id: 'chat',
-                        label: 'Chat',
-                        icon: 'fas fa-comments',
-                        view: 'chat'
                     }
                 ];
 
@@ -114,12 +108,6 @@ export const SideBarCentral = ({ sidebarHidden, activeView, changeView }) => {
                         label: 'Mis Tickets',
                         icon: 'fas fa-ticket-alt',
                         view: 'tickets'
-                    },
-                    {
-                        id: 'chat',
-                        label: 'Chat',
-                        icon: 'fas fa-comments',
-                        view: 'chat'
                     }
                 ];
 
@@ -271,10 +259,10 @@ export const SideBarCentral = ({ sidebarHidden, activeView, changeView }) => {
                                 <i className="fas fa-user text-white" style={{ fontSize: '0.8rem' }}></i>
                             </div>
                             <div className="flex-grow-1">
-                                <div className="fw-semibold small">
+                                <div className="fw-semibold" style={{ fontSize: '0.92rem' }}>
                                     {userData?.nombre === 'Pendiente' ? userRole : userData?.nombre}
                                 </div>
-                                <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                <div className="text-muted" style={{ fontSize: '0.805rem' }}>
                                     {userRole === 'cliente' ? 'Cliente' :
                                         userRole === 'analista' ? 'Analista' :
                                             userRole === 'supervisor' ? 'Supervisor' :
