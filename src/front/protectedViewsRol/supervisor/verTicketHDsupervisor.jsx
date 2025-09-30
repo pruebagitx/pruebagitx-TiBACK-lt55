@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import useGlobalReducer from '../../hooks/useGlobalReducer';
 
-export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBack }) => {
+export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaciones, onBack, analistas }) => {
     const { store } = useGlobalReducer();
     const [ticket, setTicket] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showAsignarModal, setShowAsignarModal] = useState(false);
+    const [selectedAnalista, setSelectedAnalista] = useState('');
 
     // Función para verificar si un ticket tiene analista asignado
     const tieneAnalistaAsignado = (ticket) => {
@@ -25,23 +27,23 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
         const fetchTicket = async () => {
             try {
                 setLoading(true);
-                console.log('VerTicketHD - Buscando ticket:', {
+                console.log('VerTicketHDSupervisor - Buscando ticket:', {
                     ticketId,
                     tickets: tickets,
                     ticketsLength: tickets?.length
                 });
 
-                // Usar los tickets pasados como prop desde ClientePage
+                // Usar los tickets pasados como prop desde SupervisorPage
                 const ticketsArray = tickets || [];
-                console.log('VerTicketHD - Tickets disponibles:', ticketsArray);
+                console.log('VerTicketHDSupervisor - Tickets disponibles:', ticketsArray);
 
                 const foundTicket = ticketsArray.find(t => t.id === ticketId);
-                console.log('VerTicketHD - Ticket encontrado:', foundTicket);
+                console.log('VerTicketHDSupervisor - Ticket encontrado:', foundTicket);
 
                 if (foundTicket) {
                     setTicket(foundTicket);
                 } else {
-                    console.log('VerTicketHD - Ticket no encontrado, IDs disponibles:', ticketsArray.map(t => t.id));
+                    console.log('VerTicketHDSupervisor - Ticket no encontrado, IDs disponibles:', ticketsArray.map(t => t.id));
                     setError('Ticket no encontrado');
                 }
             } catch (err) {
@@ -65,6 +67,10 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                 return 'warning';
             case 'en_espera':
                 return 'info';
+            case 'escalado':
+                return 'danger';
+            case 'cerrado':
+                return 'secondary';
             default:
                 return 'primary';
         }
@@ -72,12 +78,16 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
 
     const getPrioridadColor = (prioridad) => {
         switch (prioridad?.toLowerCase()) {
+            case 'critica':
+                return 'dark';
             case 'alta':
                 return 'danger';
             case 'media':
                 return 'warning';
-            default:
+            case 'baja':
                 return 'success';
+            default:
+                return 'secondary';
         }
     };
 
@@ -90,6 +100,115 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
             minute: '2-digit',
             hour12: true
         });
+    };
+
+    const asignarAnalista = async () => {
+        if (!selectedAnalista) {
+            alert('Por favor selecciona un analista');
+            return;
+        }
+
+        try {
+            const token = store.auth.token;
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticket.id}/asignar`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    analista_id: parseInt(selectedAnalista)
+                })
+            });
+
+            if (response.ok) {
+                alert('Analista asignado exitosamente');
+                setShowAsignarModal(false);
+                setSelectedAnalista('');
+                // Recargar el ticket
+                window.location.reload();
+            } else {
+                const errorData = await response.json();
+                alert(`Error al asignar analista: ${errorData.message || 'Error desconocido'}`);
+            }
+        } catch (err) {
+            alert(`Error al asignar analista: ${err.message}`);
+        }
+    };
+
+    const escalarTicket = async () => {
+        if (confirm('¿Estás seguro de que quieres escalar este ticket?')) {
+            try {
+                const token = store.auth.token;
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticket.id}/escalar`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    alert('Ticket escalado exitosamente');
+                    window.location.reload();
+                } else {
+                    const errorData = await response.json();
+                    alert(`Error al escalar ticket: ${errorData.message || 'Error desconocido'}`);
+                }
+            } catch (err) {
+                alert(`Error al escalar ticket: ${err.message}`);
+            }
+        }
+    };
+
+    const cerrarTicket = async () => {
+        if (confirm('¿Estás seguro de que quieres cerrar este ticket?')) {
+            try {
+                const token = store.auth.token;
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticket.id}/cerrar`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    alert('Ticket cerrado exitosamente');
+                    window.location.reload();
+                } else {
+                    const errorData = await response.json();
+                    alert(`Error al cerrar ticket: ${errorData.message || 'Error desconocido'}`);
+                }
+            } catch (err) {
+                alert(`Error al cerrar ticket: ${err.message}`);
+            }
+        }
+    };
+
+    const reabrirTicket = async () => {
+        if (confirm('¿Estás seguro de que quieres reabrir este ticket?')) {
+            try {
+                const token = store.auth.token;
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticket.id}/reabrir`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    alert('Ticket reabierto exitosamente');
+                    window.location.reload();
+                } else {
+                    const errorData = await response.json();
+                    alert(`Error al reabrir ticket: ${errorData.message || 'Error desconocido'}`);
+                }
+            } catch (err) {
+                alert(`Error al reabrir ticket: ${err.message}`);
+            }
+        }
     };
 
     if (loading) {
@@ -139,7 +258,7 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                             </button>
                             <div>
                                 <h1 className="mb-0 fw-bold">Ticket #{ticket.id}</h1>
-                                <p className="text-muted mb-0">Vista detallada del ticket</p>
+                                <p className="text-muted mb-0">Vista detallada del ticket - Supervisor</p>
                             </div>
                         </div>
                         <div className="d-flex gap-4">
@@ -194,6 +313,13 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
 
                             <div className="row g-3">
                                 <div className="col-md-6">
+                                    <h6 className="fw-semibold mb-2">Cliente</h6>
+                                    <p className="mb-0">
+                                        <i className="fas fa-user me-2"></i>
+                                        {ticket.cliente?.nombre} {ticket.cliente?.apellido}
+                                    </p>
+                                </div>
+                                <div className="col-md-6">
                                     <h6 className="fw-semibold mb-2">Categoría</h6>
                                     <span className="badge bg-secondary fs-6 px-3 py-2">
                                         {ticket.categoria || 'Sin categoría'}
@@ -204,6 +330,13 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                                     <p className="mb-0 text-muted">
                                         <i className="fas fa-calendar-alt me-2"></i>
                                         {formatDate(ticket.fecha_creacion)}
+                                    </p>
+                                </div>
+                                <div className="col-md-6">
+                                    <h6 className="fw-semibold mb-2">Email del Cliente</h6>
+                                    <p className="mb-0 text-muted">
+                                        <i className="fas fa-envelope me-2"></i>
+                                        {ticket.cliente?.email || 'No disponible'}
                                     </p>
                                 </div>
                             </div>
@@ -251,13 +384,22 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                                     </div>
                                     <h6 className="fw-semibold">{getAnalistaAsignado(ticket)}</h6>
                                     <p className="text-muted mb-3">Analista de Soporte</p>
-                                    <button
-                                        className="btn btn-success btn-sm"
-                                        onClick={() => window.open(`/ticket/${ticket.id}/chat-analista-cliente`, '_blank')}
-                                    >
-                                        <i className="fas fa-comments me-1"></i>
-                                        Iniciar Chat
-                                    </button>
+                                    <div className="d-grid gap-2">
+                                        <button
+                                            className="btn btn-success btn-sm"
+                                            onClick={() => window.open(`/ticket/${ticket.id}/chat`, '_blank')}
+                                        >
+                                            <i className="fas fa-comments me-1"></i>
+                                            Ver Chat
+                                        </button>
+                                        <button
+                                            className="btn btn-warning btn-sm"
+                                            onClick={() => setShowAsignarModal(true)}
+                                        >
+                                            <i className="fas fa-user-edit me-1"></i>
+                                            Reasignar
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div>
@@ -269,10 +411,13 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                                     </div>
                                     <h6 className="fw-semibold text-muted">Sin Asignar</h6>
                                     <p className="text-muted mb-3">Esperando asignación</p>
-                                    <span className="badge bg-warning">
-                                        <i className="fas fa-hourglass-half me-1"></i>
-                                        En Cola
-                                    </span>
+                                    <button
+                                        className="btn btn-primary btn-sm"
+                                        onClick={() => setShowAsignarModal(true)}
+                                    >
+                                        <i className="fas fa-user-plus me-1"></i>
+                                        Asignar Analista
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -302,33 +447,26 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                         </div>
                     )}
 
-                    {/* Acciones Rápidas */}
+                    {/* Acciones de Gestión */}
                     <div className="card border-0 shadow-sm">
                         <div className="card-header bg-white border-0">
                             <h5 className="card-title mb-0">
-                                <i className="fas fa-bolt text-primary me-2"></i>
-                                Acciones Rápidas
+                                <i className="fas fa-cogs text-primary me-2"></i>
+                                Acciones de Gestión
                             </h5>
                         </div>
                         <div className="card-body">
-                            <div className="d-grid gap-3">
+                            <div className="d-grid gap-2">
                                 <button
-                                    className="btn btn-outline-primary btn-lg"
+                                    className="btn btn-sidebar-teal btn-sm"
                                     onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_blank')}
                                 >
-                                    <i className="fas fa-comments me-2"></i>
+                                    <i className="fas fa-users me-2"></i>
                                     Ver Comentarios
-                                </button>
-                                <button
-                                    className={`btn btn-lg ${ticket.analista_asignado ? 'btn-outline-success' : 'btn-outline-primary'}`}
-                                    onClick={() => window.open(`/ticket/${ticket.id}/chat-analista-cliente`, '_blank')}
-                                >
-                                    <i className={`fas ${ticket.analista_asignado ? 'fa-signal' : 'fa-comments'} me-2`}></i>
-                                    {ticket.analista_asignado ? `Chat con ${ticket.analista_asignado}` : 'Chat con Analista'}
                                 </button>
                                 <div className="btn-group" role="group">
                                     <button
-                                        className="btn btn-warning btn-lg dropdown-toggle"
+                                        className="btn btn-sidebar-primary btn-sm dropdown-toggle"
                                         type="button"
                                         data-bs-toggle="dropdown"
                                         aria-expanded="false"
@@ -359,11 +497,36 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                                 </div>
                                 {ticketsConRecomendaciones && ticketsConRecomendaciones.has(ticket.id) && (
                                     <button
-                                        className="btn btn-outline-success btn-lg"
+                                        className="btn btn-sidebar-teal btn-sm"
                                         onClick={() => window.open(`/ticket/${ticket.id}/recomendaciones-similares`, '_blank')}
                                     >
                                         <i className="fas fa-lightbulb me-2"></i>
                                         Ver Sugerencias
+                                    </button>
+                                )}
+                                <button
+                                    className="btn btn-sidebar-warning btn-sm"
+                                    onClick={escalarTicket}
+                                >
+                                    <i className="fas fa-arrow-up me-2"></i>
+                                    Escalar Ticket
+                                </button>
+                                {ticket.estado !== 'cerrado' && ticket.estado !== 'resuelto' && (
+                                    <button
+                                        className="btn btn-outline-danger btn-sm"
+                                        onClick={cerrarTicket}
+                                    >
+                                        <i className="fas fa-times me-2"></i>
+                                        Cerrar Ticket
+                                    </button>
+                                )}
+                                {ticket.estado === 'cerrado' && (
+                                    <button
+                                        className="btn btn-outline-success btn-sm"
+                                        onClick={reabrirTicket}
+                                    >
+                                        <i className="fas fa-redo me-2"></i>
+                                        Reabrir Ticket
                                     </button>
                                 )}
                             </div>
@@ -389,7 +552,7 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                                     <div className="timeline-content">
                                         <h6 className="fw-semibold">Ticket Creado</h6>
                                         <p className="text-muted mb-1">{formatDate(ticket.fecha_creacion)}</p>
-                                        <p className="mb-0">El ticket fue creado y está esperando asignación.</p>
+                                        <p className="mb-0">El ticket fue creado por el cliente: {ticket.cliente?.nombre} {ticket.cliente?.apellido}</p>
                                     </div>
                                 </div>
 
@@ -404,6 +567,17 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                                     </div>
                                 )}
 
+                                {ticket.estado === 'escalado' && (
+                                    <div className="timeline-item">
+                                        <div className="timeline-marker bg-danger"></div>
+                                        <div className="timeline-content">
+                                            <h6 className="fw-semibold">Ticket Escalado</h6>
+                                            <p className="text-muted mb-1">Requiere atención del supervisor</p>
+                                            <p className="mb-0">El ticket ha sido escalado por prioridad o tiempo.</p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {ticket.fecha_solucion && (
                                     <div className="timeline-item">
                                         <div className="timeline-marker bg-success"></div>
@@ -414,13 +588,77 @@ export const VerTicketHD = ({ ticketId, tickets, ticketsConRecomendaciones, onBa
                                         </div>
                                     </div>
                                 )}
+
+                                {ticket.estado === 'cerrado' && (
+                                    <div className="timeline-item">
+                                        <div className="timeline-marker bg-secondary"></div>
+                                        <div className="timeline-content">
+                                            <h6 className="fw-semibold">Ticket Cerrado</h6>
+                                            <p className="text-muted mb-1">Cerrado por supervisor</p>
+                                            <p className="mb-0">El ticket ha sido cerrado definitivamente.</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Modal para Asignar Analista */}
+            {showAsignarModal && (
+                <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">
+                                    {tieneAnalistaAsignado(ticket) ? 'Reasignar Analista' : 'Asignar Analista'}
+                                </h5>
+                                <button
+                                    type="button"
+                                    className="btn-close"
+                                    onClick={() => setShowAsignarModal(false)}
+                                ></button>
+                            </div>
+                            <div className="modal-body">
+                                <div className="mb-3">
+                                    <label className="form-label">Seleccionar Analista:</label>
+                                    <select
+                                        className="form-select"
+                                        value={selectedAnalista}
+                                        onChange={(e) => setSelectedAnalista(e.target.value)}
+                                    >
+                                        <option value="">Selecciona un analista</option>
+                                        {analistas.map((analista) => (
+                                            <option key={analista.id} value={analista.id}>
+                                                {analista.nombre} {analista.apellido}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => setShowAsignarModal(false)}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={asignarAnalista}
+                                >
+                                    {tieneAnalistaAsignado(ticket) ? 'Reasignar' : 'Asignar'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
-export default VerTicketHD;
+export default VerTicketHDSupervisor;

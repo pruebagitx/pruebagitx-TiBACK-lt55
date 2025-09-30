@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import useGlobalReducer from '../../hooks/useGlobalReducer';
 import GoogleMapsLocation from '../../components/GoogleMapsLocation';
 import ImageUpload from '../../components/ImageUpload';
-import { VerTicketHD } from './VerTicketHD';
+import { VerTicketHDCliente } from './verTicketHDcliente';
 import { SideBarCentral } from '../../components/SideBarCentral';
 
 // Utilidades de token seguras
@@ -912,7 +912,7 @@ export function ClientePage() {
                                 onClick={toggleSidebar}
                                 title={sidebarHidden ? "Mostrar menú" : "Ocultar menú"}
                             >
-                                <i className={`fas ${sidebarHidden ? 'fa-eye' : 'fa-eye-slash'}`}></i>
+                                <i className="fas fa-bars"></i>
                             </button>
 
                             <div className="hyper-search position-relative">
@@ -1239,17 +1239,17 @@ export function ClientePage() {
                                                     <table className="table table-hover">
                                                         <thead>
                                                             <tr>
-                                                                <th>ID</th>
-                                                                <th>Título</th>
-                                                                <th>Estado</th>
-                                                                <th>Fecha y Hora</th>
+                                                                <th className="text-center">ID</th>
+                                                                <th className="text-center">Título</th>
+                                                                <th className="text-center">Estado</th>
+                                                                <th className="text-center">Fecha y Hora</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {tickets.slice(0, 5).map((ticket) => (
                                                                 <tr key={ticket.id}>
-                                                                    <td>
-                                                                        <span className="d-flex align-items-center gap-2">
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
                                                                                 className="rounded-circle d-inline-block"
                                                                                 style={{
@@ -1263,8 +1263,8 @@ export function ClientePage() {
                                                                             </span>
                                                                         </span>
                                                                     </td>
-                                                                    <td>
-                                                                        <span className="d-flex align-items-center gap-2">
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
                                                                                 className="rounded-circle d-inline-block"
                                                                                 style={{
@@ -1278,8 +1278,8 @@ export function ClientePage() {
                                                                             </span>
                                                                         </span>
                                                                     </td>
-                                                                    <td>
-                                                                        <span className="d-flex align-items-center gap-2">
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
                                                                                 className="rounded-circle d-inline-block"
                                                                                 style={{
@@ -1295,8 +1295,8 @@ export function ClientePage() {
                                                                             </span>
                                                                         </span>
                                                                     </td>
-                                                                    <td>
-                                                                        <span className="d-flex align-items-center gap-2">
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
                                                                                 className="rounded-circle d-inline-block"
                                                                                 style={{
@@ -1694,7 +1694,7 @@ export function ClientePage() {
                                                                     {/* Fila superior: Ver detalles, Comentarios, Chat */}
                                                                     <div className="d-flex gap-1">
                                                                         <button
-                                                                            className="btn btn-sidebar-primary btn-sm"
+                                                                            className="btn btn-sidebar-teal btn-sm"
                                                                             title="Ver detalles"
                                                                             onClick={() => {
                                                                                 changeView(`ticket-${ticket.id}`);
@@ -1707,7 +1707,7 @@ export function ClientePage() {
                                                                             title="Ver y agregar comentarios"
                                                                             onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
                                                                         >
-                                                                            <i className="fas fa-comments"></i>
+                                                                            <i className="fas fa-users"></i>
                                                                         </button>
                                                                         <button
                                                                             className="btn btn-sidebar-secondary btn-sm"
@@ -1722,7 +1722,7 @@ export function ClientePage() {
                                                                     <div className="d-flex gap-1">
                                                                         <div className="btn-group" role="group">
                                                                             <button
-                                                                                className="btn btn-sidebar-warning btn-sm dropdown-toggle"
+                                                                                className="btn btn-sidebar-primary btn-sm dropdown-toggle"
                                                                                 type="button"
                                                                                 data-bs-toggle="dropdown"
                                                                                 aria-expanded="false"
@@ -1753,7 +1753,7 @@ export function ClientePage() {
                                                                         </div>
                                                                         {ticketsConRecomendaciones.has(ticket.id) && (
                                                                             <button
-                                                                                className="btn btn-sidebar-success btn-sm"
+                                                                                className="btn btn-sidebar-teal btn-sm"
                                                                                 title="Ver sugerencias disponibles"
                                                                                 onClick={() => window.open(`/ticket/${ticket.id}/recomendaciones-similares`, '_self')}
                                                                             >
@@ -2099,7 +2099,7 @@ export function ClientePage() {
                         });
                         return activeView.startsWith('ticket-') && selectedTicketId;
                     })() && (
-                            <VerTicketHD
+                            <VerTicketHDCliente
                                 ticketId={selectedTicketId}
                                 tickets={tickets}
                                 ticketsConRecomendaciones={ticketsConRecomendaciones}

@@ -116,28 +116,10 @@ export const SideBarCentral = ({ sidebarHidden, activeView, changeView }) => {
                         view: 'tickets'
                     },
                     {
-                        id: 'asignados',
-                        label: 'Tickets Asignados',
-                        icon: 'fas fa-user-tie',
-                        view: 'asignados'
-                    },
-                    {
-                        id: 'disponibles',
-                        label: 'Tickets Disponibles',
-                        icon: 'fas fa-list',
-                        view: 'disponibles'
-                    },
-                    {
                         id: 'chat',
                         label: 'Chat',
                         icon: 'fas fa-comments',
                         view: 'chat'
-                    },
-                    {
-                        id: 'reportes',
-                        label: 'Reportes',
-                        icon: 'fas fa-chart-bar',
-                        view: 'reportes'
                     }
                 ];
 

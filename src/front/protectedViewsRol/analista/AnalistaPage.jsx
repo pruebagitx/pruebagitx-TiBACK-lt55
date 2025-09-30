@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useGlobalReducer from '../../hooks/useGlobalReducer';
 import { SideBarCentral } from '../../components/SideBarCentral';
+import VerTicketHDAnalista from './verTicketHDanalista';
 
 // Utilidades de token seguras
 const tokenUtils = {
@@ -131,11 +132,36 @@ export function AnalistaPage() {
 
     const getStats = () => {
         const total = tickets.length;
-        const activos = tickets.filter(t => t.estado === 'activo').length;
-        const resueltos = tickets.filter(t => t.estado === 'resuelto').length;
-        const enProgreso = tickets.filter(t => t.estado === 'en_progreso').length;
+        const activos = tickets.filter(t => t.estado === 'en_espera' || t.estado === 'activo').length;
+        const resueltos = tickets.filter(t => t.estado === 'resuelto' || t.estado === 'solucionado').length;
+        const enProgreso = tickets.filter(t => t.estado === 'en_progreso' || t.estado === 'en_proceso').length;
 
-        return { total, activos, resueltos, enProgreso };
+        // Calcular tiempo promedio de resolución
+        const ticketsResueltos = tickets.filter(t => t.estado === 'resuelto' || t.estado === 'solucionado');
+        let tiempoPromedio = 0;
+        if (ticketsResueltos.length > 0) {
+            const tiempoTotal = ticketsResueltos.reduce((sum, ticket) => {
+                if (ticket.fecha_solucion) {
+                    const inicio = new Date(ticket.fecha_creacion);
+                    const fin = new Date(ticket.fecha_solucion);
+                    return sum + (fin - inicio) / (1000 * 60 * 60); // en horas
+                }
+                return sum;
+            }, 0);
+            tiempoPromedio = Math.round(tiempoTotal / ticketsResueltos.length);
+        }
+
+        // Calcular eficiencia (porcentaje de tickets resueltos)
+        const eficiencia = total > 0 ? Math.round((resueltos / total) * 100) : 0;
+
+        return {
+            total,
+            activos,
+            resueltos,
+            enProgreso,
+            tiempoPromedio,
+            eficiencia
+        };
     };
 
     // Cargar datos del usuario
@@ -672,7 +698,7 @@ export function AnalistaPage() {
                                 onClick={toggleSidebar}
                                 title={sidebarHidden ? "Mostrar menÃº" : "Ocultar menÃº"}
                             >
-                                <i className={`fas ${sidebarHidden ? 'fa-eye' : 'fa-eye-slash'}`}></i>
+                                <i className="fas fa-bars"></i>
                             </button>
 
                             {/* Barra de bÃºsqueda */}
@@ -815,123 +841,263 @@ export function AnalistaPage() {
                         <>
                             <h1 className="hyper-page-title">Dashboard Analista</h1>
 
-                            {/* MÃ©tricas principales */}
-                            <div className="row g-4 mb-4">
-                                <div className="col-md-6 col-lg-3">
-                                    <div className="hyper-metric-card card border-0 shadow-sm">
+                            {/* Métricas principales */}
+                            <div className="row mb-4 g-3">
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
                                         <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <div className="hyper-metric-icon bg-primary me-3">
-                                                    <i className="fas fa-ticket-alt"></i>
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Mis Tickets</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-primary me-2">{stats.total}</h3>
+                                                    <div className="bg-primary bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-ticket-alt text-primary"></i>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="hyper-metric-value mb-0">{stats.total}</h3>
-                                                    <small className="text-muted">Total Tickets</small>
-                                                </div>
+                                                <small className="text-muted">Total asignados</small>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-md-6 col-lg-3">
-                                    <div className="hyper-metric-card card border-0 shadow-sm">
+
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
                                         <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <div className="hyper-metric-icon bg-warning me-3">
-                                                    <i className="fas fa-clock"></i>
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">En Progreso</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-warning me-2">{stats.enProgreso}</h3>
+                                                    <div className="bg-warning bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-clock text-warning"></i>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="hyper-metric-value mb-0">{stats.activos}</h3>
-                                                    <small className="text-muted">Tickets Activos</small>
-                                                </div>
+                                                <small className="text-muted">Trabajando</small>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-md-6 col-lg-3">
-                                    <div className="hyper-metric-card card border-0 shadow-sm">
+
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
                                         <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <div className="hyper-metric-icon bg-info me-3">
-                                                    <i className="fas fa-play-circle"></i>
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Resueltos</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-success me-2">{stats.resueltos}</h3>
+                                                    <div className="bg-success bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-check-circle text-success"></i>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="hyper-metric-value mb-0">{stats.enProgreso}</h3>
-                                                    <small className="text-muted">En Progreso</small>
-                                                </div>
+                                                <small className="text-muted">Completados</small>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-md-6 col-lg-3">
-                                    <div className="hyper-metric-card card border-0 shadow-sm">
+
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
                                         <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <div className="hyper-metric-icon bg-success me-3">
-                                                    <i className="fas fa-check-circle"></i>
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Pendientes</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-info me-2">{stats.activos}</h3>
+                                                    <div className="bg-info bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-hourglass-half text-info"></i>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="hyper-metric-value mb-0">{stats.resueltos}</h3>
-                                                    <small className="text-muted">Tickets Resueltos</small>
+                                                <small className="text-muted">Esperando</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
+                                        <div className="card-body">
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Tiempo Promedio</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-secondary me-2">
+                                                        {stats.tiempoPromedio ? `${stats.tiempoPromedio}h` : '0h'}
+                                                    </h3>
+                                                    <div className="bg-secondary bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-stopwatch text-secondary"></i>
+                                                    </div>
                                                 </div>
+                                                <small className="text-muted">Por ticket</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
+                                        <div className="card-body">
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Eficiencia</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-success me-2">
+                                                        {stats.eficiencia ? `${stats.eficiencia}%` : '0%'}
+                                                    </h3>
+                                                    <div className="bg-success bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-chart-line text-success"></i>
+                                                    </div>
+                                                </div>
+                                                <small className="text-muted">Rendimiento</small>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Widgets del dashboard */}
-                            <div className="row g-4">
-                                <div className="col-lg-8">
-                                    <div className="hyper-widget card border-0 shadow-sm">
-                                        <div className="hyper-widget-header card-header bg-white border-bottom">
-                                            <h3 className="hyper-widget-title mb-0">Mis Tickets Recientes</h3>
+                            {/* Tickets Recientes */}
+                            <div className="row">
+                                <div className="col-12">
+                                    <div className="card border-0 shadow-sm">
+                                        <div className="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                                            <h5 className="card-title mb-0">Mis Tickets Recientes</h5>
+                                            <button
+                                                className="btn btn-sidebar-primary btn-sm"
+                                                onClick={() => changeView('tickets')}
+                                            >
+                                                <i className="fas fa-list me-1"></i>
+                                                Ver Todos Mis Tickets
+                                            </button>
                                         </div>
-                                        <div className="hyper-widget-body card-body">
-                                            {tickets.slice(0, 5).map((ticket) => (
-                                                <div key={ticket.id} className="d-flex align-items-center py-2 border-bottom">
-                                                    <div className="hyper-activity-icon bg-primary me-3">
-                                                        <i className="fas fa-ticket-alt"></i>
-                                                    </div>
-                                                    <div className="flex-grow-1">
-                                                        <div className="fw-semibold">#{ticket.id} - {ticket.titulo}</div>
-                                                        <small className="text-muted">
-                                                            {ticket.estado} â€¢ {ticket.prioridad} â€¢ {new Date(ticket.fecha_creacion).toLocaleDateString()}
-                                                        </small>
-                                                    </div>
+                                        <div className="card-body">
+                                            {tickets.length > 0 ? (
+                                                <div className="table-responsive">
+                                                    <table className="table table-hover">
+                                                        <thead>
+                                                            <tr>
+                                                                <th className="text-center">ID</th>
+                                                                <th className="text-center">Título</th>
+                                                                <th className="text-center">Estado</th>
+                                                                <th className="text-center">Prioridad</th>
+                                                                <th className="text-center">Cliente</th>
+                                                                <th className="text-center">Fecha y Hora</th>
+                                                                <th className="text-center">Acciones</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {tickets.slice(0, 5).map((ticket) => (
+                                                                <tr key={ticket.id}>
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#007bff'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="fw-bold text-dark dark-theme:text-white">
+                                                                                #{ticket.id}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#6f42c1'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.titulo}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: ticket.estado === 'solucionado' ? '#28a745' :
+                                                                                        ticket.estado === 'en_proceso' ? '#ffc107' :
+                                                                                            ticket.estado === 'en_espera' ? '#17a2b8' :
+                                                                                                ticket.estado === 'escalado' ? '#dc3545' : '#6c757d'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.estado}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: ticket.prioridad === 'critica' ? '#343a40' :
+                                                                                        ticket.prioridad === 'alta' ? '#dc3545' :
+                                                                                            ticket.prioridad === 'media' ? '#ffc107' :
+                                                                                                ticket.prioridad === 'baja' ? '#28a745' : '#6c757d'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.prioridad || 'Normal'}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#20c997'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.cliente?.nombre} {ticket.cliente?.apellido}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#fd7e14'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {new Date(ticket.fecha_creacion).toLocaleDateString()}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="text-center">
+                                                                        <button
+                                                                            className="btn btn-sidebar-teal btn-sm"
+                                                                            title="Ver detalles"
+                                                                            onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                                        >
+                                                                            <i className="fas fa-eye"></i>
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="col-lg-4">
-                                    <div className="hyper-widget card border-0 shadow-sm">
-                                        <div className="hyper-widget-header card-header bg-white border-bottom">
-                                            <h3 className="hyper-widget-title mb-0">Acciones RÃ¡pidas</h3>
-                                        </div>
-                                        <div className="hyper-widget-body card-body">
-                                            <div className="d-grid gap-2">
-                                                <button
-                                                    className="btn btn-primary"
-                                                    onClick={() => changeView('tickets')}
-                                                >
-                                                    <i className="fas fa-list me-2"></i>
-                                                    Ver Mis Tickets
-                                                </button>
-                                                <button
-                                                    className="btn btn-outline-primary"
-                                                    onClick={() => changeView('resueltos')}
-                                                >
-                                                    <i className="fas fa-check-circle me-2"></i>
-                                                    Tickets Resueltos
-                                                </button>
-                                                <button
-                                                    className="btn btn-outline-primary"
-                                                    onClick={() => changeView('estadisticas')}
-                                                >
-                                                    <i className="fas fa-chart-bar me-2"></i>
-                                                    Mis EstadÃ­sticas
-                                                </button>
-                                            </div>
+                                            ) : (
+                                                <div className="text-center py-4">
+                                                    <i className="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                                    <p className="text-muted">No tienes tickets asignados</p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1084,50 +1250,32 @@ export function AnalistaPage() {
                                                             </span>
                                                         </td>
                                                         <td>
-                                                            <div className="btn-group" role="group">
+                                                            <div className="d-flex flex-wrap gap-1 justify-content-center">
                                                                 <button
-                                                                    className="btn btn-sm btn-outline-primary"
+                                                                    className="btn btn-sidebar-teal btn-sm"
+                                                                    title="Ver detalles"
                                                                     onClick={() => changeView(`ticket-${ticket.id}`)}
                                                                 >
                                                                     <i className="fas fa-eye"></i>
                                                                 </button>
-                                                                <div className="btn-group" role="group">
+                                                                {ticket.estado === 'en_espera' && (
                                                                     <button
-                                                                        className="btn btn-sm btn-outline-secondary dropdown-toggle"
-                                                                        data-bs-toggle="dropdown"
+                                                                        className="btn btn-sidebar-success btn-sm"
+                                                                        title="Iniciar trabajo"
+                                                                        onClick={() => iniciarTrabajo(ticket.id)}
                                                                     >
-                                                                        <i className="fas fa-cog"></i>
+                                                                        <i className="fas fa-play"></i>
                                                                     </button>
-                                                                    <ul className="dropdown-menu">
-                                                                        <li>
-                                                                            <button
-                                                                                className="dropdown-item"
-                                                                                onClick={() => actualizarEstadoTicket(ticket.id, 'en_progreso')}
-                                                                            >
-                                                                                <i className="fas fa-play me-2"></i>
-                                                                                Iniciar Trabajo
-                                                                            </button>
-                                                                        </li>
-                                                                        <li>
-                                                                            <button
-                                                                                className="dropdown-item"
-                                                                                onClick={() => actualizarEstadoTicket(ticket.id, 'resuelto')}
-                                                                            >
-                                                                                <i className="fas fa-check me-2"></i>
-                                                                                Marcar Resuelto
-                                                                            </button>
-                                                                        </li>
-                                                                        <li>
-                                                                            <button
-                                                                                className="dropdown-item"
-                                                                                onClick={() => generarRecomendacion(ticket.id)}
-                                                                            >
-                                                                                <i className="fas fa-robot me-2"></i>
-                                                                                Generar RecomendaciÃ³n
-                                                                            </button>
-                                                                        </li>
-                                                                    </ul>
-                                                                </div>
+                                                                )}
+                                                                {ticket.estado === 'en_proceso' && (
+                                                                    <button
+                                                                        className="btn btn-sidebar-warning btn-sm"
+                                                                        title="Marcar como resuelto"
+                                                                        onClick={() => marcarComoResuelto(ticket.id)}
+                                                                    >
+                                                                        <i className="fas fa-check"></i>
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1324,6 +1472,16 @@ export function AnalistaPage() {
                                 </div>
                             </div>
                         </div>
+                    )}
+
+                    {/* Vista de Ticket Detallada */}
+                    {activeView.startsWith('ticket-') && (
+                        <VerTicketHDAnalista
+                            ticketId={parseInt(activeView.split('-')[1])}
+                            tickets={tickets}
+                            ticketsConRecomendaciones={ticketsConRecomendaciones}
+                            onBack={() => setActiveView('tickets')}
+                        />
                     )}
                 </div>
             </div>

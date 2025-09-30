@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import useGlobalReducer from '../../hooks/useGlobalReducer';
 import { SideBarCentral } from '../../components/SideBarCentral';
 import { DashboardCalidad } from '../../pages/DashboardCalidad';
+import VerTicketHDSupervisor from './verTicketHDsupervisor';
 
 // Utilidades de token seguras
 const tokenUtils = {
@@ -69,6 +70,7 @@ export function SupervisorPage() {
     };
 
     const changeView = (view) => {
+        console.log('SupervisorPage - changeView called with:', view);
         setActiveView(view);
     };
 
@@ -699,6 +701,87 @@ export function SupervisorPage() {
         navigate(`/ticket/${ticket.id}/recomendacion-ia`);
     };
 
+    const asignarAnalista = (ticketId) => {
+        // Redirigir a la vista de asignación de analistas
+        navigate(`/ticket/${ticketId}/asignar-analista`);
+    };
+
+    const escalarTicket = async (ticketId) => {
+        try {
+            const token = store.auth.token;
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/escalar`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                // Actualizar la lista de tickets
+                await actualizarTodasLasTablas();
+                alert('Ticket escalado exitosamente');
+            } else {
+                const errorData = await response.json();
+                alert(`Error al escalar ticket: ${errorData.message || 'Error desconocido'}`);
+            }
+        } catch (err) {
+            alert(`Error al escalar ticket: ${err.message}`);
+        }
+    };
+
+    const cerrarTicket = async (ticketId) => {
+        if (confirm('¿Estás seguro de que quieres cerrar este ticket?')) {
+            try {
+                const token = store.auth.token;
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/cerrar`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    // Actualizar la lista de tickets
+                    await actualizarTodasLasTablas();
+                    alert('Ticket cerrado exitosamente');
+                } else {
+                    const errorData = await response.json();
+                    alert(`Error al cerrar ticket: ${errorData.message || 'Error desconocido'}`);
+                }
+            } catch (err) {
+                alert(`Error al cerrar ticket: ${err.message}`);
+            }
+        }
+    };
+
+    const reabrirTicket = async (ticketId) => {
+        if (confirm('¿Estás seguro de que quieres reabrir este ticket?')) {
+            try {
+                const token = store.auth.token;
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/reabrir`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    // Actualizar la lista de tickets
+                    await actualizarTodasLasTablas();
+                    alert('Ticket reabierto exitosamente');
+                } else {
+                    const errorData = await response.json();
+                    alert(`Error al reabrir ticket: ${errorData.message || 'Error desconocido'}`);
+                }
+            } catch (err) {
+                alert(`Error al reabrir ticket: ${err.message}`);
+            }
+        }
+    };
+
     const handleInfoChange = (e) => {
         const { name, value } = e.target;
         setInfoData(prev => ({
@@ -866,7 +949,7 @@ export function SupervisorPage() {
                                 onClick={toggleSidebar}
                                 title={sidebarHidden ? "Mostrar menÃº" : "Ocultar menÃº"}
                             >
-                                <i className={`fas ${sidebarHidden ? 'fa-eye' : 'fa-eye-slash'}`}></i>
+                                <i className="fas fa-bars"></i>
                             </button>
 
                             {/* Barra de bÃºsqueda */}
@@ -1010,63 +1093,109 @@ export function SupervisorPage() {
                             <h1 className="hyper-page-title">Dashboard Supervisor</h1>
 
                             {/* MÃ©tricas principales */}
-                            <div className="row g-4 mb-4">
-                                <div className="col-md-6 col-lg-3">
-                                    <div className="hyper-metric-card card border-0 shadow-sm">
+                            <div className="row mb-4 g-3">
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
                                         <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <div className="hyper-metric-icon bg-primary me-3">
-                                                    <i className="fas fa-ticket-alt"></i>
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Total Tickets</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-primary me-2">{stats.total}</h3>
+                                                    <div className="bg-primary bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-ticket-alt text-primary"></i>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="hyper-metric-value mb-0">{stats.total}</h3>
-                                                    <small className="text-muted">Total Tickets</small>
-                                                </div>
+                                                <small className="text-muted">Total del sistema</small>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-md-6 col-lg-3">
-                                    <div className="hyper-metric-card card border-0 shadow-sm">
+
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
                                         <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <div className="hyper-metric-icon bg-warning me-3">
-                                                    <i className="fas fa-clock"></i>
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Tickets Activos</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-warning me-2">{stats.activos}</h3>
+                                                    <div className="bg-warning bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-clock text-warning"></i>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="hyper-metric-value mb-0">{stats.activos}</h3>
-                                                    <small className="text-muted">Tickets Activos</small>
-                                                </div>
+                                                <small className="text-muted">En proceso</small>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-md-6 col-lg-3">
-                                    <div className="hyper-metric-card card border-0 shadow-sm">
+
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
                                         <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <div className="hyper-metric-icon bg-success me-3">
-                                                    <i className="fas fa-check-circle"></i>
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Tickets Resueltos</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-success me-2">{stats.resueltos}</h3>
+                                                    <div className="bg-success bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-check-circle text-success"></i>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="hyper-metric-value mb-0">{stats.resueltos}</h3>
-                                                    <small className="text-muted">Tickets Resueltos</small>
-                                                </div>
+                                                <small className="text-muted">Completados</small>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="col-md-6 col-lg-3">
-                                    <div className="hyper-metric-card card border-0 shadow-sm">
+
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
                                         <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <div className="hyper-metric-icon bg-danger me-3">
-                                                    <i className="fas fa-exclamation-triangle"></i>
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Tickets Escalados</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-danger me-2">{stats.escalados}</h3>
+                                                    <div className="bg-danger bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-exclamation-triangle text-danger"></i>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="hyper-metric-value mb-0">{stats.escalados}</h3>
-                                                    <small className="text-muted">Tickets Escalados</small>
+                                                <small className="text-muted">Requieren atención</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
+                                        <div className="card-body">
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Tickets Reabiertos</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-info me-2">{tickets.filter(t => t.estado === 'reabierto').length}</h3>
+                                                    <div className="bg-info bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-redo text-info"></i>
+                                                    </div>
                                                 </div>
+                                                <small className="text-muted">Reactivados</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="col-xl-2 col-lg-3 col-md-6 mb-3">
+                                    <div className="hyper-widget card border-0 shadow-sm h-100">
+                                        <div className="card-body">
+                                            <div className="text-center">
+                                                <h6 className="card-title text-muted mb-2">Satisfacción Cliente</h6>
+                                                <div className="d-flex align-items-center justify-content-center mb-2">
+                                                    <h3 className="mb-0 text-warning me-2">
+                                                        {tickets.filter(t => t.calificacion).length > 0
+                                                            ? (tickets.filter(t => t.calificacion).reduce((sum, t) => sum + t.calificacion, 0) / tickets.filter(t => t.calificacion).length).toFixed(1)
+                                                            : '0.0'
+                                                        }
+                                                    </h3>
+                                                    <div className="bg-warning bg-opacity-10 rounded-circle p-2">
+                                                        <i className="fas fa-star text-warning"></i>
+                                                    </div>
+                                                </div>
+                                                <small className="text-muted">Promedio general</small>
                                             </div>
                                         </div>
                                     </div>
@@ -1074,58 +1203,115 @@ export function SupervisorPage() {
                             </div>
 
                             {/* Widgets del dashboard */}
+                            {/* Tickets recientes */}
                             <div className="row g-4">
-                                <div className="col-lg-8">
-                                    <div className="hyper-widget card border-0 shadow-sm">
-                                        <div className="hyper-widget-header card-header bg-white border-bottom">
-                                            <h3 className="hyper-widget-title mb-0">Tickets Recientes</h3>
+                                <div className="col-12">
+                                    <div className="card border-0 shadow-sm">
+                                        <div className="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                                            <h5 className="card-title mb-0">Tickets Recientes</h5>
+                                            <button
+                                                className="btn btn-sidebar-primary btn-sm"
+                                                onClick={() => changeView('tickets')}
+                                            >
+                                                <i className="fas fa-list me-1"></i>
+                                                Ver Todos los Tickets
+                                            </button>
                                         </div>
-                                        <div className="hyper-widget-body card-body">
-                                            {tickets.slice(0, 5).map((ticket) => (
-                                                <div key={ticket.id} className="d-flex align-items-center py-2 border-bottom">
-                                                    <div className="hyper-activity-icon bg-primary me-3">
-                                                        <i className="fas fa-ticket-alt"></i>
-                                                    </div>
-                                                    <div className="flex-grow-1">
-                                                        <div className="fw-semibold">#{ticket.id} - {ticket.titulo}</div>
-                                                        <small className="text-muted">
-                                                            {ticket.estado} â€¢ {ticket.prioridad} â€¢ {new Date(ticket.fecha_creacion).toLocaleDateString()}
-                                                        </small>
-                                                    </div>
+                                        <div className="card-body">
+                                            {tickets.length > 0 ? (
+                                                <div className="table-responsive">
+                                                    <table className="table table-hover">
+                                                        <thead>
+                                                            <tr>
+                                                                <th className="text-center">ID</th>
+                                                                <th className="text-center">Título</th>
+                                                                <th className="text-center">Estado</th>
+                                                                <th className="text-center">Fecha y Hora</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {tickets.slice(0, 5).map((ticket) => (
+                                                                <tr key={ticket.id}>
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#007bff'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="fw-bold text-dark dark-theme:text-white">
+                                                                                #{ticket.id}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#6f42c1'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.titulo}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: ticket.estado.toLowerCase() === 'solucionado' ? '#28a745' :
+                                                                                        ticket.estado.toLowerCase() === 'en_proceso' ? '#ffc107' :
+                                                                                            '#007bff'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.estado}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: '#17a2b8'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {new Date(ticket.fecha_creacion).toLocaleDateString('es-ES', {
+                                                                                    year: 'numeric',
+                                                                                    month: 'short',
+                                                                                    day: 'numeric',
+                                                                                    hour: '2-digit',
+                                                                                    minute: '2-digit',
+                                                                                    hour12: true
+                                                                                })}
+                                                                            </span>
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="col-lg-4">
-                                    <div className="hyper-widget card border-0 shadow-sm">
-                                        <div className="hyper-widget-header card-header bg-white border-bottom">
-                                            <h3 className="hyper-widget-title mb-0">Acciones RÃ¡pidas</h3>
-                                        </div>
-                                        <div className="hyper-widget-body card-body">
-                                            <div className="d-grid gap-2">
-                                                <button
-                                                    className="btn btn-primary"
-                                                    onClick={() => changeView('tickets')}
-                                                >
-                                                    <i className="fas fa-list me-2"></i>
-                                                    Ver Todos los Tickets
-                                                </button>
-                                                <button
-                                                    className="btn btn-outline-primary"
-                                                    onClick={() => changeView('analistas')}
-                                                >
-                                                    <i className="fas fa-users me-2"></i>
-                                                    Gestionar Analistas
-                                                </button>
-                                                <button
-                                                    className="btn btn-outline-primary"
-                                                    onClick={() => changeView('asignaciones')}
-                                                >
-                                                    <i className="fas fa-tasks me-2"></i>
-                                                    Ver Asignaciones
-                                                </button>
-                                            </div>
+                                            ) : (
+                                                <div className="text-center py-4">
+                                                    <i className="fas fa-ticket-alt fa-3x text-muted mb-3"></i>
+                                                    <p className="text-muted">No hay tickets disponibles</p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1259,7 +1445,6 @@ export function SupervisorPage() {
                                             <table className="table table-hover mb-0">
                                                 <thead className="table-light">
                                                     <tr>
-                                                        <th className="text-center px-3">Semáforo</th>
                                                         <th className="text-center px-3">ID</th>
                                                         <th className="px-4">Cliente</th>
                                                         <th className="px-4">Título</th>
@@ -1281,26 +1466,6 @@ export function SupervisorPage() {
                                                         .map((ticket) => (
                                                             <tr key={ticket.id} className={getSemaforoColor(ticket, tickets)}>
                                                                 <td className="text-center px-3">
-                                                                    <div className="d-flex justify-content-center">
-                                                                        <div
-                                                                            className="rounded-circle d-flex align-items-center justify-content-center"
-                                                                            style={{
-                                                                                width: '20px',
-                                                                                height: '20px',
-                                                                                backgroundColor: getSemaforoColor(ticket, tickets) === 'table-danger' ? '#dc3545' :
-                                                                                    getSemaforoColor(ticket, tickets) === 'table-warning' ? '#ffc107' : '#28a745'
-                                                                            }}
-                                                                            title={
-                                                                                getSemaforoColor(ticket, tickets) === 'table-danger' ? '🔴 Rojo: Prioridad alta y ticket más viejo' :
-                                                                                    getSemaforoColor(ticket, tickets) === 'table-warning' ? '🟠 Naranja: Prioridad alta o ticket viejo' :
-                                                                                        '🟢 Verde: Prioridad media/baja y ticket reciente'
-                                                                            }
-                                                                        >
-                                                                            <i className="fas fa-circle" style={{ fontSize: '8px', color: 'white' }}></i>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="text-center px-3">
                                                                     <div className="d-flex align-items-center justify-content-center">
                                                                         <span className="me-2">#{ticket.id}</span>
                                                                         {ticket.url_imagen ? (
@@ -1318,7 +1483,19 @@ export function SupervisorPage() {
                                                                     </div>
                                                                 </td>
                                                                 <td className="px-4">
-                                                                    {ticket.cliente?.nombre} {ticket.cliente?.apellido}
+                                                                    <span className="d-flex align-items-center gap-2">
+                                                                        <span
+                                                                            className="rounded-circle d-inline-block"
+                                                                            style={{
+                                                                                width: '8px',
+                                                                                height: '8px',
+                                                                                backgroundColor: '#17a2b8'
+                                                                            }}
+                                                                        ></span>
+                                                                        <span className="text-dark dark-theme:text-white">
+                                                                            {ticket.cliente?.nombre} {ticket.cliente?.apellido}
+                                                                        </span>
+                                                                    </span>
                                                                 </td>
                                                                 <td className="px-4">
                                                                     <div>
@@ -1370,21 +1547,6 @@ export function SupervisorPage() {
                                                                     </span>
                                                                 </td>
                                                                 <td className="text-center px-3">
-                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
-                                                                        <span
-                                                                            className="rounded-circle d-inline-block"
-                                                                            style={{
-                                                                                width: '8px',
-                                                                                height: '8px',
-                                                                                backgroundColor: '#17a2b8'
-                                                                            }}
-                                                                        ></span>
-                                                                        <span className="text-dark dark-theme:text-white">
-                                                                            {ticket.cliente?.nombre || 'N/A'}
-                                                                        </span>
-                                                                    </span>
-                                                                </td>
-                                                                <td className="text-center px-3">
                                                                     {ticket.asignacion_actual && ticket.asignacion_actual.analista ? (
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
                                                                             <span
@@ -1396,7 +1558,7 @@ export function SupervisorPage() {
                                                                                 }}
                                                                             ></span>
                                                                             <span className="text-dark dark-theme:text-white">
-                                                                                {ticket.asignacion_actual.analista.nombre}
+                                                                                {ticket.asignacion_actual.analista.nombre} {ticket.asignacion_actual.analista.apellido}
                                                                             </span>
                                                                         </span>
                                                                     ) : (
@@ -1438,106 +1600,117 @@ export function SupervisorPage() {
                                                                     </span>
                                                                 </td>
                                                                 <td className="text-center px-4">
-                                                                    <div className="d-flex flex-column gap-2">
-                                                                        {/* Fila superior: Ver detalles, Comentarios, Chat */}
-                                                                        <div className="d-flex gap-1">
+                                                                    <div className="d-flex flex-wrap gap-1 justify-content-center">
+                                                                        {/* Ver detalles */}
+                                                                        <button
+                                                                            className="btn btn-sidebar-teal btn-sm"
+                                                                            title="Ver detalles"
+                                                                            onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                                        >
+                                                                            <i className="fas fa-eye"></i>
+                                                                        </button>
+
+                                                                        {/* Comentarios */}
+                                                                        <button
+                                                                            className="btn btn-sidebar-accent btn-sm"
+                                                                            title="Ver y agregar comentarios"
+                                                                            onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
+                                                                        >
+                                                                            <i className="fas fa-users"></i>
+                                                                        </button>
+
+                                                                        {/* Chat */}
+                                                                        <button
+                                                                            className="btn btn-sidebar-secondary btn-sm"
+                                                                            title="Chat con analista"
+                                                                            onClick={() => window.open(`/ticket/${ticket.id}/chat`, '_self')}
+                                                                        >
+                                                                            <i className="fas fa-comments"></i>
+                                                                        </button>
+
+                                                                        {/* IA */}
+                                                                        <div className="btn-group" role="group">
                                                                             <button
-                                                                                className="btn btn-outline-primary btn-sm"
-                                                                                title="Ver detalles"
-                                                                                onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                                                className="btn btn-sidebar-primary btn-sm dropdown-toggle"
+                                                                                type="button"
+                                                                                data-bs-toggle="dropdown"
+                                                                                aria-expanded="false"
+                                                                                title="Opciones de IA"
                                                                             >
-                                                                                <i className="fas fa-eye"></i>
+                                                                                <i className="fas fa-robot"></i> IA
                                                                             </button>
-                                                                            <button
-                                                                                className="btn btn-info btn-sm"
-                                                                                title="Ver y agregar comentarios"
-                                                                                onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
-                                                                            >
-                                                                                <i className="fas fa-comments"></i>
-                                                                            </button>
-                                                                            <button
-                                                                                className="btn btn-success btn-sm"
-                                                                                title="Chat con analista"
-                                                                                onClick={() => window.open(`/ticket/${ticket.id}/chat`, '_self')}
-                                                                            >
-                                                                                <i className="fas fa-comments"></i>
-                                                                            </button>
+                                                                            <ul className="dropdown-menu">
+                                                                                <li>
+                                                                                    <button
+                                                                                        className="dropdown-item"
+                                                                                        onClick={() => generarRecomendacion(ticket.id)}
+                                                                                    >
+                                                                                        <i className="fas fa-lightbulb me-2"></i>
+                                                                                        Generar Recomendación
+                                                                                    </button>
+                                                                                </li>
+                                                                                <li>
+                                                                                    <button
+                                                                                        className="dropdown-item"
+                                                                                        onClick={() => window.open(`/ticket/${ticket.id}/identificar-imagen`, '_self')}
+                                                                                    >
+                                                                                        <i className="fas fa-camera me-2"></i>
+                                                                                        Analizar Imagen
+                                                                                    </button>
+                                                                                </li>
+                                                                            </ul>
                                                                         </div>
 
-                                                                        {/* Fila inferior: IA, Asignar, Escalar */}
-                                                                        <div className="d-flex gap-1">
-                                                                            <div className="btn-group" role="group">
-                                                                                <button
-                                                                                    className="btn btn-warning btn-sm dropdown-toggle"
-                                                                                    type="button"
-                                                                                    data-bs-toggle="dropdown"
-                                                                                    aria-expanded="false"
-                                                                                    title="Opciones de IA"
-                                                                                >
-                                                                                    <i className="fas fa-robot"></i> IA
-                                                                                </button>
-                                                                                <ul className="dropdown-menu">
-                                                                                    <li>
-                                                                                        <button
-                                                                                            className="dropdown-item"
-                                                                                            onClick={() => generarRecomendacion(ticket.id)}
-                                                                                        >
-                                                                                            <i className="fas fa-lightbulb me-2"></i>
-                                                                                            Generar RecomendaciÃ³n
-                                                                                        </button>
-                                                                                    </li>
-                                                                                    <li>
-                                                                                        <button
-                                                                                            className="dropdown-item"
-                                                                                            onClick={() => window.open(`/ticket/${ticket.id}/identificar-imagen`, '_self')}
-                                                                                        >
-                                                                                            <i className="fas fa-camera me-2"></i>
-                                                                                            Analizar Imagen
-                                                                                        </button>
-                                                                                    </li>
-                                                                                </ul>
-                                                                            </div>
-                                                                            {ticketsConRecomendaciones.has(ticket.id) && (
-                                                                                <button
-                                                                                    className="btn btn-outline-success btn-sm"
-                                                                                    title="Ver sugerencias disponibles"
-                                                                                    onClick={() => window.open(`/ticket/${ticket.id}/recomendaciones-similares`, '_self')}
-                                                                                >
-                                                                                    <i className="fas fa-lightbulb"></i>
-                                                                                </button>
-                                                                            )}
-                                                                            <div className="btn-group" role="group">
-                                                                                <button
-                                                                                    className="btn btn-outline-secondary btn-sm dropdown-toggle"
-                                                                                    type="button"
-                                                                                    data-bs-toggle="dropdown"
-                                                                                    aria-expanded="false"
-                                                                                    title="Acciones de gestiÃ³n"
-                                                                                >
-                                                                                    <i className="fas fa-cog"></i>
-                                                                                </button>
-                                                                                <ul className="dropdown-menu">
-                                                                                    <li>
-                                                                                        <button
-                                                                                            className="dropdown-item"
-                                                                                            onClick={() => escalarTicket(ticket.id)}
-                                                                                        >
-                                                                                            <i className="fas fa-arrow-up me-2"></i>
-                                                                                            Escalar Ticket
-                                                                                        </button>
-                                                                                    </li>
-                                                                                    <li>
-                                                                                        <button
-                                                                                            className="dropdown-item"
-                                                                                            onClick={() => changeView('asignaciones')}
-                                                                                        >
-                                                                                            <i className="fas fa-user-plus me-2"></i>
-                                                                                            Asignar Analista
-                                                                                        </button>
-                                                                                    </li>
-                                                                                </ul>
-                                                                            </div>
-                                                                        </div>
+                                                                        {/* Sugerencias */}
+                                                                        {ticketsConRecomendaciones.has(ticket.id) && (
+                                                                            <button
+                                                                                className="btn btn-sidebar-teal btn-sm"
+                                                                                title="Ver sugerencias disponibles"
+                                                                                onClick={() => window.open(`/ticket/${ticket.id}/recomendaciones-similares`, '_self')}
+                                                                            >
+                                                                                <i className="fas fa-lightbulb"></i>
+                                                                            </button>
+                                                                        )}
+
+                                                                        {/* Asignar/Reasignar Analista */}
+                                                                        <button
+                                                                            className="btn btn-sidebar-success btn-sm"
+                                                                            title={ticket.asignacion_actual?.analista ? "Reasignar analista" : "Asignar analista"}
+                                                                            onClick={() => asignarAnalista(ticket.id)}
+                                                                        >
+                                                                            <i className="fas fa-user-plus"></i>
+                                                                        </button>
+
+                                                                        {/* Escalar */}
+                                                                        <button
+                                                                            className="btn btn-sidebar-warning btn-sm"
+                                                                            title="Escalar ticket"
+                                                                            onClick={() => escalarTicket(ticket.id)}
+                                                                        >
+                                                                            <i className="fas fa-arrow-up"></i>
+                                                                        </button>
+
+                                                                        {/* Cerrar ticket */}
+                                                                        {ticket.estado !== 'cerrado' && ticket.estado !== 'resuelto' && (
+                                                                            <button
+                                                                                className="btn btn-outline-danger btn-sm"
+                                                                                title="Cerrar ticket"
+                                                                                onClick={() => cerrarTicket(ticket.id)}
+                                                                            >
+                                                                                <i className="fas fa-times"></i>
+                                                                            </button>
+                                                                        )}
+
+                                                                        {/* Reabrir ticket */}
+                                                                        {ticket.estado === 'cerrado' && (
+                                                                            <button
+                                                                                className="btn btn-outline-success btn-sm"
+                                                                                title="Reabrir ticket"
+                                                                                onClick={() => reabrirTicket(ticket.id)}
+                                                                            >
+                                                                                <i className="fas fa-redo"></i>
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -1570,7 +1743,7 @@ export function SupervisorPage() {
                                         }}
                                         disabled={loadingCerrados}
                                     >
-                                        <i className={`fas ${showCerrados ? 'fa-eye-slash' : 'fa-eye'} me-1`}></i>
+                                        <i className="fas fa-bars me-1"></i>
                                         {showCerrados ? 'Ocultar' : 'Mostrar'} Cerrados
                                         {ticketsCerrados.length > 0 && (
                                             <span className="badge bg-secondary ms-2">{ticketsCerrados.length}</span>
@@ -1872,6 +2045,20 @@ export function SupervisorPage() {
                                     </div>
                                 </div>
                             </div>
+                        </>
+                    )}
+
+                    {/* Vista de Ticket Detallada */}
+                    {activeView.startsWith('ticket-') && (
+                        <>
+                            {console.log('SupervisorPage - Rendering VerTicketHDSupervisor with activeView:', activeView)}
+                            <VerTicketHDSupervisor
+                                ticketId={parseInt(activeView.split('-')[1])}
+                                tickets={tickets}
+                                ticketsConRecomendaciones={ticketsConRecomendaciones}
+                                analistas={analistas}
+                                onBack={() => setActiveView('tickets')}
+                            />
                         </>
                     )}
 
