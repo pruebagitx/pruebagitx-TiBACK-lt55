@@ -473,7 +473,7 @@ export function SupervisorPage() {
     // Efecto para manejar sincronizaciÃ³n manual desde Footer
     useEffect(() => {
         const handleManualSync = (event) => {
-            console.log('ðŸ”„ SincronizaciÃ³n manual recibida en SupervisorPage:', event.detail);
+            console.log('ðŸ"„ SincronizaciÃ³n manual recibida en SupervisorPage:', event.detail);
             if (event.detail.role === 'supervisor') {
                 actualizarTickets();
                 actualizarAnalistas();
@@ -482,6 +482,46 @@ export function SupervisorPage() {
 
         window.addEventListener('manualSyncTriggered', handleManualSync);
         return () => window.removeEventListener('manualSyncTriggered', handleManualSync);
+    }, []);
+
+    // Escuchar eventos de sincronización total desde el Footer
+    useEffect(() => {
+        const handleTotalSync = (event) => {
+            console.log('🔄 Sincronización total recibida en SupervisorPage:', event.detail);
+            if (event.detail.role === 'supervisor' || event.detail.source === 'footer_sync') {
+                // Recargar todos los datos del supervisor
+                actualizarTickets();
+                actualizarAnalistas();
+                console.log('✅ Datos del supervisor actualizados por sincronización total');
+            }
+        };
+
+        const handleSyncCompleted = (event) => {
+            console.log('✅ Sincronización total completada en SupervisorPage:', event.detail);
+        };
+
+        const handleSyncError = (event) => {
+            console.error('❌ Error en sincronización total en SupervisorPage:', event.detail);
+        };
+
+        // Escuchar eventos de sincronización
+        window.addEventListener('totalSyncTriggered', handleTotalSync);
+        window.addEventListener('sync_completed', handleSyncCompleted);
+        window.addEventListener('sync_error', handleSyncError);
+        window.addEventListener('refresh_tickets', handleTotalSync);
+        window.addEventListener('refresh_dashboard', handleTotalSync);
+        window.addEventListener('sync_tickets', handleTotalSync);
+        window.addEventListener('sync_usuarios', handleTotalSync);
+
+        return () => {
+            window.removeEventListener('totalSyncTriggered', handleTotalSync);
+            window.removeEventListener('sync_completed', handleSyncCompleted);
+            window.removeEventListener('sync_error', handleSyncError);
+            window.removeEventListener('refresh_tickets', handleTotalSync);
+            window.removeEventListener('refresh_dashboard', handleTotalSync);
+            window.removeEventListener('sync_tickets', handleTotalSync);
+            window.removeEventListener('sync_usuarios', handleTotalSync);
+        };
     }, []);
 
     // Efecto para manejar actualizaciones crÃ­ticas de tickets

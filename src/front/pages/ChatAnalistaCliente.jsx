@@ -315,6 +315,41 @@ function ChatAnalistaCliente() {
         scrollToBottom();
     }, [mensajes]);
 
+    // Escuchar eventos de sincronización total desde el Footer
+    useEffect(() => {
+        const handleTotalSync = (event) => {
+            console.log('🔄 Sincronización total recibida en ChatAnalistaCliente:', event.detail);
+            if (event.detail.source === 'footer_sync') {
+                // Recargar mensajes del chat
+                cargarMensajes();
+                console.log('✅ Mensajes del chat actualizados por sincronización total');
+            }
+        };
+
+        const handleSyncCompleted = (event) => {
+            console.log('✅ Sincronización total completada en ChatAnalistaCliente:', event.detail);
+        };
+
+        const handleSyncError = (event) => {
+            console.error('❌ Error en sincronización total en ChatAnalistaCliente:', event.detail);
+        };
+
+        // Escuchar eventos de sincronización
+        window.addEventListener('totalSyncTriggered', handleTotalSync);
+        window.addEventListener('sync_completed', handleSyncCompleted);
+        window.addEventListener('sync_error', handleSyncError);
+        window.addEventListener('refresh_chats', handleTotalSync);
+        window.addEventListener('sync_comentarios', handleTotalSync);
+
+        return () => {
+            window.removeEventListener('totalSyncTriggered', handleTotalSync);
+            window.removeEventListener('sync_completed', handleSyncCompleted);
+            window.removeEventListener('sync_error', handleSyncError);
+            window.removeEventListener('refresh_chats', handleTotalSync);
+            window.removeEventListener('sync_comentarios', handleTotalSync);
+        };
+    }, []);
+
     if (loading) {
         return (
             <div className="container py-5">

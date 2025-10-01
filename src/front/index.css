@@ -604,6 +604,26 @@ html body .avatar-header-normal {
   object-fit: cover;
 }
 
+/* Excepción específica para avatares del header - deben mantener su tamaño */
+html body .avatar-header-normal.rounded-circle {
+  width: 60px !important;
+  height: 60px !important;
+  min-width: 60px !important;
+  min-height: 60px !important;
+  max-width: 60px !important;
+  max-height: 60px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 60px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+  transform: none !important;
+  scale: 1 !important;
+}
+
 /* Tarjetas de métricas - Solo gradientes específicos */
 .hyper-metric-icon.customers {
   background: linear-gradient(135deg, var(--ct-primary) 0%, var(--ct-purple) 100%);
@@ -2056,7 +2076,7 @@ html body .text-center .rounded-circle {
 }
 
 /* ========================================
-   MODO OSCURO COMPLETO CON !IMPORTANT
+   MODO OSCURO COMPLETO CON !IMPORTANT, solo se permite su uso (!important) aqui
    ======================================== */
 
 /* Aplicar modo oscuro cuando el body tenga la clase dark-theme */
@@ -2851,4 +2871,24 @@ body.dark-theme .col-12 {
 body.dark-theme,
 body.dark-theme html {
   background-color: #1a1a1a !important;
+}
+
+/* Excepción específica para avatares del header en modo oscuro - deben mantener su tamaño */
+body.dark-theme .avatar-header-normal.rounded-circle {
+  width: 60px !important;
+  height: 60px !important;
+  min-width: 60px !important;
+  min-height: 60px !important;
+  max-width: 60px !important;
+  max-height: 60px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 60px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+  transform: none !important;
+  scale: 1 !important;
 }

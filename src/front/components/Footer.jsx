@@ -59,7 +59,7 @@ export const Footer = () => {
 
 		try {
 			setIsSyncing(true);
-			console.log('🔄 Iniciando sincronización manual desde Footer...');
+			console.log('🔄 Iniciando SINCRONIZACIÓN TOTAL desde Footer...');
 
 			// Debug: Verificar estado de autenticación
 			console.log('🔍 Estado de autenticación:', {
@@ -71,22 +71,15 @@ export const Footer = () => {
 			});
 
 			// Verificar que tenemos los datos necesarios
-			// Permitir sincronización si está autenticado y tiene token, incluso si user aún no está cargado
 			if (!store.auth.isAuthenticated || !store.auth.token) {
-				console.warn('⚠️ No hay usuario autenticado para sincronizar:', {
-					isAuthenticated: store.auth.isAuthenticated,
-					hasUser: !!store.auth.user,
-					hasToken: !!store.auth.token
-				});
+				console.warn('⚠️ No hay usuario autenticado para sincronizar');
 				return;
 			}
 
-			// Si no hay objeto user pero sí hay token, intentar obtenerlo del token
+			// Obtener datos del usuario
 			let userData = store.auth.user;
 			if (!userData && store.auth.token) {
-				console.log('🔄 Objeto user no disponible, intentando obtener datos del token...');
 				try {
-					// Decodificar el token para obtener información del usuario
 					const tokenPayload = JSON.parse(atob(store.auth.token.split('.')[1]));
 					userData = {
 						id: tokenPayload.user_id,
@@ -100,44 +93,179 @@ export const Footer = () => {
 				}
 			}
 
-			// Configurar sincronización con callbacks específicos por rol
+			// PASO 1: Reconectar WebSocket si está desconectado
+			if (!store.websocket.connected || !store.websocket.socket) {
+				console.log('🔌 Reconectando WebSocket...');
+				const socket = connectWebSocket(store.auth.token);
+				if (socket) {
+					// Esperar un momento para que se establezca la conexión
+					await new Promise(resolve => setTimeout(resolve, 1000));
+				}
+			}
+
+			// PASO 2: Unirse a TODAS las rooms críticas
+			if (store.websocket.connected && store.websocket.socket) {
+				console.log('🚨 Uniéndose a TODAS las rooms críticas...');
+				joinAllCriticalRooms(store.websocket.socket, userData);
+
+				// Unirse a rooms específicas por rol
+				if (userData.role === 'administrador') {
+					// Administrador se une a todas las rooms
+					store.websocket.socket.emit('join_critical_rooms', {
+						role: userData.role,
+						user_id: userData.id,
+						critical_rooms: [
+							'global_tickets', 'global_chats', 'critical_updates',
+							'admin_tickets', 'admin_users', 'admin_system'
+						]
+					});
+				} else if (userData.role === 'supervisor') {
+					store.websocket.socket.emit('join_critical_rooms', {
+						role: userData.role,
+						user_id: userData.id,
+						critical_rooms: [
+							'supervisor_tickets', 'supervisor_analistas', 'supervisor_chats'
+						]
+					});
+				} else if (userData.role === 'analista') {
+					store.websocket.socket.emit('join_critical_rooms', {
+						role: userData.role,
+						user_id: userData.id,
+						critical_rooms: [
+							'analista_tickets', 'analista_chats'
+						]
+					});
+				} else if (userData.role === 'cliente') {
+					store.websocket.socket.emit('join_critical_rooms', {
+						role: userData.role,
+						user_id: userData.id,
+						critical_rooms: [
+							'cliente_tickets', 'cliente_chats'
+						]
+					});
+				}
+			}
+
+			// PASO 3: Configurar sincronización TOTAL con todos los tipos
+			const allSyncTypes = [
+				'tickets', 'comentarios', 'asignaciones', 'usuarios',
+				'gestiones', 'chats', 'notificaciones', 'estadisticas'
+			];
+
 			const syncConfig = startRealtimeSync({
-				syncTypes: ['tickets', 'comentarios', 'asignaciones'],
+				syncTypes: allSyncTypes,
+				syncInterval: 5000, // Sincronización más frecuente
+				enablePolling: true,
 				onSyncTriggered: (data) => {
-					console.log('✅ Sincronización activada desde Footer:', data);
-					// Emitir evento personalizado para que las vistas puedan reaccionar
-					window.dispatchEvent(new CustomEvent('manualSyncTriggered', {
+					console.log('✅ SINCRONIZACIÓN TOTAL activada:', data);
+
+					// Emitir evento personalizado para TODAS las vistas
+					window.dispatchEvent(new CustomEvent('totalSyncTriggered', {
 						detail: {
 							type: data.type,
 							source: data.source,
 							role: userData.role,
+							userId: userData.id,
+							timestamp: new Date().toISOString(),
+							priority: 'critical'
+						}
+					}));
+
+					// Emitir evento específico por tipo
+					window.dispatchEvent(new CustomEvent(`sync_${data.type}`, {
+						detail: {
+							...data,
+							role: userData.role,
+							userId: userData.id,
 							timestamp: new Date().toISOString()
 						}
 					}));
 				},
 				onSyncRequested: (data) => {
-					console.log('📡 Solicitud de sincronización enviada:', data);
+					console.log('📡 Solicitud de sincronización TOTAL enviada:', data);
 				}
 			});
 
-			// Inicializar la sincronización primero
+			// PASO 4: Inicializar y ejecutar sincronización
 			if (syncConfig && syncConfig.initializeSync) {
 				syncConfig.initializeSync();
 			}
 
-			// Ejecutar la sincronización manual
 			if (syncConfig && syncConfig.triggerSync) {
-				syncConfig.triggerSync('manual');
+				// Ejecutar múltiples sincronizaciones para asegurar cobertura total
+				syncConfig.triggerSync('manual_total');
+				syncConfig.triggerSync('critical');
+				syncConfig.triggerSync('full_refresh');
 			}
 
-			// Unirse a todas las rooms críticas si hay WebSocket conectado
+			// PASO 5: Solicitar sincronización desde el servidor
 			if (store.websocket.connected && store.websocket.socket) {
-				joinAllCriticalRooms(store.websocket.socket, userData);
+				console.log('📡 Solicitando sincronización total desde servidor...');
+				store.websocket.socket.emit('request_sync', {
+					role: userData.role,
+					user_id: userData.id,
+					sync_type: 'total',
+					include_all: true,
+					timestamp: new Date().toISOString()
+				});
 			}
 
-			console.log('✅ Sincronización manual completada desde Footer');
+			// PASO 6: Forzar actualización de todas las vistas activas
+			console.log('🔄 Forzando actualización de todas las vistas...');
+
+			// Emitir eventos para cada tipo de vista
+			const viewEvents = [
+				'refresh_tickets', 'refresh_comentarios', 'refresh_asignaciones',
+				'refresh_usuarios', 'refresh_gestiones', 'refresh_chats',
+				'refresh_estadisticas', 'refresh_dashboard'
+			];
+
+			viewEvents.forEach(eventType => {
+				window.dispatchEvent(new CustomEvent(eventType, {
+					detail: {
+						role: userData.role,
+						userId: userData.id,
+						timestamp: new Date().toISOString(),
+						source: 'footer_sync'
+					}
+				}));
+			});
+
+			// PASO 7: Limpiar cache y forzar recarga de datos críticos
+			console.log('🧹 Limpiando cache y forzando recarga...');
+
+			// Limpiar localStorage de datos obsoletos
+			const keysToClean = ['tickets_cache', 'comentarios_cache', 'asignaciones_cache'];
+			keysToClean.forEach(key => {
+				if (localStorage.getItem(key)) {
+					localStorage.removeItem(key);
+					console.log(`🗑️ Cache limpiado: ${key}`);
+				}
+			});
+
+			console.log('✅ SINCRONIZACIÓN TOTAL completada desde Footer');
+
+			// Mostrar notificación de éxito
+			window.dispatchEvent(new CustomEvent('sync_completed', {
+				detail: {
+					type: 'success',
+					message: 'Sincronización total completada exitosamente',
+					timestamp: new Date().toISOString()
+				}
+			}));
+
 		} catch (error) {
-			console.error('❌ Error en sincronización manual desde Footer:', error);
+			console.error('❌ Error en sincronización total desde Footer:', error);
+
+			// Mostrar notificación de error
+			window.dispatchEvent(new CustomEvent('sync_error', {
+				detail: {
+					type: 'error',
+					message: 'Error en sincronización total',
+					error: error.message,
+					timestamp: new Date().toISOString()
+				}
+			}));
 		} finally {
 			setIsSyncing(false);
 		}
@@ -175,19 +303,19 @@ export const Footer = () => {
 								disabled={isSyncing || !store.auth.isAuthenticated || !store.auth.token}
 								title={
 									isSyncing
-										? "Sincronizando..."
+										? "Sincronización total en progreso..."
 										: (!store.auth.isAuthenticated || !store.auth.token)
 											? "Usuario no autenticado"
-											: "Sincronizar ahora"
+											: "Sincronización total - Actualizar todo"
 								}
 							>
 								{isSyncing ? (
 									<>
 										<span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-										⏳
+										⏳ Sincronizando...
 									</>
 								) : (
-									'🔄'
+									'🔄 Sincronizar Todo'
 								)}
 							</button>
 							<button

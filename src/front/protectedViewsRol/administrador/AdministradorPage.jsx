@@ -41,6 +41,7 @@ export function AdministradorPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showMapaDistribucion, setShowMapaDistribucion] = useState(false);
+    const [darkMode, setDarkMode] = useState(false);
 
     // Conectar WebSocket cuando el usuario esté autenticado
     useEffect(() => {
@@ -188,6 +189,52 @@ export function AdministradorPage() {
         cargarEstadisticas();
     }, [store.auth.token]);
 
+    // Manejar modo oscuro
+    useEffect(() => {
+        if (darkMode) {
+            document.body.classList.add('dark-theme');
+        } else {
+            document.body.classList.remove('dark-theme');
+        }
+    }, [darkMode]);
+
+    // Escuchar eventos de sincronización total desde el Footer
+    useEffect(() => {
+        const handleTotalSync = (event) => {
+            console.log('🔄 Sincronización total recibida en AdministradorPage:', event.detail);
+            if (event.detail.role === 'administrador' || event.detail.source === 'footer_sync') {
+                // Recargar todas las estadísticas
+                cargarEstadisticas();
+                console.log('✅ Estadísticas del administrador actualizadas por sincronización total');
+            }
+        };
+
+        const handleSyncCompleted = (event) => {
+            console.log('✅ Sincronización total completada:', event.detail);
+            // Opcional: mostrar notificación de éxito
+        };
+
+        const handleSyncError = (event) => {
+            console.error('❌ Error en sincronización total:', event.detail);
+            // Opcional: mostrar notificación de error
+        };
+
+        // Escuchar eventos de sincronización
+        window.addEventListener('totalSyncTriggered', handleTotalSync);
+        window.addEventListener('sync_completed', handleSyncCompleted);
+        window.addEventListener('sync_error', handleSyncError);
+        window.addEventListener('refresh_estadisticas', handleTotalSync);
+        window.addEventListener('refresh_dashboard', handleTotalSync);
+
+        return () => {
+            window.removeEventListener('totalSyncTriggered', handleTotalSync);
+            window.removeEventListener('sync_completed', handleSyncCompleted);
+            window.removeEventListener('sync_error', handleSyncError);
+            window.removeEventListener('refresh_estadisticas', handleTotalSync);
+            window.removeEventListener('refresh_dashboard', handleTotalSync);
+        };
+    }, []);
+
     return (
         <div className="container py-4">
             {/* Header con información del administrador */}
@@ -205,10 +252,26 @@ export function AdministradorPage() {
                                     </span>
                                 </div>
                             </div>
-                            <div className="d-flex gap-2">
+                            <div className="d-flex gap-2 align-items-center">
                                 <Link to="/administradores" className="btn btn-ct-primary">
                                     Ir al CRUD
                                 </Link>
+
+                                {/* Switch de Modo Oscuro */}
+                                <div className="form-check form-switch">
+                                    <input
+                                        className="form-check-input"
+                                        type="checkbox"
+                                        id="darkModeSwitch"
+                                        checked={darkMode}
+                                        onChange={(e) => setDarkMode(e.target.checked)}
+                                    />
+                                    <label className="form-check-label" htmlFor="darkModeSwitch">
+                                        <i className={`fas ${darkMode ? 'fa-moon' : 'fa-sun'} me-1`}></i>
+                                        {darkMode ? 'Oscuro' : 'Claro'}
+                                    </label>
+                                </div>
+
                                 <Link to="/tickets" className="btn btn-ct-secondary">
                                     <i className="fas fa-ticket-alt me-2"></i>Tickets
                                 </Link>
