@@ -44,8 +44,9 @@ export function AnalistaPage() {
         confirmPassword: ''
     });
     const [ticketsConRecomendaciones, setTicketsConRecomendaciones] = useState(new Set());
+    const [expandedTickets, setExpandedTickets] = useState(new Set());
 
-    // Estados para el nuevo diseÃ±o
+    // Estados para el nuevo diseño
     const [sidebarHidden, setSidebarHidden] = useState(false);
     const [activeView, setActiveView] = useState('dashboard');
     const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -57,7 +58,7 @@ export function AnalistaPage() {
     const [filterEstado, setFilterEstado] = useState('');
     const [filterPrioridad, setFilterPrioridad] = useState('');
 
-    // Funciones para el nuevo diseÃ±o
+    // Funciones para el nuevo diseño
     const toggleSidebar = () => {
         setSidebarHidden(!sidebarHidden);
     };
@@ -94,12 +95,25 @@ export function AnalistaPage() {
         setSearchResults([]);
     };
 
+    // Función para alternar expansión de ticket
+    const toggleTicketExpansion = (ticketId) => {
+        setExpandedTickets(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(ticketId)) {
+                newSet.delete(ticketId);
+            } else {
+                newSet.add(ticketId);
+            }
+            return newSet;
+        });
+    };
+
     const selectTicketFromSearch = (ticket) => {
         setActiveView(`ticket-${ticket.id}`);
         closeSearchResults();
     };
 
-    // FunciÃ³n helper para actualizar tickets sin recargar la pÃ¡gina
+    // Función helper para actualizar tickets sin recargar la página
     const actualizarTickets = async () => {
         try {
             const token = store.auth.token;
@@ -118,7 +132,7 @@ export function AnalistaPage() {
         }
     };
 
-    // Funciones de filtrado y estadÃ­sticas
+    // Funciones de filtrado y estadísticas
     const getFilteredTickets = () => {
         let filtered = tickets;
 
@@ -217,7 +231,7 @@ export function AnalistaPage() {
     // Verificar recomendaciones para todos los tickets
     useEffect(() => {
         if (tickets.length > 0 && store.auth.token && store.auth.isAuthenticated) {
-            // Agregar un pequeÃ±o delay para evitar llamadas mÃºltiples
+            // Agregar un pequeño delay para evitar llamadas múltiples
             const timeoutId = setTimeout(() => {
                 verificarRecomendaciones();
             }, 500);
@@ -245,7 +259,7 @@ export function AnalistaPage() {
 
             const recomendacionesPromises = tickets.map(async (ticket) => {
                 try {
-                    // Validar que el ticket tenga contenido vÃ¡lido
+                    // Validar que el ticket tenga contenido válido
                     if (!ticket.titulo || !ticket.descripcion || ticket.titulo.trim() === '' || ticket.descripcion.trim() === '') {
                         console.log(`âš ï¸ Ticket ${ticket.id} sin contenido suficiente para recomendaciones`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'sin_contenido' };
@@ -256,7 +270,7 @@ export function AnalistaPage() {
                             'Authorization': `Bearer ${token}`,
                             'Content-Type': 'application/json'
                         },
-                        // Aumentar timeout para requests mÃ¡s robustos
+                        // Aumentar timeout para requests más robustos
                         signal: AbortSignal.timeout(15000) // 15 segundos timeout
                     });
 
@@ -271,12 +285,12 @@ export function AnalistaPage() {
                             algoritmo: data.algoritmo || 'legacy'
                         };
                     } else {
-                        // Log del error especÃ­fico pero no fallar
+                        // Log del error específico pero no fallar
                         console.warn(`âš ï¸ Error ${response.status} verificando recomendaciones para ticket ${ticket.id}`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: `error_${response.status}` };
                     }
                 } catch (fetchError) {
-                    // Manejar errores individuales sin fallar toda la operaciÃ³n
+                    // Manejar errores individuales sin fallar toda la operación
                     if (fetchError.name === 'AbortError') {
                         console.warn(`â° Timeout verificando recomendaciones para ticket ${ticket.id}`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'timeout' };
@@ -292,7 +306,7 @@ export function AnalistaPage() {
 
             const resultados = await Promise.all(recomendacionesPromises);
 
-            // AnÃ¡lisis detallado de resultados
+            // Análisis detallado de resultados
             const ticketsConRecomendaciones = resultados.filter(r => r.tieneRecomendaciones);
             const ticketsSinRecomendaciones = resultados.filter(r => !r.tieneRecomendaciones);
 
@@ -303,7 +317,7 @@ export function AnalistaPage() {
                 detalles: resultados
             });
 
-            // Log especÃ­fico para tickets sin recomendaciones
+            // Log específico para tickets sin recomendaciones
             if (ticketsSinRecomendaciones.length > 0) {
                 console.log('âš ï¸ Tickets sin recomendaciones:', ticketsSinRecomendaciones.map(t => ({
                     id: t.ticketId,
@@ -320,7 +334,7 @@ export function AnalistaPage() {
             });
             setTicketsConRecomendaciones(ticketsConRecomendacionesSet);
 
-            console.log(`âœ… VerificaciÃ³n de recomendaciones completada para ${tickets.length} tickets`);
+            console.log(`✅ Verificación de recomendaciones completada para ${tickets.length} tickets`);
         } catch (error) {
             console.error('âŒ Error general verificando recomendaciones:', error);
             // En caso de error general, limpiar el estado
@@ -328,7 +342,7 @@ export function AnalistaPage() {
         }
     };
 
-    // Conectar WebSocket cuando el usuario estÃ© autenticado
+    // Conectar WebSocket cuando el usuario esté autenticado
     useEffect(() => {
         if (store.auth.isAuthenticated && store.auth.token && !store.websocket.connected && !store.websocket.connecting) {
             const socket = connectWebSocket(store.auth.token);
@@ -347,24 +361,24 @@ export function AnalistaPage() {
         };
     }, [store.auth.isAuthenticated, store.auth.token, store.websocket.connected, store.websocket.connecting]);
 
-    // Configurar sincronizaciÃ³n crÃ­tica en tiempo real
+    // Configurar sincronización crítica en tiempo real
     useEffect(() => {
         if (store.auth.user && store.websocket.connected && store.websocket.socket) {
-            // Unirse a todas las rooms crÃ­ticas inmediatamente
+            // Unirse a todas las rooms críticas inmediatamente
             joinAllCriticalRooms(store.websocket.socket, store.auth.user);
 
-            // Configurar sincronizaciÃ³n crÃ­tica
+            // Configurar sincronización crítica
             const syncConfig = startRealtimeSync({
                 syncTypes: ['tickets', 'comentarios', 'asignaciones'],
                 onSyncTriggered: (data) => {
-                    console.log('ðŸš¨ SincronizaciÃ³n crÃ­tica activada en AnalistaPage:', data);
+                    console.log('🔄 Sincronización crítica activada en AnalistaPage:', data);
                     if (data.type === 'tickets' || data.priority === 'critical') {
                         actualizarTickets();
                     }
                 }
             });
 
-            // Unirse a rooms crÃ­ticos de todos los tickets asignados
+            // Unirse a rooms críticos de todos los tickets asignados
             const ticketIds = tickets.map(ticket => ticket.id);
             if (ticketIds.length > 0) {
                 joinCriticalRooms(store.websocket.socket, ticketIds, store.auth.user);
@@ -372,10 +386,10 @@ export function AnalistaPage() {
         }
     }, [store.auth.user, store.websocket.connected, tickets.length]);
 
-    // Efecto para manejar sincronizaciÃ³n manual desde Footer
+    // Efecto para manejar sincronización manual desde Footer
     useEffect(() => {
         const handleManualSync = (event) => {
-            console.log('ðŸ"„ SincronizaciÃ³n manual recibida en AnalistaPage:', event.detail);
+            console.log('🔄 Sincronización manual recibida en AnalistaPage:', event.detail);
             if (event.detail.role === 'analista') {
                 actualizarTickets();
             }
@@ -607,8 +621,48 @@ export function AnalistaPage() {
     };
 
     const generarRecomendacion = (ticket) => {
-        // Redirigir a la vista de recomendaciÃ³n IA
+        // Redirigir a la vista de recomendación IA
         navigate(`/ticket/${ticket.id}/recomendacion-ia`);
+    };
+
+    // Función para iniciar trabajo en un ticket
+    const iniciarTrabajo = async (ticketId) => {
+        try {
+            await cambiarEstadoTicket(ticketId, 'en_proceso');
+            console.log(`✅ Trabajo iniciado en ticket ${ticketId}`);
+        } catch (err) {
+            console.error('Error al iniciar trabajo:', err);
+            setError('Error al iniciar trabajo en el ticket');
+        }
+    };
+
+    // Función para marcar ticket como resuelto
+    const marcarComoResuelto = async (ticketId) => {
+        try {
+            await cambiarEstadoTicket(ticketId, 'resuelto');
+            console.log(`✅ Ticket ${ticketId} marcado como resuelto`);
+        } catch (err) {
+            console.error('Error al marcar como resuelto:', err);
+            setError('Error al marcar ticket como resuelto');
+        }
+    };
+
+    // Función para escalar ticket al supervisor
+    const escalarTicket = async (ticketId) => {
+        try {
+            // La escalación se maneja cambiando el estado a 'en_espera'
+            await cambiarEstadoTicket(ticketId, 'en_espera');
+
+            // Emitir acción crítica de escalación
+            if (store.websocket.socket) {
+                emitCriticalTicketAction(store.websocket.socket, ticketId, 'escalado', store.auth.user);
+            }
+
+            console.log(`🚨 Ticket ${ticketId} escalado al supervisor`);
+        } catch (err) {
+            console.error('Error al escalar ticket:', err);
+            setError('Error al escalar ticket al supervisor');
+        }
     };
 
     const handleInfoChange = (e) => {
@@ -622,14 +676,14 @@ export function AnalistaPage() {
 
     const updateInfo = async () => {
         try {
-            // Validar contraseÃ±as si se proporcionan
+            // Validar contraseñas si se proporcionan
             if (infoData.password && infoData.password !== infoData.confirmPassword) {
-                setError('Las contraseÃ±as no coinciden');
+                setError('Las contraseñas no coinciden');
                 return;
             }
 
             if (infoData.password && infoData.password.length < 6) {
-                setError('La contraseÃ±a debe tener al menos 6 caracteres');
+                setError('La contraseña debe tener al menos 6 caracteres');
                 return;
             }
 
@@ -661,7 +715,7 @@ export function AnalistaPage() {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.message || 'Error al actualizar informaciÃ³n');
+                throw new Error(errorData.message || 'Error al actualizar información');
             }
 
             // Actualizar los datos locales
@@ -673,7 +727,7 @@ export function AnalistaPage() {
                 especialidad: infoData.especialidad
             }));
 
-            alert('InformaciÃ³n actualizada exitosamente');
+            alert('Información actualizada exitosamente');
             setShowInfoForm(false);
             setError('');
         } catch (err) {
@@ -720,7 +774,7 @@ export function AnalistaPage() {
 
     return (
         <div className="hyper-layout d-flex">
-            {/* Sidebar central dinÃ¡mico */}
+            {/* Sidebar central dinámico */}
             <SideBarCentral
                 sidebarHidden={sidebarHidden}
                 activeView={activeView}
@@ -736,18 +790,18 @@ export function AnalistaPage() {
                             <button
                                 className="hyper-sidebar-toggle btn btn-link p-2"
                                 onClick={toggleSidebar}
-                                title={sidebarHidden ? "Mostrar menÃº" : "Ocultar menÃº"}
+                                title={sidebarHidden ? "Mostrar menú" : "Ocultar menú"}
                             >
                                 <i className="fas fa-bars"></i>
                             </button>
 
-                            {/* Barra de bÃºsqueda */}
+                            {/* Barra de búsqueda */}
                             <div className="hyper-search position-relative">
                                 <i className="fas fa-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
                                 <input
                                     type="text"
                                     className="form-control pe-5"
-                                    placeholder="Buscar tickets por tÃ­tulo..."
+                                    placeholder="Buscar tickets por titulo..."
                                     value={searchQuery}
                                     onChange={(e) => handleSearch(e.target.value)}
                                     onFocus={() => {
@@ -764,13 +818,13 @@ export function AnalistaPage() {
                                             setSearchResults([]);
                                             setShowSearchResults(false);
                                         }}
-                                        title="Limpiar bÃºsqueda"
+                                        title="Limpiar búsqueda"
                                     >
                                         <i className="fas fa-times text-muted"></i>
                                     </button>
                                 )}
 
-                                {/* Resultados de bÃºsqueda */}
+                                {/* Resultados de búsqueda */}
                                 {showSearchResults && searchResults.length > 0 && (
                                     <div className="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-lg dropdown-menu-custom">
                                         <div className="p-3">
@@ -794,7 +848,7 @@ export function AnalistaPage() {
                                                 >
                                                     <div className="fw-semibold">#{ticket.id} - {ticket.titulo}</div>
                                                     <small className="text-muted">
-                                                        {ticket.estado} â€¢ {ticket.prioridad}
+                                                        {ticket.estado} • {ticket.prioridad}
                                                     </small>
                                                 </div>
                                             ))}
@@ -858,7 +912,7 @@ export function AnalistaPage() {
                                                 onClick={logout}
                                             >
                                                 <i className="fas fa-sign-out-alt"></i>
-                                                Cerrar SesiÃ³n
+                                                Cerrar Sesion
                                             </button>
                                         </div>
                                     </div>
@@ -1158,7 +1212,7 @@ export function AnalistaPage() {
                                                         <option value="baja">Baja</option>
                                                         <option value="media">Media</option>
                                                         <option value="alta">Alta</option>
-                                                        <option value="critica">CrÃ­tica</option>
+                                                        <option value="critica">Crítica</option>
                                                     </select>
                                                 </div>
                                                 <button
@@ -1182,132 +1236,297 @@ export function AnalistaPage() {
                                         <table className="table table-hover mb-0">
                                             <thead className="table-light">
                                                 <tr>
-                                                    <th>ID</th>
-                                                    <th>TÃ­tulo</th>
-                                                    <th>Estado</th>
-                                                    <th>Prioridad</th>
-                                                    <th>Cliente</th>
-                                                    <th>Fecha</th>
-                                                    <th>Acciones</th>
+                                                    <th className="text-center">ID</th>
+                                                    <th className="text-center">Título</th>
+                                                    <th className="text-center">Estado</th>
+                                                    <th className="text-center">Prioridad</th>
+                                                    <th className="text-center">Cliente</th>
+                                                    <th className="text-center">Fecha</th>
+                                                    <th className="text-center">Acciones</th>
+                                                    <th className="text-center px-2" style={{ width: '50px' }}>Expandir</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {filteredTickets.map((ticket) => (
-                                                    <tr key={ticket.id}>
-                                                        <td>
-                                                            <div className="d-flex align-items-center justify-content-center">
-                                                                <span className="me-2">#{ticket.id}</span>
-                                                                {ticket.url_imagen ? (
-                                                                    <img
-                                                                        src={ticket.url_imagen}
-                                                                        alt="Imagen del ticket"
-                                                                        className="img-thumbnail thumbnail-small"
-                                                                    />
-                                                                ) : (
-                                                                    <span className="text-muted">
-                                                                        <i className="fas fa-image icon-tiny"></i>
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div className="fw-semibold">{ticket.titulo}</div>
-                                                            <small className="text-muted">{ticket.descripcion}</small>
-                                                        </td>
-                                                        <td>
-                                                            <span className="d-flex align-items-center gap-2">
-                                                                <span
-                                                                    className="rounded-circle d-inline-block"
-                                                                    style={{
-                                                                        width: '8px',
-                                                                        height: '8px',
-                                                                        backgroundColor: ticket.estado === 'activo' ? 'var(--ct-warning)' :
-                                                                            ticket.estado === 'en_progreso' ? 'var(--ct-info)' : 'var(--ct-success)'
-                                                                    }}
-                                                                ></span>
-                                                                <span className="text-dark dark-theme:text-white">
-                                                                    {ticket.estado}
-                                                                </span>
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <span className="d-flex align-items-center gap-2">
-                                                                <span
-                                                                    className="rounded-circle d-inline-block"
-                                                                    style={{
-                                                                        width: '8px',
-                                                                        height: '8px',
-                                                                        backgroundColor: ticket.prioridad === 'baja' ? 'var(--ct-secondary)' :
-                                                                            ticket.prioridad === 'media' ? 'var(--ct-blue)' :
-                                                                                ticket.prioridad === 'alta' ? 'var(--ct-warning)' : 'var(--ct-danger)'
-                                                                    }}
-                                                                ></span>
-                                                                <span className="text-dark dark-theme:text-white">
-                                                                    {ticket.prioridad}
-                                                                </span>
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <span className="d-flex align-items-center gap-2">
-                                                                <span
-                                                                    className="rounded-circle d-inline-block"
-                                                                    style={{
-                                                                        width: '8px',
-                                                                        height: '8px',
-                                                                        backgroundColor: 'var(--ct-info)'
-                                                                    }}
-                                                                ></span>
-                                                                <span className="text-dark dark-theme:text-white">
-                                                                    {ticket.cliente?.nombre || 'N/A'}
-                                                                </span>
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <span className="d-flex align-items-center gap-2">
-                                                                <span
-                                                                    className="rounded-circle d-inline-block"
-                                                                    style={{
-                                                                        width: '8px',
-                                                                        height: '8px',
-                                                                        backgroundColor: 'var(--ct-info)'
-                                                                    }}
-                                                                ></span>
-                                                                <span className="text-dark dark-theme:text-white">
-                                                                    {new Date(ticket.fecha_creacion).toLocaleDateString()}
-                                                                </span>
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <div className="d-flex flex-wrap gap-1 justify-content-center">
-                                                                <button
-                                                                    className="btn btn-sidebar-teal btn-sm"
-                                                                    title="Ver detalles"
-                                                                    onClick={() => changeView(`ticket-${ticket.id}`)}
-                                                                >
-                                                                    <i className="fas fa-eye"></i>
-                                                                </button>
-                                                                {ticket.estado === 'en_espera' && (
+                                                {filteredTickets.map((ticket) => {
+                                                    const isExpanded = expandedTickets.has(ticket.id);
+                                                    return (
+                                                        <React.Fragment key={ticket.id}>
+                                                            <tr>
+                                                                <td>
+                                                                    <div className="d-flex align-items-center justify-content-center">
+                                                                        <span className="me-2">#{ticket.id}</span>
+                                                                        {ticket.url_imagen ? (
+                                                                            <img
+                                                                                src={ticket.url_imagen}
+                                                                                alt="Imagen del ticket"
+                                                                                className="img-thumbnail thumbnail-small"
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="text-muted">
+                                                                                <i className="fas fa-image icon-tiny"></i>
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <div className="text-center">
+                                                                        <div className="fw-semibold text-dark dark-theme:text-white">{ticket.titulo}</div>
+                                                                        <small className="text-muted">{ticket.descripcion}</small>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <div className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: ticket.estado === 'activo' ? 'var(--ct-warning)' :
+                                                                                        ticket.estado === 'en_progreso' ? 'var(--ct-info)' : 'var(--ct-success)'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.estado}
+                                                                            </span>
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <div className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: ticket.prioridad === 'baja' ? 'var(--ct-secondary)' :
+                                                                                        ticket.prioridad === 'media' ? 'var(--ct-blue)' :
+                                                                                            ticket.prioridad === 'alta' ? 'var(--ct-warning)' : 'var(--ct-danger)'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.prioridad}
+                                                                            </span>
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <div className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: 'var(--ct-info)'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {ticket.cliente?.nombre || 'N/A'}
+                                                                            </span>
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <div className="text-center">
+                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                            <span
+                                                                                className="rounded-circle d-inline-block"
+                                                                                style={{
+                                                                                    width: '8px',
+                                                                                    height: '8px',
+                                                                                    backgroundColor: 'var(--ct-info)'
+                                                                                }}
+                                                                            ></span>
+                                                                            <span className="text-dark dark-theme:text-white">
+                                                                                {new Date(ticket.fecha_creacion).toLocaleDateString()}
+                                                                            </span>
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <div className="d-flex flex-wrap gap-1 justify-content-center">
+                                                                        {/* Ver detalles */}
+                                                                        <button
+                                                                            className="btn btn-sidebar-teal btn-sm"
+                                                                            title="Ver detalles"
+                                                                            onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                                        >
+                                                                            <i className="fas fa-eye"></i>
+                                                                        </button>
+
+                                                                        {/* Comentarios */}
+                                                                        <button
+                                                                            className="btn btn-sidebar-accent btn-sm"
+                                                                            title="Ver y agregar comentarios"
+                                                                            onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
+                                                                        >
+                                                                            <i className="fas fa-comment-dots"></i>
+                                                                        </button>
+
+                                                                        {/* Chat con cliente */}
+                                                                        <button
+                                                                            className="btn btn-sidebar-secondary btn-sm"
+                                                                            title="Chat con cliente"
+                                                                            onClick={() => window.open(`/ticket/${ticket.id}/chat-analista-cliente`, '_self')}
+                                                                        >
+                                                                            <i className="fas fa-comments"></i>
+                                                                        </button>
+
+                                                                        {/* Chat con supervisor */}
+                                                                        <button
+                                                                            className="btn btn-sidebar-primary btn-sm"
+                                                                            title="Chat con supervisor"
+                                                                            onClick={() => window.open(`/ticket/${ticket.id}/chat-supervisor-analista`, '_self')}
+                                                                        >
+                                                                            <i className="fas fa-user-tie"></i>
+                                                                        </button>
+
+                                                                        {/* Escalar ticket */}
+                                                                        <button
+                                                                            className="btn btn-sidebar-warning btn-sm"
+                                                                            title="Escalar al supervisor"
+                                                                            onClick={() => escalarTicket(ticket.id)}
+                                                                        >
+                                                                            <i className="fas fa-arrow-up"></i>
+                                                                        </button>
+
+                                                                        {/* Iniciar trabajo - solo si está en espera */}
+                                                                        {ticket.estado === 'en_espera' && (
+                                                                            <button
+                                                                                className="btn btn-sidebar-success btn-sm"
+                                                                                title="Iniciar trabajo"
+                                                                                onClick={() => iniciarTrabajo(ticket.id)}
+                                                                            >
+                                                                                <i className="fas fa-play"></i>
+                                                                            </button>
+                                                                        )}
+
+                                                                        {/* Marcar como resuelto - solo si está en proceso */}
+                                                                        {ticket.estado === 'en_proceso' && (
+                                                                            <button
+                                                                                className="btn btn-outline-success btn-sm"
+                                                                                title="Marcar como resuelto"
+                                                                                onClick={() => marcarComoResuelto(ticket.id)}
+                                                                            >
+                                                                                <i className="fas fa-check"></i>
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="text-center px-2">
                                                                     <button
-                                                                        className="btn btn-sidebar-success btn-sm"
-                                                                        title="Iniciar trabajo"
-                                                                        onClick={() => iniciarTrabajo(ticket.id)}
+                                                                        className="btn btn-outline-secondary btn-sm"
+                                                                        style={{
+                                                                            height: '100%',
+                                                                            minHeight: '60px',
+                                                                            width: '40px',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center'
+                                                                        }}
+                                                                        onClick={() => toggleTicketExpansion(ticket.id)}
+                                                                        title={isExpanded ? "Colapsar acciones" : "Expandir acciones"}
                                                                     >
-                                                                        <i className="fas fa-play"></i>
+                                                                        <i className={`fas ${isExpanded ? 'fa-arrow-down' : 'fa-arrow-up'}`}></i>
                                                                     </button>
-                                                                )}
-                                                                {ticket.estado === 'en_proceso' && (
-                                                                    <button
-                                                                        className="btn btn-sidebar-warning btn-sm"
-                                                                        title="Marcar como resuelto"
-                                                                        onClick={() => marcarComoResuelto(ticket.id)}
-                                                                    >
-                                                                        <i className="fas fa-check"></i>
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                                </td>
+                                                            </tr>
+
+                                                            {/* Fila expandida con acciones grandes - solo se muestra si está expandido */}
+                                                            {isExpanded && (
+                                                                <tr>
+                                                                    <td colSpan="8" className="px-0 py-0">
+                                                                        <div className="w-100 bg-light border-top">
+                                                                            {/* Área de acciones expandida - solo botones */}
+                                                                            <div className="px-4 py-3">
+                                                                                <div className="d-flex gap-2 flex-wrap justify-content-center" style={{ maxWidth: '100%' }}>
+                                                                                    {/* Fila 1: Ver detalles, Comentarios, Chat con cliente */}
+                                                                                    <button
+                                                                                        className="btn btn-sidebar-teal"
+                                                                                        style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                        title="Ver detalles del ticket"
+                                                                                        onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                                                    >
+                                                                                        <i className="fas fa-eye me-2"></i>
+                                                                                        Ver Detalles
+                                                                                    </button>
+
+                                                                                    <button
+                                                                                        className="btn btn-sidebar-accent"
+                                                                                        style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                        title="Ver y agregar comentarios"
+                                                                                        onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
+                                                                                    >
+                                                                                        <i className="fas fa-comment-dots me-2"></i>
+                                                                                        Comentarios
+                                                                                    </button>
+
+                                                                                    <button
+                                                                                        className="btn btn-sidebar-secondary"
+                                                                                        style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                        title="Chat con cliente"
+                                                                                        onClick={() => window.open(`/ticket/${ticket.id}/chat-analista-cliente`, '_self')}
+                                                                                    >
+                                                                                        <i className="fas fa-comments me-2"></i>
+                                                                                        Chat Cliente
+                                                                                    </button>
+
+                                                                                    {/* Fila 2: Chat con supervisor, Escalar, Iniciar/Resolver */}
+                                                                                    <button
+                                                                                        className="btn btn-sidebar-primary"
+                                                                                        style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                        title="Chat con supervisor"
+                                                                                        onClick={() => window.open(`/ticket/${ticket.id}/chat-supervisor-analista`, '_self')}
+                                                                                    >
+                                                                                        <i className="fas fa-user-tie me-2"></i>
+                                                                                        Chat Supervisor
+                                                                                    </button>
+
+                                                                                    <button
+                                                                                        className="btn btn-sidebar-warning"
+                                                                                        style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                        title="Escalar al supervisor"
+                                                                                        onClick={() => escalarTicket(ticket.id)}
+                                                                                    >
+                                                                                        <i className="fas fa-arrow-up me-2"></i>
+                                                                                        Escalar
+                                                                                    </button>
+
+                                                                                    {/* Botón condicional - Iniciar o Resolver */}
+                                                                                    {ticket.estado === 'en_espera' && (
+                                                                                        <button
+                                                                                            className="btn btn-sidebar-success"
+                                                                                            style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                            title="Iniciar trabajo"
+                                                                                            onClick={() => iniciarTrabajo(ticket.id)}
+                                                                                        >
+                                                                                            <i className="fas fa-play me-2"></i>
+                                                                                            Iniciar
+                                                                                        </button>
+                                                                                    )}
+
+                                                                                    {ticket.estado === 'en_proceso' && (
+                                                                                        <button
+                                                                                            className="btn btn-outline-success"
+                                                                                            style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                            title="Marcar como resuelto"
+                                                                                            onClick={() => marcarComoResuelto(ticket.id)}
+                                                                                        >
+                                                                                            <i className="fas fa-check me-2"></i>
+                                                                                            Resolver
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
@@ -1327,9 +1546,9 @@ export function AnalistaPage() {
                                             <thead className="table-light">
                                                 <tr>
                                                     <th>ID</th>
-                                                    <th>TÃ­tulo</th>
+                                                    <th>Título</th>
                                                     <th>Cliente</th>
-                                                    <th>Fecha ResoluciÃ³n</th>
+                                                    <th>Fecha Resolución</th>
                                                     <th>Acciones</th>
                                                 </tr>
                                             </thead>
@@ -1362,10 +1581,10 @@ export function AnalistaPage() {
                         </>
                     )}
 
-                    {/* EstadÃ­sticas View */}
+                    {/* Estadísticas View */}
                     {activeView === 'estadisticas' && (
                         <>
-                            <h1 className="hyper-page-title">Mis EstadÃ­sticas</h1>
+                            <h1 className="hyper-page-title">Mis Estadísticas</h1>
                             <div className="row g-4">
                                 <div className="col-md-6">
                                     <div className="hyper-widget card border-0 shadow-sm">
@@ -1375,7 +1594,7 @@ export function AnalistaPage() {
                                         <div className="hyper-widget-body card-body">
                                             <div className="text-center py-4">
                                                 <i className="fas fa-chart-pie fa-3x text-muted mb-3"></i>
-                                                <p className="text-muted">EstadÃ­sticas detalladas en desarrollo</p>
+                                                <p className="text-muted">Estadísticas detalladas en desarrollo</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1388,7 +1607,7 @@ export function AnalistaPage() {
                                         <div className="hyper-widget-body card-body">
                                             <div className="text-center py-4">
                                                 <i className="fas fa-trophy fa-3x text-muted mb-3"></i>
-                                                <p className="text-muted">MÃ©tricas de rendimiento en desarrollo</p>
+                                                <p className="text-muted">Métricas de rendimiento en desarrollo</p>
                                             </div>
                                         </div>
                                     </div>

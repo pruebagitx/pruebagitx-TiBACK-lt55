@@ -49,8 +49,9 @@ export function SupervisorPage() {
         confirmPassword: ''
     });
     const [ticketsConRecomendaciones, setTicketsConRecomendaciones] = useState(new Set());
+    const [expandedTickets, setExpandedTickets] = useState(new Set());
 
-    // Estados para el nuevo diseÃ±o
+    // Estados para el nuevo diseño
     const [sidebarHidden, setSidebarHidden] = useState(false);
     const [activeView, setActiveView] = useState('dashboard');
     const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -101,12 +102,25 @@ export function SupervisorPage() {
         setSearchResults([]);
     };
 
+    // Función para alternar expansión de ticket
+    const toggleTicketExpansion = (ticketId) => {
+        setExpandedTickets(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(ticketId)) {
+                newSet.delete(ticketId);
+            } else {
+                newSet.add(ticketId);
+            }
+            return newSet;
+        });
+    };
+
     const selectTicketFromSearch = (ticket) => {
         setActiveView(`ticket-${ticket.id}`);
         closeSearchResults();
     };
 
-    // FunciÃ³n helper para actualizar tickets sin recargar la pÃ¡gina
+    // Función helper para actualizar tickets sin recargar la página
     const actualizarTickets = async () => {
         try {
             const token = store.auth.token;
@@ -125,7 +139,7 @@ export function SupervisorPage() {
         }
     };
 
-    // FunciÃ³n para cargar tickets cerrados
+    // Función para cargar tickets cerrados
     const cargarTicketsCerrados = async () => {
         try {
             setLoadingCerrados(true);
@@ -147,7 +161,7 @@ export function SupervisorPage() {
         }
     };
 
-    // FunciÃ³n para actualizar la lista de analistas
+    // Función para actualizar la lista de analistas
     const actualizarAnalistas = async () => {
         try {
             const token = store.auth.token;
@@ -160,7 +174,7 @@ export function SupervisorPage() {
             if (response.ok) {
                 const analistasData = await response.json();
                 setAnalistas(analistasData);
-                // TambiÃ©n actualizar el store global
+                // También actualizar el store global
                 dispatch({ type: "analistas_set_list", payload: analistasData });
             }
         } catch (err) {
@@ -168,7 +182,7 @@ export function SupervisorPage() {
         }
     };
 
-    // FunciÃ³n helper para actualizar tanto tickets activos como cerrados
+    // Función helper para actualizar tanto tickets activos como cerrados
     const actualizarTodasLasTablas = async () => {
         await actualizarTickets();
         if (showCerrados) {
@@ -176,7 +190,7 @@ export function SupervisorPage() {
         }
     };
 
-    // FunciÃ³n especÃ­fica para manejar tickets cerrados
+    // Función específica para manejar tickets cerrados
     const manejarTicketCerrado = (ticketId) => {
 
         // Remover inmediatamente de la lista de tickets activos
@@ -187,7 +201,7 @@ export function SupervisorPage() {
             return prev.filter(ticket => ticket.id !== ticketId);
         });
 
-        // Si estÃ¡ viendo la lista de cerrados, actualizar inmediatamente
+        // Si está viendo la lista de cerrados, actualizar inmediatamente
         if (showCerrados) {
             cargarTicketsCerrados();
         }
@@ -212,7 +226,7 @@ export function SupervisorPage() {
         };
     }, [store.auth.isAuthenticated, store.auth.token]);
 
-    // Funciones de filtrado y estadÃ­sticas
+    // Funciones de filtrado y estadísticas
     const getFilteredTickets = () => {
         let filtered = tickets;
 
@@ -338,7 +352,7 @@ export function SupervisorPage() {
     // Verificar recomendaciones para todos los tickets
     useEffect(() => {
         if (tickets.length > 0 && store.auth.token && store.auth.isAuthenticated) {
-            // Agregar un pequeÃ±o delay para evitar llamadas mÃºltiples
+            // Agregar un pequeño delay para evitar llamadas múltiples
             const timeoutId = setTimeout(() => {
                 verificarRecomendaciones();
             }, 500);
@@ -351,7 +365,7 @@ export function SupervisorPage() {
         try {
             const token = store.auth.token;
 
-            // Verificar que tenemos tickets y token vÃ¡lido
+            // Verificar que tenemos tickets y token válido
             if (!tickets || tickets.length === 0 || !token) {
                 console.log('âš ï¸ No hay tickets o token para verificar recomendaciones');
                 return;
@@ -359,7 +373,7 @@ export function SupervisorPage() {
 
             const recomendacionesPromises = tickets.map(async (ticket) => {
                 try {
-                    // Validar que el ticket tenga contenido vÃ¡lido
+                    // Validar que el ticket tenga contenido válido
                     if (!ticket.titulo || !ticket.descripcion || ticket.titulo.trim() === '' || ticket.descripcion.trim() === '') {
                         console.log(`âš ï¸ Ticket ${ticket.id} sin contenido suficiente para recomendaciones`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'sin_contenido' };
@@ -370,7 +384,7 @@ export function SupervisorPage() {
                             'Authorization': `Bearer ${token}`,
                             'Content-Type': 'application/json'
                         },
-                        // Aumentar timeout para requests mÃ¡s robustos
+                        // Aumentar timeout para requests más robustos
                         signal: AbortSignal.timeout(15000) // 15 segundos timeout
                     });
 
@@ -385,12 +399,12 @@ export function SupervisorPage() {
                             algoritmo: data.algoritmo || 'legacy'
                         };
                     } else {
-                        // Log del error especÃ­fico pero no fallar
+                        // Log del error específico pero no fallar
                         console.warn(`âš ï¸ Error ${response.status} verificando recomendaciones para ticket ${ticket.id}`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: `error_${response.status}` };
                     }
                 } catch (fetchError) {
-                    // Manejar errores individuales sin fallar toda la operaciÃ³n
+                    // Manejar errores individuales sin fallar toda la operación
                     if (fetchError.name === 'AbortError') {
                         console.warn(`â° Timeout verificando recomendaciones para ticket ${ticket.id}`);
                         return { ticketId: ticket.id, tieneRecomendaciones: false, razon: 'timeout' };
@@ -406,7 +420,7 @@ export function SupervisorPage() {
 
             const resultados = await Promise.all(recomendacionesPromises);
 
-            // AnÃ¡lisis detallado de resultados
+            // Análisis detallado de resultados
             const ticketsConRecomendaciones = resultados.filter(r => r.tieneRecomendaciones);
             const ticketsSinRecomendaciones = resultados.filter(r => !r.tieneRecomendaciones);
 
@@ -417,7 +431,7 @@ export function SupervisorPage() {
                 detalles: resultados
             });
 
-            // Log especÃ­fico para tickets sin recomendaciones
+            // Log específico para tickets sin recomendaciones
             if (ticketsSinRecomendaciones.length > 0) {
                 console.log('âš ï¸ Tickets sin recomendaciones:', ticketsSinRecomendaciones.map(t => ({
                     id: t.ticketId,
@@ -434,7 +448,7 @@ export function SupervisorPage() {
             });
             setTicketsConRecomendaciones(ticketsConRecomendacionesSet);
 
-            console.log(`âœ… VerificaciÃ³n de recomendaciones completada para ${tickets.length} tickets`);
+            console.log(`✅ Verificación de recomendaciones completada para ${tickets.length} tickets`);
         } catch (error) {
             console.error('âŒ Error general verificando recomendaciones:', error);
             // En caso de error general, limpiar el estado
@@ -442,17 +456,17 @@ export function SupervisorPage() {
         }
     };
 
-    // Configurar sincronizaciÃ³n crÃ­tica en tiempo real
+    // Configurar sincronización crítica en tiempo real
     useEffect(() => {
         if (store.auth.user && store.websocket.connected && store.websocket.socket) {
-            // Unirse a todas las rooms crÃ­ticas inmediatamente
+            // Unirse a todas las rooms críticas inmediatamente
             joinAllCriticalRooms(store.websocket.socket, store.auth.user);
 
-            // Configurar sincronizaciÃ³n crÃ­tica
+            // Configurar sincronización crítica
             const syncConfig = startRealtimeSync({
                 syncTypes: ['tickets', 'comentarios', 'asignaciones', 'analistas'],
                 onSyncTriggered: (data) => {
-                    console.log('ðŸš¨ SincronizaciÃ³n crÃ­tica activada en SupervisorPage:', data);
+                    console.log('🔄 Sincronización crítica activada en SupervisorPage:', data);
                     if (data.type === 'tickets' || data.priority === 'critical') {
                         actualizarTickets();
                     }
@@ -462,7 +476,7 @@ export function SupervisorPage() {
                 }
             });
 
-            // Unirse a rooms crÃ­ticos de todos los tickets supervisados
+            // Unirse a rooms críticos de todos los tickets supervisados
             const ticketIds = tickets.map(ticket => ticket.id);
             if (ticketIds.length > 0) {
                 joinCriticalRooms(store.websocket.socket, ticketIds, store.auth.user);
@@ -470,10 +484,10 @@ export function SupervisorPage() {
         }
     }, [store.auth.user, store.websocket.connected, tickets.length]);
 
-    // Efecto para manejar sincronizaciÃ³n manual desde Footer
+    // Efecto para manejar sincronización manual desde Footer
     useEffect(() => {
         const handleManualSync = (event) => {
-            console.log('ðŸ"„ SincronizaciÃ³n manual recibida en SupervisorPage:', event.detail);
+            console.log('🔄 Sincronización manual recibida en SupervisorPage:', event.detail);
             if (event.detail.role === 'supervisor') {
                 actualizarTickets();
                 actualizarAnalistas();
@@ -958,6 +972,28 @@ export function SupervisorPage() {
         );
     };
 
+    // Función helper para detectar si un ticket fue escalado por un analista
+    const fueEscaladoPorAnalista = (ticket) => {
+        if (!ticket.comentarios || !Array.isArray(ticket.comentarios)) {
+            return false;
+        }
+
+        // Un ticket fue escalado si:
+        // 1. Está en estado 'en_espera'
+        // 2. Tiene comentarios de escalación
+        // 3. No tiene asignación actual (fue desasignado)
+        const tieneComentarioEscalacion = ticket.comentarios.some(comentario =>
+            comentario.texto && (
+                comentario.texto.toLowerCase().includes('escalado') ||
+                comentario.texto.toLowerCase().includes('escalación')
+            )
+        );
+
+        return ticket.estado === 'en_espera' &&
+            tieneComentarioEscalacion &&
+            (!ticket.asignacion_actual || !ticket.asignacion_actual.analista);
+    };
+
     const stats = getStats();
     const filteredTickets = getFilteredTickets();
 
@@ -1000,7 +1036,7 @@ export function SupervisorPage() {
                                 <input
                                     type="text"
                                     className="form-control pe-5"
-                                    placeholder="Buscar tickets por tÃ­tulo..."
+                                    placeholder="Buscar tickets por titulo..."
                                     value={searchQuery}
                                     onChange={(e) => handleSearch(e.target.value)}
                                     onFocus={() => {
@@ -1111,7 +1147,7 @@ export function SupervisorPage() {
                                                 onClick={logout}
                                             >
                                                 <i className="fas fa-sign-out-alt"></i>
-                                                Cerrar SesiÃ³n
+                                                Cerrar Sesion
                                             </button>
                                         </div>
                                     </div>
@@ -1362,11 +1398,12 @@ export function SupervisorPage() {
                                         <small className="text-muted">
                                             {analistas.length} analista{analistas.length !== 1 ? 's' : ''} disponible{analistas.length !== 1 ? 's' : ''}
                                         </small>
-                                        <div className="dropdown filter-dropdown">
+                                        <div className="dropdown">
                                             <button
                                                 className="btn btn-outline-primary btn-sm dropdown-toggle"
                                                 type="button"
-                                                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                                                data-bs-toggle="dropdown"
+                                                aria-expanded="false"
                                             >
                                                 <i className="fas fa-filter me-1"></i>
                                                 Filtrar
@@ -1375,12 +1412,9 @@ export function SupervisorPage() {
                                                 )}
                                             </button>
 
-                                            {showFilterDropdown && (
-                                                <div className="dropdown-menu show position-absolute dropdown-menu-positioned">
-                                                    <div className="dropdown-header">
-                                                        <h6 className="mb-0">Filtrar Tickets</h6>
-                                                    </div>
-
+                                            <ul className="dropdown-menu">
+                                                <li><h6 className="dropdown-header">Filtrar Tickets</h6></li>
+                                                <li>
                                                     <div className="px-3 py-2">
                                                         <label className="form-label small">Por Estado:</label>
                                                         <select
@@ -1396,9 +1430,10 @@ export function SupervisorPage() {
                                                             <option value="cerrado">Cerrado</option>
                                                         </select>
                                                     </div>
-
+                                                </li>
+                                                <li>
                                                     <div className="px-3 py-2">
-                                                        <label className="form-label small">Por AsignaciÃ³n:</label>
+                                                        <label className="form-label small">Por Asignación:</label>
                                                         <select
                                                             className="form-select form-select-sm"
                                                             value={filterAsignado}
@@ -1409,7 +1444,8 @@ export function SupervisorPage() {
                                                             <option value="no-asignados">Sin Asignar</option>
                                                         </select>
                                                     </div>
-
+                                                </li>
+                                                <li>
                                                     <div className="px-3 py-2">
                                                         <label className="form-label small">Por Prioridad:</label>
                                                         <select
@@ -1421,34 +1457,26 @@ export function SupervisorPage() {
                                                             <option value="baja">Baja</option>
                                                             <option value="media">Media</option>
                                                             <option value="alta">Alta</option>
-                                                            <option value="critica">CrÃ­tica</option>
+                                                            <option value="critica">Crítica</option>
                                                         </select>
                                                     </div>
-
-                                                    <div className="dropdown-divider"></div>
-                                                    <div className="px-3 py-2">
-                                                        <button
-                                                            className="btn btn-outline-secondary btn-sm w-100"
-                                                            onClick={() => {
-                                                                setFilterEstado('');
-                                                                setFilterAsignado('');
-                                                                setFilterPrioridad('');
-                                                            }}
-                                                        >
-                                                            <i className="fas fa-times me-1"></i>
-                                                            Limpiar filtros
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
+                                                </li>
+                                                <li><hr className="dropdown-divider" /></li>
+                                                <li>
+                                                    <button
+                                                        className="dropdown-item"
+                                                        onClick={() => {
+                                                            setFilterEstado('');
+                                                            setFilterAsignado('');
+                                                            setFilterPrioridad('');
+                                                        }}
+                                                    >
+                                                        <i className="fas fa-times me-1"></i>
+                                                        Limpiar filtros
+                                                    </button>
+                                                </li>
+                                            </ul>
                                         </div>
-                                        <button
-                                            className="btn btn-outline-secondary btn-sm"
-                                            onClick={() => setShowCerrados(!showCerrados)}
-                                        >
-                                            <i className="fas fa-archive me-1"></i>
-                                            {showCerrados ? 'Ocultar' : 'Ver'} Cerrados
-                                        </button>
                                     </div>
                                 </div>
 
@@ -1475,13 +1503,14 @@ export function SupervisorPage() {
                                                 <thead>
                                                     <tr>
                                                         <th className="text-center px-3">ID</th>
-                                                        <th className="px-4">Cliente</th>
-                                                        <th className="px-4">Título</th>
+                                                        <th className="text-center px-4">Cliente</th>
+                                                        <th className="text-center px-4">Título</th>
                                                         <th className="text-center px-3">Estado</th>
                                                         <th className="text-center px-3">Prioridad</th>
                                                         <th className="text-center px-3">Analista</th>
                                                         <th className="text-center px-3">Fecha</th>
                                                         <th className="text-center px-4">Acciones</th>
+                                                        <th className="text-center px-2" style={{ width: '50px' }}>Expandir</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1492,253 +1521,443 @@ export function SupervisorPage() {
                                                             const order = { 'table-danger': 0, 'table-warning': 1, 'table-success': 2 };
                                                             return order[colorA] - order[colorB];
                                                         })
-                                                        .map((ticket) => (
-                                                            <tr key={ticket.id} className={getSemaforoColor(ticket, tickets)}>
-                                                                <td className="text-center px-3">
-                                                                    <div className="d-flex align-items-center justify-content-center">
-                                                                        <span className="me-2">#{ticket.id}</span>
-                                                                        {ticket.url_imagen ? (
-                                                                            <img
-                                                                                src={ticket.url_imagen}
-                                                                                alt="Imagen del ticket"
-                                                                                className="img-thumbnail thumbnail-small"
-                                                                            />
-                                                                        ) : (
-                                                                            <span className="text-muted">
-                                                                                <i className="fas fa-image icon-tiny"></i>
+                                                        .map((ticket) => {
+                                                            const isExpanded = expandedTickets.has(ticket.id);
+                                                            return (
+                                                                <React.Fragment key={ticket.id}>
+                                                                    <tr className={getSemaforoColor(ticket, tickets)}>
+                                                                        <td className="text-center px-3">
+                                                                            <div className="d-flex align-items-center justify-content-center">
+                                                                                <span className="me-2">#{ticket.id}</span>
+                                                                                {ticket.url_imagen ? (
+                                                                                    <img
+                                                                                        src={ticket.url_imagen}
+                                                                                        alt="Imagen del ticket"
+                                                                                        className="img-thumbnail thumbnail-small"
+                                                                                    />
+                                                                                ) : (
+                                                                                    <span className="text-muted">
+                                                                                        <i className="fas fa-image icon-tiny"></i>
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-4">
+                                                                            <span className="d-flex align-items-center gap-2">
+                                                                                <span
+                                                                                    className="rounded-circle d-inline-block"
+                                                                                    style={{
+                                                                                        width: '8px',
+                                                                                        height: '8px',
+                                                                                        backgroundColor: 'var(--ct-info)'
+                                                                                    }}
+                                                                                ></span>
+                                                                                <span className="text-dark dark-theme:text-white">
+                                                                                    {ticket.cliente?.nombre} {ticket.cliente?.apellido}
+                                                                                </span>
                                                                             </span>
-                                                                        )}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-4">
-                                                                    <span className="d-flex align-items-center gap-2">
-                                                                        <span
-                                                                            className="rounded-circle d-inline-block"
-                                                                            style={{
-                                                                                width: '8px',
-                                                                                height: '8px',
-                                                                                backgroundColor: 'var(--ct-info)'
-                                                                            }}
-                                                                        ></span>
-                                                                        <span className="text-dark dark-theme:text-white">
-                                                                            {ticket.cliente?.nombre} {ticket.cliente?.apellido}
-                                                                        </span>
-                                                                    </span>
-                                                                </td>
-                                                                <td className="px-4">
-                                                                    <div>
-                                                                        <div className="fw-semibold mb-1">{ticket.titulo}</div>
-                                                                        <small className="text-muted">
-                                                                            {ticket.descripcion && ticket.descripcion.length > 50
-                                                                                ? `${ticket.descripcion.substring(0, 50)}...`
-                                                                                : ticket.descripcion || 'Sin descripción'
-                                                                            }
-                                                                        </small>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="text-center px-3">
-                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
-                                                                        <span
-                                                                            className={`rounded-circle d-inline-block ${ticket.estado === 'activo' ? 'dot-estado-activo' :
-                                                                                ticket.estado === 'en_progreso' ? 'dot-estado-en-proceso' :
-                                                                                    ticket.estado === 'resuelto' ? 'dot-estado-solucionado' :
-                                                                                        ticket.estado === 'escalado' ? 'dot-estado-escalado' :
-                                                                                            'dot-ct-secondary'
-                                                                                }`}
-                                                                        ></span>
-                                                                        <span className="text-dark dark-theme:text-white">
-                                                                            {ticket.estado}
-                                                                        </span>
-                                                                    </span>
-                                                                </td>
-                                                                <td className="text-center px-3">
-                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
-                                                                        <span
-                                                                            className="rounded-circle d-inline-block"
-                                                                            style={{
-                                                                                width: '8px',
-                                                                                height: '8px',
-                                                                                backgroundColor: ticket.prioridad === 'baja' ? '#28a745' :
-                                                                                    ticket.prioridad === 'media' ? '#ffc107' :
-                                                                                        ticket.prioridad === 'alta' ? '#dc3545' :
-                                                                                            ticket.prioridad === 'critica' ? '#343a40' :
-                                                                                                '#6c757d'
-                                                                            }}
-                                                                        ></span>
-                                                                        <span className="text-dark dark-theme:text-white">
-                                                                            {ticket.prioridad || 'Normal'}
-                                                                        </span>
-                                                                    </span>
-                                                                </td>
-                                                                <td className="text-center px-3">
-                                                                    {ticket.asignacion_actual && ticket.asignacion_actual.analista ? (
-                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
-                                                                            <span
-                                                                                className="rounded-circle d-inline-block"
+                                                                        </td>
+                                                                        <td className="px-4">
+                                                                            <div>
+                                                                                <div className="fw-semibold mb-1">{ticket.titulo}</div>
+                                                                                <small className="text-muted">
+                                                                                    {ticket.descripcion && ticket.descripcion.length > 50
+                                                                                        ? `${ticket.descripcion.substring(0, 50)}...`
+                                                                                        : ticket.descripcion || 'Sin descripción'
+                                                                                    }
+                                                                                </small>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="text-center px-3">
+                                                                            <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                                <span
+                                                                                    className={`rounded-circle d-inline-block ${ticket.estado === 'activo' ? 'dot-estado-activo' :
+                                                                                        ticket.estado === 'en_progreso' ? 'dot-estado-en-proceso' :
+                                                                                            ticket.estado === 'resuelto' ? 'dot-estado-solucionado' :
+                                                                                                ticket.estado === 'escalado' ? 'dot-estado-escalado' :
+                                                                                                    'dot-ct-secondary'
+                                                                                        }`}
+                                                                                ></span>
+                                                                                <span className="text-dark dark-theme:text-white">
+                                                                                    {ticket.estado}
+                                                                                </span>
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="text-center px-3">
+                                                                            <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                                <span
+                                                                                    className="rounded-circle d-inline-block"
+                                                                                    style={{
+                                                                                        width: '8px',
+                                                                                        height: '8px',
+                                                                                        backgroundColor: ticket.prioridad === 'baja' ? '#28a745' :
+                                                                                            ticket.prioridad === 'media' ? '#ffc107' :
+                                                                                                ticket.prioridad === 'alta' ? '#dc3545' :
+                                                                                                    ticket.prioridad === 'critica' ? '#343a40' :
+                                                                                                        '#6c757d'
+                                                                                    }}
+                                                                                ></span>
+                                                                                <span className="text-dark dark-theme:text-white">
+                                                                                    {ticket.prioridad || 'Normal'}
+                                                                                </span>
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="text-center px-3">
+                                                                            {ticket.asignacion_actual && ticket.asignacion_actual.analista ? (
+                                                                                <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                                    <span
+                                                                                        className="rounded-circle d-inline-block"
+                                                                                        style={{
+                                                                                            width: '8px',
+                                                                                            height: '8px',
+                                                                                            backgroundColor: '#28a745'
+                                                                                        }}
+                                                                                    ></span>
+                                                                                    <span className="text-dark dark-theme:text-white">
+                                                                                        {ticket.asignacion_actual.analista.nombre} {ticket.asignacion_actual.analista.apellido}
+                                                                                    </span>
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                                    <span
+                                                                                        className="rounded-circle d-inline-block"
+                                                                                        style={{
+                                                                                            width: '8px',
+                                                                                            height: '8px',
+                                                                                            backgroundColor: '#6c757d'
+                                                                                        }}
+                                                                                    ></span>
+                                                                                    <span className="text-dark dark-theme:text-white">
+                                                                                        Sin asignar
+                                                                                    </span>
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="text-center px-3">
+                                                                            <span className="d-flex align-items-center justify-content-center gap-2">
+                                                                                <span
+                                                                                    className="rounded-circle d-inline-block"
+                                                                                    style={{
+                                                                                        width: '8px',
+                                                                                        height: '8px',
+                                                                                        backgroundColor: 'var(--ct-info)'
+                                                                                    }}
+                                                                                ></span>
+                                                                                <small className="text-dark dark-theme:text-white">
+                                                                                    {new Date(ticket.fecha_creacion).toLocaleDateString('es-ES', {
+                                                                                        year: 'numeric',
+                                                                                        month: 'short',
+                                                                                        day: 'numeric',
+                                                                                        hour: '2-digit',
+                                                                                        minute: '2-digit',
+                                                                                        hour12: true
+                                                                                    })}
+                                                                                </small>
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="text-center px-4">
+                                                                            <div className="d-flex flex-wrap gap-1 justify-content-center">
+                                                                                {/* Ver detalles */}
+                                                                                <button
+                                                                                    className="btn btn-sidebar-teal btn-sm"
+                                                                                    title="Ver detalles"
+                                                                                    onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                                                >
+                                                                                    <i className="fas fa-eye"></i>
+                                                                                </button>
+
+                                                                                {/* Comentarios */}
+                                                                                <button
+                                                                                    className="btn btn-sidebar-accent btn-sm"
+                                                                                    title="Ver y agregar comentarios"
+                                                                                    onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
+                                                                                >
+                                                                                    <i className="fas fa-users"></i>
+                                                                                </button>
+
+                                                                                {/* Chat */}
+                                                                                <button
+                                                                                    className="btn btn-sidebar-secondary btn-sm"
+                                                                                    title="Chat con analista"
+                                                                                    onClick={() => window.open(`/ticket/${ticket.id}/chat`, '_self')}
+                                                                                >
+                                                                                    <i className="fas fa-comments"></i>
+                                                                                </button>
+
+                                                                                {/* IA */}
+                                                                                <div className="btn-group" role="group">
+                                                                                    <button
+                                                                                        className="btn btn-sidebar-primary btn-sm dropdown-toggle"
+                                                                                        type="button"
+                                                                                        data-bs-toggle="dropdown"
+                                                                                        aria-expanded="false"
+                                                                                        title="Opciones de IA"
+                                                                                    >
+                                                                                        <i className="fas fa-robot"></i> IA
+                                                                                    </button>
+                                                                                    <ul className="dropdown-menu">
+                                                                                        <li>
+                                                                                            <button
+                                                                                                className="dropdown-item"
+                                                                                                onClick={() => generarRecomendacion(ticket.id)}
+                                                                                            >
+                                                                                                <i className="fas fa-lightbulb me-2"></i>
+                                                                                                Generar Recomendación
+                                                                                            </button>
+                                                                                        </li>
+                                                                                        <li>
+                                                                                            <button
+                                                                                                className="dropdown-item"
+                                                                                                onClick={() => window.open(`/ticket/${ticket.id}/identificar-imagen`, '_self')}
+                                                                                            >
+                                                                                                <i className="fas fa-camera me-2"></i>
+                                                                                                Analizar Imagen
+                                                                                            </button>
+                                                                                        </li>
+                                                                                    </ul>
+                                                                                </div>
+
+                                                                                {/* Sugerencias */}
+                                                                                {ticketsConRecomendaciones.has(ticket.id) && (
+                                                                                    <button
+                                                                                        className="btn btn-sidebar-teal btn-sm"
+                                                                                        title="Ver sugerencias disponibles"
+                                                                                        onClick={() => window.open(`/ticket/${ticket.id}/recomendaciones-similares`, '_self')}
+                                                                                    >
+                                                                                        <i className="fas fa-lightbulb"></i>
+                                                                                    </button>
+                                                                                )}
+
+                                                                                {/* Asignar/Reasignar Analista */}
+                                                                                <div className="btn-group" role="group">
+                                                                                    <button
+                                                                                        className={`btn btn-sm dropdown-toggle ${fueEscaladoPorAnalista(ticket)
+                                                                                            ? 'btn-danger'
+                                                                                            : 'btn-sidebar-success'
+                                                                                            }`}
+                                                                                        type="button"
+                                                                                        data-bs-toggle="dropdown"
+                                                                                        aria-expanded="false"
+                                                                                        title={
+                                                                                            fueEscaladoPorAnalista(ticket)
+                                                                                                ? "Ticket escalado - Reasignar analista"
+                                                                                                : ticket.asignacion_actual?.analista
+                                                                                                    ? "Reasignar analista"
+                                                                                                    : "Asignar analista"
+                                                                                        }
+                                                                                    >
+                                                                                        <i className="fas fa-user-plus"></i>
+                                                                                    </button>
+                                                                                    <ul className="dropdown-menu">
+                                                                                        {analistas.map((analista) => (
+                                                                                            <li key={analista.id}>
+                                                                                                <button
+                                                                                                    className="dropdown-item"
+                                                                                                    onClick={() => asignarTicket(ticket.id, analista.id)}
+                                                                                                >
+                                                                                                    <i className="fas fa-user me-2"></i>
+                                                                                                    {analista.nombre} {analista.apellido}
+                                                                                                    {analista.especialidad && (
+                                                                                                        <small className="text-muted ms-2">({analista.especialidad})</small>
+                                                                                                    )}
+                                                                                                </button>
+                                                                                            </li>
+                                                                                        ))}
+                                                                                    </ul>
+                                                                                </div>
+
+                                                                                {/* Cerrar ticket - solo si hay solicitud de reapertura */}
+                                                                                {tieneSolicitudReapertura(ticket) && (
+                                                                                    <button
+                                                                                        className="btn btn-outline-danger btn-sm"
+                                                                                        title="Cerrar ticket"
+                                                                                        onClick={() => cerrarTicket(ticket.id)}
+                                                                                    >
+                                                                                        <i className="fas fa-times"></i>
+                                                                                    </button>
+                                                                                )}
+
+                                                                                {/* Reabrir ticket - solo si hay solicitud de reapertura */}
+                                                                                {tieneSolicitudReapertura(ticket) && (
+                                                                                    <button
+                                                                                        className="btn btn-outline-success btn-sm"
+                                                                                        title="Reabrir ticket"
+                                                                                        onClick={() => reabrirTicket(ticket.id)}
+                                                                                    >
+                                                                                        <i className="fas fa-redo"></i>
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="text-center px-2">
+                                                                            <button
+                                                                                className="btn btn-outline-secondary btn-sm"
                                                                                 style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: '#28a745'
+                                                                                    height: '100%',
+                                                                                    minHeight: '60px',
+                                                                                    width: '40px',
+                                                                                    display: 'flex',
+                                                                                    alignItems: 'center',
+                                                                                    justifyContent: 'center'
                                                                                 }}
-                                                                            ></span>
-                                                                            <span className="text-dark dark-theme:text-white">
-                                                                                {ticket.asignacion_actual.analista.nombre} {ticket.asignacion_actual.analista.apellido}
-                                                                            </span>
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="d-flex align-items-center justify-content-center gap-2">
-                                                                            <span
-                                                                                className="rounded-circle d-inline-block"
-                                                                                style={{
-                                                                                    width: '8px',
-                                                                                    height: '8px',
-                                                                                    backgroundColor: '#6c757d'
-                                                                                }}
-                                                                            ></span>
-                                                                            <span className="text-dark dark-theme:text-white">
-                                                                                Sin asignar
-                                                                            </span>
-                                                                        </span>
+                                                                                onClick={() => toggleTicketExpansion(ticket.id)}
+                                                                                title={isExpanded ? "Colapsar acciones" : "Expandir acciones"}
+                                                                            >
+                                                                                <i className={`fas ${isExpanded ? 'fa-arrow-down' : 'fa-arrow-up'}`}></i>
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+
+                                                                    {/* Fila expandida con acciones grandes - solo se muestra si está expandido */}
+                                                                    {isExpanded && (
+                                                                        <tr>
+                                                                            <td colSpan="9" className="px-0 py-0">
+                                                                                <div className="w-100 bg-light border-top">
+                                                                                    {/* Área de acciones expandida - solo botones */}
+                                                                                    <div className="px-4 py-3">
+                                                                                        <div className="d-flex gap-2 flex-wrap justify-content-center">
+                                                                                            <button
+                                                                                                className="btn btn-sidebar-teal flex-fill"
+                                                                                                style={{ minWidth: '120px' }}
+                                                                                                title="Ver detalles del ticket"
+                                                                                                onClick={() => changeView(`ticket-${ticket.id}`)}
+                                                                                            >
+                                                                                                <i className="fas fa-eye me-2"></i>
+                                                                                                Ver Detalles
+                                                                                            </button>
+                                                                                            <button
+                                                                                                className="btn btn-sidebar-accent flex-fill"
+                                                                                                style={{ minWidth: '120px' }}
+                                                                                                title="Ver y agregar comentarios"
+                                                                                                onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
+                                                                                            >
+                                                                                                <i className="fas fa-comments me-2"></i>
+                                                                                                Comentarios
+                                                                                            </button>
+                                                                                            <button
+                                                                                                className="btn btn-sidebar-secondary flex-fill"
+                                                                                                style={{ minWidth: '120px' }}
+                                                                                                title="Chat con analista"
+                                                                                                onClick={() => window.open(`/ticket/${ticket.id}/chat`, '_self')}
+                                                                                            >
+                                                                                                <i className="fas fa-comments me-2"></i>
+                                                                                                Chat
+                                                                                            </button>
+                                                                                            <div className="btn-group flex-fill" role="group" style={{ minWidth: '120px' }}>
+                                                                                                <button
+                                                                                                    className="btn btn-sidebar-primary dropdown-toggle"
+                                                                                                    type="button"
+                                                                                                    data-bs-toggle="dropdown"
+                                                                                                    aria-expanded="false"
+                                                                                                    title="Opciones de IA"
+                                                                                                >
+                                                                                                    <i className="fas fa-robot me-2"></i>
+                                                                                                    IA
+                                                                                                </button>
+                                                                                                <ul className="dropdown-menu">
+                                                                                                    <li>
+                                                                                                        <button
+                                                                                                            className="dropdown-item"
+                                                                                                            onClick={() => generarRecomendacion(ticket.id)}
+                                                                                                        >
+                                                                                                            <i className="fas fa-lightbulb me-2"></i>
+                                                                                                            Generar Recomendación
+                                                                                                        </button>
+                                                                                                    </li>
+                                                                                                    <li>
+                                                                                                        <button
+                                                                                                            className="dropdown-item"
+                                                                                                            onClick={() => window.open(`/ticket/${ticket.id}/identificar-imagen`, '_self')}
+                                                                                                        >
+                                                                                                            <i className="fas fa-camera me-2"></i>
+                                                                                                            Analizar Imagen
+                                                                                                        </button>
+                                                                                                    </li>
+                                                                                                </ul>
+                                                                                            </div>
+                                                                                            {ticketsConRecomendaciones.has(ticket.id) && (
+                                                                                                <button
+                                                                                                    className="btn btn-sidebar-teal flex-fill"
+                                                                                                    style={{ minWidth: '120px' }}
+                                                                                                    title="Ver sugerencias disponibles"
+                                                                                                    onClick={() => window.open(`/ticket/${ticket.id}/recomendaciones-similares`, '_self')}
+                                                                                                >
+                                                                                                    <i className="fas fa-lightbulb me-2"></i>
+                                                                                                    Sugerencias
+                                                                                                </button>
+                                                                                            )}
+                                                                                            <div className="btn-group flex-fill" role="group" style={{ minWidth: '120px' }}>
+                                                                                                <button
+                                                                                                    className={`btn dropdown-toggle ${fueEscaladoPorAnalista(ticket)
+                                                                                                        ? 'btn-danger'
+                                                                                                        : 'btn-sidebar-success'
+                                                                                                        }`}
+                                                                                                    type="button"
+                                                                                                    data-bs-toggle="dropdown"
+                                                                                                    aria-expanded="false"
+                                                                                                    title={
+                                                                                                        fueEscaladoPorAnalista(ticket)
+                                                                                                            ? "Ticket escalado - Reasignar analista"
+                                                                                                            : ticket.asignacion_actual?.analista
+                                                                                                                ? "Reasignar analista"
+                                                                                                                : "Asignar analista"
+                                                                                                    }
+                                                                                                >
+                                                                                                    <i className="fas fa-user-plus me-2"></i>
+                                                                                                    {fueEscaladoPorAnalista(ticket)
+                                                                                                        ? "Reasignar"
+                                                                                                        : ticket.asignacion_actual?.analista
+                                                                                                            ? "Reasignar"
+                                                                                                            : "Asignar"}
+                                                                                                </button>
+                                                                                                <ul className="dropdown-menu">
+                                                                                                    {analistas.map((analista) => (
+                                                                                                        <li key={analista.id}>
+                                                                                                            <button
+                                                                                                                className="dropdown-item"
+                                                                                                                onClick={() => asignarTicket(ticket.id, analista.id)}
+                                                                                                            >
+                                                                                                                <i className="fas fa-user me-2"></i>
+                                                                                                                {analista.nombre} {analista.apellido}
+                                                                                                                {analista.especialidad && (
+                                                                                                                    <small className="text-muted ms-2">({analista.especialidad})</small>
+                                                                                                                )}
+                                                                                                            </button>
+                                                                                                        </li>
+                                                                                                    ))}
+                                                                                                </ul>
+                                                                                            </div>
+                                                                                            {tieneSolicitudReapertura(ticket) && (
+                                                                                                <button
+                                                                                                    className="btn btn-outline-danger flex-fill"
+                                                                                                    style={{ minWidth: '120px' }}
+                                                                                                    title="Cerrar ticket"
+                                                                                                    onClick={() => cerrarTicket(ticket.id)}
+                                                                                                >
+                                                                                                    <i className="fas fa-times me-2"></i>
+                                                                                                    Cerrar
+                                                                                                </button>
+                                                                                            )}
+                                                                                            {tieneSolicitudReapertura(ticket) && (
+                                                                                                <button
+                                                                                                    className="btn btn-outline-success flex-fill"
+                                                                                                    style={{ minWidth: '120px' }}
+                                                                                                    title="Reabrir ticket"
+                                                                                                    onClick={() => reabrirTicket(ticket.id)}
+                                                                                                >
+                                                                                                    <i className="fas fa-redo me-2"></i>
+                                                                                                    Reabrir
+                                                                                                </button>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
                                                                     )}
-                                                                </td>
-                                                                <td className="text-center px-3">
-                                                                    <span className="d-flex align-items-center justify-content-center gap-2">
-                                                                        <span
-                                                                            className="rounded-circle d-inline-block"
-                                                                            style={{
-                                                                                width: '8px',
-                                                                                height: '8px',
-                                                                                backgroundColor: 'var(--ct-info)'
-                                                                            }}
-                                                                        ></span>
-                                                                        <small className="text-dark dark-theme:text-white">
-                                                                            {new Date(ticket.fecha_creacion).toLocaleDateString('es-ES', {
-                                                                                year: 'numeric',
-                                                                                month: 'short',
-                                                                                day: 'numeric',
-                                                                                hour: '2-digit',
-                                                                                minute: '2-digit',
-                                                                                hour12: true
-                                                                            })}
-                                                                        </small>
-                                                                    </span>
-                                                                </td>
-                                                                <td className="text-center px-4">
-                                                                    <div className="d-flex flex-wrap gap-1 justify-content-center">
-                                                                        {/* Ver detalles */}
-                                                                        <button
-                                                                            className="btn btn-sidebar-teal btn-sm"
-                                                                            title="Ver detalles"
-                                                                            onClick={() => changeView(`ticket-${ticket.id}`)}
-                                                                        >
-                                                                            <i className="fas fa-eye"></i>
-                                                                        </button>
-
-                                                                        {/* Comentarios */}
-                                                                        <button
-                                                                            className="btn btn-sidebar-accent btn-sm"
-                                                                            title="Ver y agregar comentarios"
-                                                                            onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
-                                                                        >
-                                                                            <i className="fas fa-users"></i>
-                                                                        </button>
-
-                                                                        {/* Chat */}
-                                                                        <button
-                                                                            className="btn btn-sidebar-secondary btn-sm"
-                                                                            title="Chat con analista"
-                                                                            onClick={() => window.open(`/ticket/${ticket.id}/chat`, '_self')}
-                                                                        >
-                                                                            <i className="fas fa-comments"></i>
-                                                                        </button>
-
-                                                                        {/* IA */}
-                                                                        <div className="btn-group" role="group">
-                                                                            <button
-                                                                                className="btn btn-sidebar-primary btn-sm dropdown-toggle"
-                                                                                type="button"
-                                                                                data-bs-toggle="dropdown"
-                                                                                aria-expanded="false"
-                                                                                title="Opciones de IA"
-                                                                            >
-                                                                                <i className="fas fa-robot"></i> IA
-                                                                            </button>
-                                                                            <ul className="dropdown-menu">
-                                                                                <li>
-                                                                                    <button
-                                                                                        className="dropdown-item"
-                                                                                        onClick={() => generarRecomendacion(ticket.id)}
-                                                                                    >
-                                                                                        <i className="fas fa-lightbulb me-2"></i>
-                                                                                        Generar Recomendación
-                                                                                    </button>
-                                                                                </li>
-                                                                                <li>
-                                                                                    <button
-                                                                                        className="dropdown-item"
-                                                                                        onClick={() => window.open(`/ticket/${ticket.id}/identificar-imagen`, '_self')}
-                                                                                    >
-                                                                                        <i className="fas fa-camera me-2"></i>
-                                                                                        Analizar Imagen
-                                                                                    </button>
-                                                                                </li>
-                                                                            </ul>
-                                                                        </div>
-
-                                                                        {/* Sugerencias */}
-                                                                        {ticketsConRecomendaciones.has(ticket.id) && (
-                                                                            <button
-                                                                                className="btn btn-sidebar-teal btn-sm"
-                                                                                title="Ver sugerencias disponibles"
-                                                                                onClick={() => window.open(`/ticket/${ticket.id}/recomendaciones-similares`, '_self')}
-                                                                            >
-                                                                                <i className="fas fa-lightbulb"></i>
-                                                                            </button>
-                                                                        )}
-
-                                                                        {/* Asignar/Reasignar Analista */}
-                                                                        <button
-                                                                            className="btn btn-sidebar-success btn-sm"
-                                                                            title={ticket.asignacion_actual?.analista ? "Reasignar analista" : "Asignar analista"}
-                                                                            onClick={() => asignarAnalista(ticket.id)}
-                                                                        >
-                                                                            <i className="fas fa-user-plus"></i>
-                                                                        </button>
-
-                                                                        {/* Escalar */}
-                                                                        <button
-                                                                            className="btn btn-sidebar-warning btn-sm"
-                                                                            title="Escalar ticket"
-                                                                            onClick={() => escalarTicket(ticket.id)}
-                                                                        >
-                                                                            <i className="fas fa-arrow-up"></i>
-                                                                        </button>
-
-                                                                        {/* Cerrar ticket */}
-                                                                        {ticket.estado !== 'cerrado' && ticket.estado !== 'resuelto' && (
-                                                                            <button
-                                                                                className="btn btn-outline-danger btn-sm"
-                                                                                title="Cerrar ticket"
-                                                                                onClick={() => cerrarTicket(ticket.id)}
-                                                                            >
-                                                                                <i className="fas fa-times"></i>
-                                                                            </button>
-                                                                        )}
-
-                                                                        {/* Reabrir ticket */}
-                                                                        {ticket.estado === 'cerrado' && (
-                                                                            <button
-                                                                                className="btn btn-outline-success btn-sm"
-                                                                                title="Reabrir ticket"
-                                                                                onClick={() => reabrirTicket(ticket.id)}
-                                                                            >
-                                                                                <i className="fas fa-redo"></i>
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
+                                                                </React.Fragment>
+                                                            );
+                                                        })}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -1757,22 +1976,6 @@ export function SupervisorPage() {
                                             </div>
                                         )}
                                     </div>
-                                    <button
-                                        className="btn btn-outline-secondary btn-sm"
-                                        onClick={() => {
-                                            if (!showCerrados) {
-                                                cargarTicketsCerrados();
-                                            }
-                                            setShowCerrados(!showCerrados);
-                                        }}
-                                        disabled={loadingCerrados}
-                                    >
-                                        <i className="fas fa-bars me-1"></i>
-                                        {showCerrados ? 'Ocultar' : 'Mostrar'} Cerrados
-                                        {ticketsCerrados.length > 0 && (
-                                            <span className="badge bg-secondary ms-2">{ticketsCerrados.length}</span>
-                                        )}
-                                    </button>
                                 </div>
                                 {showCerrados && (
                                     <div className="card-body">
@@ -1791,15 +1994,15 @@ export function SupervisorPage() {
                                                 <table className="table table-hover">
                                                     <thead>
                                                         <tr>
-                                                            <th>ID</th>
-                                                            <th>Cliente</th>
-                                                            <th>Título</th>
-                                                            <th>Estado</th>
-                                                            <th>Prioridad</th>
-                                                            <th>Analista Asignado</th>
-                                                            <th>Fecha Cierre</th>
-                                                            <th>Calificación</th>
-                                                            <th>Acciones</th>
+                                                            <th className="text-center">ID</th>
+                                                            <th className="text-center">Cliente</th>
+                                                            <th className="text-center">Título</th>
+                                                            <th className="text-center">Estado</th>
+                                                            <th className="text-center">Prioridad</th>
+                                                            <th className="text-center">Analista Asignado</th>
+                                                            <th className="text-center">Fecha Cierre</th>
+                                                            <th className="text-center">Calificación</th>
+                                                            <th className="text-center">Acciones</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>

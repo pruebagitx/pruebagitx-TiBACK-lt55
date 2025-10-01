@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import useGlobalReducer from "../hooks/useGlobalReducer";
 
 export const Footer = () => {
-	const { store, getRealtimeStatus, startRealtimeSync, joinAllCriticalRooms } = useGlobalReducer();
+	const { store, getRealtimeStatus, startRealtimeSync, joinAllCriticalRooms, connectWebSocket } = useGlobalReducer();
 	const [showDetails, setShowDetails] = useState(false);
 	const [isSyncing, setIsSyncing] = useState(false);
 	const [sidebarState, setSidebarState] = useState({ collapsed: false, hidden: false, exists: false });
