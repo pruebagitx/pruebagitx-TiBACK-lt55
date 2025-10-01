@@ -639,7 +639,7 @@ export function AnalistaPage() {
     // Función para marcar ticket como resuelto
     const marcarComoResuelto = async (ticketId) => {
         try {
-            await cambiarEstadoTicket(ticketId, 'resuelto');
+            await cambiarEstadoTicket(ticketId, 'solucionado');
             console.log(`✅ Ticket ${ticketId} marcado como resuelto`);
         } catch (err) {
             console.error('Error al marcar como resuelto:', err);
@@ -1345,7 +1345,7 @@ export function AnalistaPage() {
                                                                         </span>
                                                                     </div>
                                                                 </td>
-                                                                <td>
+                                                                <td className="text-center px-4">
                                                                     <div className="d-flex flex-wrap gap-1 justify-content-center">
                                                                         {/* Ver detalles */}
                                                                         <button
@@ -1441,11 +1441,10 @@ export function AnalistaPage() {
                                                                         <div className="w-100 bg-light border-top">
                                                                             {/* Área de acciones expandida - solo botones */}
                                                                             <div className="px-4 py-3">
-                                                                                <div className="d-flex gap-2 flex-wrap justify-content-center" style={{ maxWidth: '100%' }}>
-                                                                                    {/* Fila 1: Ver detalles, Comentarios, Chat con cliente */}
+                                                                                <div className="d-flex gap-2 flex-wrap justify-content-center">
                                                                                     <button
-                                                                                        className="btn btn-sidebar-teal"
-                                                                                        style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                        className="btn btn-sidebar-teal flex-fill"
+                                                                                        style={{ minWidth: '120px' }}
                                                                                         title="Ver detalles del ticket"
                                                                                         onClick={() => changeView(`ticket-${ticket.id}`)}
                                                                                     >
@@ -1454,8 +1453,8 @@ export function AnalistaPage() {
                                                                                     </button>
 
                                                                                     <button
-                                                                                        className="btn btn-sidebar-accent"
-                                                                                        style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                        className="btn btn-sidebar-accent flex-fill"
+                                                                                        style={{ minWidth: '120px' }}
                                                                                         title="Ver y agregar comentarios"
                                                                                         onClick={() => window.open(`/ticket/${ticket.id}/comentarios`, '_self')}
                                                                                     >
@@ -1464,8 +1463,8 @@ export function AnalistaPage() {
                                                                                     </button>
 
                                                                                     <button
-                                                                                        className="btn btn-sidebar-secondary"
-                                                                                        style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                        className="btn btn-sidebar-secondary flex-fill"
+                                                                                        style={{ minWidth: '120px' }}
                                                                                         title="Chat con cliente"
                                                                                         onClick={() => window.open(`/ticket/${ticket.id}/chat-analista-cliente`, '_self')}
                                                                                     >
@@ -1473,10 +1472,9 @@ export function AnalistaPage() {
                                                                                         Chat Cliente
                                                                                     </button>
 
-                                                                                    {/* Fila 2: Chat con supervisor, Escalar, Iniciar/Resolver */}
                                                                                     <button
-                                                                                        className="btn btn-sidebar-primary"
-                                                                                        style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                        className="btn btn-sidebar-primary flex-fill"
+                                                                                        style={{ minWidth: '120px' }}
                                                                                         title="Chat con supervisor"
                                                                                         onClick={() => window.open(`/ticket/${ticket.id}/chat-supervisor-analista`, '_self')}
                                                                                     >
@@ -1485,8 +1483,8 @@ export function AnalistaPage() {
                                                                                     </button>
 
                                                                                     <button
-                                                                                        className="btn btn-sidebar-warning"
-                                                                                        style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                        className="btn btn-sidebar-warning flex-fill"
+                                                                                        style={{ minWidth: '120px' }}
                                                                                         title="Escalar al supervisor"
                                                                                         onClick={() => escalarTicket(ticket.id)}
                                                                                     >
@@ -1497,8 +1495,8 @@ export function AnalistaPage() {
                                                                                     {/* Botón condicional - Iniciar o Resolver */}
                                                                                     {ticket.estado === 'en_espera' && (
                                                                                         <button
-                                                                                            className="btn btn-sidebar-success"
-                                                                                            style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                            className="btn btn-sidebar-success flex-fill"
+                                                                                            style={{ minWidth: '120px' }}
                                                                                             title="Iniciar trabajo"
                                                                                             onClick={() => iniciarTrabajo(ticket.id)}
                                                                                         >
@@ -1509,8 +1507,8 @@ export function AnalistaPage() {
 
                                                                                     {ticket.estado === 'en_proceso' && (
                                                                                         <button
-                                                                                            className="btn btn-outline-success"
-                                                                                            style={{ minWidth: '120px', flex: '0 0 calc(33.333% - 8px)' }}
+                                                                                            className="btn btn-outline-success flex-fill"
+                                                                                            style={{ minWidth: '120px' }}
                                                                                             title="Marcar como resuelto"
                                                                                             onClick={() => marcarComoResuelto(ticket.id)}
                                                                                         >

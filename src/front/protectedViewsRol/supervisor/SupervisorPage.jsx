@@ -790,12 +790,13 @@ export function SupervisorPage() {
         if (confirm('¿Estás seguro de que quieres cerrar este ticket?')) {
             try {
                 const token = store.auth.token;
-                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/cerrar`, {
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/estado`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({ estado: 'cerrado' })
                 });
 
                 if (response.ok) {
@@ -1728,45 +1729,45 @@ export function SupervisorPage() {
                                                                                     </button>
                                                                                 )}
 
-                                                                                {/* Asignar/Reasignar Analista */}
-                                                                                <div className="btn-group" role="group">
-                                                                                    <button
-                                                                                        className={`btn btn-sm dropdown-toggle ${fueEscaladoPorAnalista(ticket)
-                                                                                            ? 'btn-danger'
-                                                                                            : 'btn-sidebar-success'
-                                                                                            }`}
-                                                                                        type="button"
-                                                                                        data-bs-toggle="dropdown"
-                                                                                        aria-expanded="false"
-                                                                                        title={
-                                                                                            fueEscaladoPorAnalista(ticket)
-                                                                                                ? "Ticket escalado - Reasignar analista"
-                                                                                                : ticket.asignacion_actual?.analista
-                                                                                                    ? "Reasignar analista"
+                                                                                {/* Asignar/Reasignar Analista - Solo mostrar si no está asignado o fue escalado */}
+                                                                                {(!ticket.asignacion_actual?.analista || fueEscaladoPorAnalista(ticket)) && (
+                                                                                    <div className="btn-group" role="group">
+                                                                                        <button
+                                                                                            className={`btn btn-sm dropdown-toggle ${fueEscaladoPorAnalista(ticket)
+                                                                                                ? 'btn-danger'
+                                                                                                : 'btn-sidebar-success'
+                                                                                                }`}
+                                                                                            type="button"
+                                                                                            data-bs-toggle="dropdown"
+                                                                                            aria-expanded="false"
+                                                                                            title={
+                                                                                                fueEscaladoPorAnalista(ticket)
+                                                                                                    ? "Ticket escalado - Reasignar analista"
                                                                                                     : "Asignar analista"
-                                                                                        }
-                                                                                    >
-                                                                                        <i className="fas fa-user-plus"></i>
-                                                                                    </button>
-                                                                                    <ul className="dropdown-menu">
-                                                                                        {analistas.map((analista) => (
-                                                                                            <li key={analista.id}>
-                                                                                                <button
-                                                                                                    className="dropdown-item"
-                                                                                                    onClick={() => asignarTicket(ticket.id, analista.id)}
-                                                                                                >
-                                                                                                    <i className="fas fa-user me-2"></i>
-                                                                                                    {analista.nombre} {analista.apellido}
-                                                                                                    {analista.especialidad && (
-                                                                                                        <small className="text-muted ms-2">({analista.especialidad})</small>
-                                                                                                    )}
-                                                                                                </button>
-                                                                                            </li>
-                                                                                        ))}
-                                                                                    </ul>
-                                                                                </div>
+                                                                                            }
+                                                                                        >
+                                                                                            <i className="fas fa-user-plus"></i>
+                                                                                        </button>
+                                                                                        <ul className="dropdown-menu">
+                                                                                            {analistas.map((analista) => (
+                                                                                                <li key={analista.id}>
+                                                                                                    <button
+                                                                                                        className="dropdown-item"
+                                                                                                        onClick={() => asignarTicket(ticket.id, analista.id)}
+                                                                                                    >
+                                                                                                        <i className="fas fa-user me-2"></i>
+                                                                                                        {analista.nombre} {analista.apellido}
+                                                                                                        {analista.especialidad && (
+                                                                                                            <small className="text-muted ms-2">({analista.especialidad})</small>
+                                                                                                        )}
+                                                                                                    </button>
+                                                                                                </li>
+                                                                                            ))}
+                                                                                        </ul>
+                                                                                    </div>
+                                                                                )}
 
-                                                                                {/* Cerrar ticket - solo si hay solicitud de reapertura */}
+                                                                                {/* Cerrar ticket - solo si hay solicitud de reapertura vigente */}
                                                                                 {tieneSolicitudReapertura(ticket) && (
                                                                                     <button
                                                                                         className="btn btn-outline-danger btn-sm"
@@ -1886,47 +1887,46 @@ export function SupervisorPage() {
                                                                                                     Sugerencias
                                                                                                 </button>
                                                                                             )}
-                                                                                            <div className="btn-group flex-fill" role="group" style={{ minWidth: '120px' }}>
-                                                                                                <button
-                                                                                                    className={`btn dropdown-toggle ${fueEscaladoPorAnalista(ticket)
-                                                                                                        ? 'btn-danger'
-                                                                                                        : 'btn-sidebar-success'
-                                                                                                        }`}
-                                                                                                    type="button"
-                                                                                                    data-bs-toggle="dropdown"
-                                                                                                    aria-expanded="false"
-                                                                                                    title={
-                                                                                                        fueEscaladoPorAnalista(ticket)
-                                                                                                            ? "Ticket escalado - Reasignar analista"
-                                                                                                            : ticket.asignacion_actual?.analista
-                                                                                                                ? "Reasignar analista"
+                                                                                            {/* Asignar/Reasignar Analista - Solo mostrar si no está asignado o fue escalado */}
+                                                                                            {(!ticket.asignacion_actual?.analista || fueEscaladoPorAnalista(ticket)) && (
+                                                                                                <div className="btn-group flex-fill" role="group" style={{ minWidth: '120px' }}>
+                                                                                                    <button
+                                                                                                        className={`btn dropdown-toggle ${fueEscaladoPorAnalista(ticket)
+                                                                                                            ? 'btn-danger'
+                                                                                                            : 'btn-sidebar-success'
+                                                                                                            }`}
+                                                                                                        type="button"
+                                                                                                        data-bs-toggle="dropdown"
+                                                                                                        aria-expanded="false"
+                                                                                                        title={
+                                                                                                            fueEscaladoPorAnalista(ticket)
+                                                                                                                ? "Ticket escalado - Reasignar analista"
                                                                                                                 : "Asignar analista"
-                                                                                                    }
-                                                                                                >
-                                                                                                    <i className="fas fa-user-plus me-2"></i>
-                                                                                                    {fueEscaladoPorAnalista(ticket)
-                                                                                                        ? "Reasignar"
-                                                                                                        : ticket.asignacion_actual?.analista
+                                                                                                        }
+                                                                                                    >
+                                                                                                        <i className="fas fa-user-plus me-2"></i>
+                                                                                                        {fueEscaladoPorAnalista(ticket)
                                                                                                             ? "Reasignar"
                                                                                                             : "Asignar"}
-                                                                                                </button>
-                                                                                                <ul className="dropdown-menu">
-                                                                                                    {analistas.map((analista) => (
-                                                                                                        <li key={analista.id}>
-                                                                                                            <button
-                                                                                                                className="dropdown-item"
-                                                                                                                onClick={() => asignarTicket(ticket.id, analista.id)}
-                                                                                                            >
-                                                                                                                <i className="fas fa-user me-2"></i>
-                                                                                                                {analista.nombre} {analista.apellido}
-                                                                                                                {analista.especialidad && (
-                                                                                                                    <small className="text-muted ms-2">({analista.especialidad})</small>
-                                                                                                                )}
-                                                                                                            </button>
-                                                                                                        </li>
-                                                                                                    ))}
-                                                                                                </ul>
-                                                                                            </div>
+                                                                                                    </button>
+                                                                                                    <ul className="dropdown-menu">
+                                                                                                        {analistas.map((analista) => (
+                                                                                                            <li key={analista.id}>
+                                                                                                                <button
+                                                                                                                    className="dropdown-item"
+                                                                                                                    onClick={() => asignarTicket(ticket.id, analista.id)}
+                                                                                                                >
+                                                                                                                    <i className="fas fa-user me-2"></i>
+                                                                                                                    {analista.nombre} {analista.apellido}
+                                                                                                                    {analista.especialidad && (
+                                                                                                                        <small className="text-muted ms-2">({analista.especialidad})</small>
+                                                                                                                    )}
+                                                                                                                </button>
+                                                                                                            </li>
+                                                                                                        ))}
+                                                                                                    </ul>
+                                                                                                </div>
+                                                                                            )}
                                                                                             {tieneSolicitudReapertura(ticket) && (
                                                                                                 <button
                                                                                                     className="btn btn-outline-danger flex-fill"
@@ -1976,6 +1976,14 @@ export function SupervisorPage() {
                                             </div>
                                         )}
                                     </div>
+                                    <button
+                                        className="btn btn-outline-secondary btn-sm"
+                                        onClick={() => setShowCerrados(!showCerrados)}
+                                        title={showCerrados ? "Ocultar tickets cerrados" : "Mostrar tickets cerrados"}
+                                    >
+                                        <i className={`fas ${showCerrados ? 'fa-eye-slash' : 'fa-eye'} me-1`}></i>
+                                        {showCerrados ? 'Ocultar' : 'Mostrar'}
+                                    </button>
                                 </div>
                                 {showCerrados && (
                                     <div className="card-body">

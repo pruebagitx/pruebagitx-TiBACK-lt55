@@ -386,7 +386,7 @@ function ChatSupervisorAnalista() {
                                 onClick={toggleSidebar}
                                 title={sidebarHidden ? "Mostrar menú" : "Ocultar menú"}
                             >
-                                <i className={`fas ${sidebarHidden ? 'fa-eye' : 'fa-eye-slash'}`}></i>
+                                <i className="fas fa-bars"></i>
                             </button>
                             <h4 className="mb-0">Chat Supervisor - Analista - Ticket #{ticketId}</h4>
                         </div>

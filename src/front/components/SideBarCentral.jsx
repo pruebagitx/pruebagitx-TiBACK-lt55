@@ -199,7 +199,22 @@ export const SideBarCentral = ({ sidebarHidden, activeView, changeView }) => {
                             className={`hyper-nav-item d-flex align-items-center gap-3 px-3 py-2 rounded text-decoration-none ${activeView === item.view ? 'active' : ''}`}
                             onClick={(e) => {
                                 e.preventDefault();
-                                changeView(item.view);
+                                // Si es Dashboard y estamos en comentarios o chat, redirigir al dashboard del rol
+                                if (item.id === 'dashboard' && (activeView === 'comentarios' || activeView === 'chat')) {
+                                    // Redirigir al dashboard del rol correspondiente
+                                    if (userRole === 'cliente') {
+                                        window.open('/cliente', '_self');
+                                    } else if (userRole === 'analista') {
+                                        window.open('/analista', '_self');
+                                    } else if (userRole === 'supervisor') {
+                                        window.open('/supervisor', '_self');
+                                    } else if (userRole === 'administrador') {
+                                        window.open('/administrador', '_self');
+                                    }
+                                } else {
+                                    // Para otros casos, usar changeView normal
+                                    changeView(item.view);
+                                }
                             }}
                         >
                             <i className={item.icon}></i>

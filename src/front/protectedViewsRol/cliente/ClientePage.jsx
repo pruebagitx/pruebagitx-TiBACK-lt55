@@ -636,12 +636,15 @@ export function ClientePage() {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ estado: 'reabierto' })
+                body: JSON.stringify({ estado: 'solicitar_reapertura' })
             });
 
             if (!response.ok) {
-                throw new Error('Error al reabrir ticket');
+                throw new Error('Error al solicitar reapertura');
             }
+
+            // Agregar el ticket a las solicitudes de reapertura pendientes
+            setSolicitudesReapertura(prev => new Set([...prev, ticketId]));
 
             // Actualizar tickets sin recargar la pÃ¡gina
             await actualizarTickets();
@@ -1603,7 +1606,10 @@ export function ClientePage() {
                                                         const isExpanded = expandedTickets.has(ticket.id);
                                                         return (
                                                             <React.Fragment key={ticket.id}>
-                                                                <tr data-ticket-id={ticket.id}>
+                                                                <tr
+                                                                    data-ticket-id={ticket.id}
+                                                                    className={solicitudesReapertura.has(ticket.id) ? 'table-warning' : ''}
+                                                                >
                                                                     <td className="text-center px-3">
                                                                         <div className="d-flex align-items-center justify-content-center">
                                                                             <span className="me-2">#{ticket.id}</span>
@@ -1654,6 +1660,15 @@ export function ClientePage() {
                                                                                 {ticket.estado}
                                                                             </span>
                                                                         </span>
+                                                                        {/* Mostrar mensaje de solicitud enviada */}
+                                                                        {solicitudesReapertura.has(ticket.id) && (
+                                                                            <div className="mt-1">
+                                                                                <small className="badge bg-warning text-dark">
+                                                                                    <i className="fas fa-clock me-1"></i>
+                                                                                    Solicitud enviada
+                                                                                </small>
+                                                                            </div>
+                                                                        )}
                                                                     </td>
                                                                     <td className="text-center px-3">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
@@ -1786,7 +1801,7 @@ export function ClientePage() {
                                                                                 </button>
                                                                             </div>
 
-                                                                            {/* Fila inferior: IA y Sugerencias */}
+                                                                            {/* Fila inferior: IA, Sugerencias, y botones de Cerrar/Reabrir para tickets solucionados */}
                                                                             <div className="d-flex gap-1">
                                                                                 <div className="btn-group" role="group">
                                                                                     <button
@@ -1828,6 +1843,26 @@ export function ClientePage() {
                                                                                         <i className="fas fa-lightbulb"></i>
                                                                                     </button>
                                                                                 )}
+
+                                                                                {/* Botones de Cerrar y Reabrir para tickets solucionados - ocultar si hay solicitud pendiente */}
+                                                                                {ticket.estado.toLowerCase() === 'solucionado' && !solicitudesReapertura.has(ticket.id) && (
+                                                                                    <>
+                                                                                        <button
+                                                                                            className="btn btn-outline-success btn-sm"
+                                                                                            title="Cerrar ticket y calificar servicio"
+                                                                                            onClick={() => cerrarTicket(ticket.id)}
+                                                                                        >
+                                                                                            <i className="fas fa-check"></i>
+                                                                                        </button>
+                                                                                        <button
+                                                                                            className="btn btn-outline-warning btn-sm"
+                                                                                            title="Reabrir ticket si la solución no fue satisfactoria"
+                                                                                            onClick={() => reabrirTicket(ticket.id)}
+                                                                                        >
+                                                                                            <i className="fas fa-redo"></i>
+                                                                                        </button>
+                                                                                    </>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                     </td>
@@ -1852,9 +1887,9 @@ export function ClientePage() {
 
                                                                 {/* Fila expandida con acciones grandes - solo se muestra si está expandido */}
                                                                 {isExpanded && (
-                                                                    <tr>
+                                                                    <tr className={solicitudesReapertura.has(ticket.id) ? 'table-warning' : ''}>
                                                                         <td colSpan="9" className="px-0 py-0">
-                                                                            <div className="w-100 bg-light border-top">
+                                                                            <div className={`w-100 border-top ${solicitudesReapertura.has(ticket.id) ? 'bg-warning bg-opacity-25' : 'bg-light'}`}>
                                                                                 {/* Área de acciones expandida - solo botones */}
                                                                                 <div className="px-4 py-3">
                                                                                     <div className="d-flex gap-2 flex-wrap justify-content-center">
@@ -1929,6 +1964,30 @@ export function ClientePage() {
                                                                                                 <i className="fas fa-lightbulb me-2"></i>
                                                                                                 Sugerencias
                                                                                             </button>
+                                                                                        )}
+
+                                                                                        {/* Botones de Cerrar y Reabrir para tickets solucionados en vista expandida - ocultar si hay solicitud pendiente */}
+                                                                                        {ticket.estado.toLowerCase() === 'solucionado' && !solicitudesReapertura.has(ticket.id) && (
+                                                                                            <>
+                                                                                                <button
+                                                                                                    className="btn btn-outline-success flex-fill"
+                                                                                                    style={{ minWidth: '120px' }}
+                                                                                                    title="Cerrar ticket y calificar servicio"
+                                                                                                    onClick={() => cerrarTicket(ticket.id)}
+                                                                                                >
+                                                                                                    <i className="fas fa-check me-2"></i>
+                                                                                                    Cerrar
+                                                                                                </button>
+                                                                                                <button
+                                                                                                    className="btn btn-outline-warning flex-fill"
+                                                                                                    style={{ minWidth: '120px' }}
+                                                                                                    title="Reabrir ticket si la solución no fue satisfactoria"
+                                                                                                    onClick={() => reabrirTicket(ticket.id)}
+                                                                                                >
+                                                                                                    <i className="fas fa-redo me-2"></i>
+                                                                                                    Reabrir
+                                                                                                </button>
+                                                                                            </>
                                                                                         )}
                                                                                     </div>
                                                                                 </div>
