@@ -968,6 +968,45 @@ export function ClientePage() {
         }
     }, [isDarkMode]);
 
+    // CAMBIO CLIENTE 3: Sistema de sincronización mejorado para eventos críticos
+    useEffect(() => {
+        const handleForceUpdate = (event) => {
+            console.log('🔄 CLIENTE - FORZAR ACTUALIZACIÓN:', event.detail);
+            actualizarTickets();
+        };
+
+        const handleSyncCliente = (event) => {
+            console.log('👤 CLIENTE - SINCRONIZACIÓN ESPECÍFICA:', event.detail);
+            actualizarTickets();
+        };
+
+        const handleSyncTickets = (event) => {
+            console.log('🎫 CLIENTE - SINCRONIZACIÓN TICKETS:', event.detail);
+            actualizarTickets();
+        };
+
+        const handleSyncError = (event) => {
+            console.error('❌ CLIENTE - ERROR DE SINCRONIZACIÓN:', event.detail);
+            // Intentar actualizar de todas formas
+            actualizarTickets();
+        };
+
+        // Agregar listeners para eventos del Footer (fallback HTTP)
+        window.addEventListener('forceUpdateAllViews', handleForceUpdate);
+        window.addEventListener('sync_cliente', handleSyncCliente);
+        window.addEventListener('sync_tickets', handleSyncTickets);
+        window.addEventListener('syncError', handleSyncError);
+
+        // Cleanup
+        return () => {
+            window.removeEventListener('forceUpdateAllViews', handleForceUpdate);
+            window.removeEventListener('sync_cliente', handleSyncCliente);
+            window.removeEventListener('sync_tickets', handleSyncTickets);
+            window.removeEventListener('syncError', handleSyncError);
+        };
+    }, []);
+    // FIN CAMBIO CLIENTE 3
+
     console.log('🎨 ClientePage - Renderizando componente:', {
         loading,
         error,

@@ -196,9 +196,9 @@ export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaci
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    // CAMBIO 6: Corrección del parámetro para reapertura de tickets
+                    // CAMBIO 6: Corrección del parámetro para reapertura de tickets (ESTADO VÁLIDO BACKEND)
                     body: JSON.stringify({
-                        estado: 'reabierto'  // Cambiado de 'nuevo_estado' a 'estado'
+                        estado: 'en_espera'  // Estado válido que supervisor puede usar según reglas del backend
                     })
                     // FIN CAMBIO 6
                 });

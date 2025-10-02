@@ -261,12 +261,17 @@ export function SupervisorPage() {
                 console.log(`🎯 SUPERVISOR: Unido a ${ticketIds.length} rooms de tickets específicos`);
             }
 
-            // Configurar listeners para eventos de tickets en tiempo real
+            // CAMBIO 4A: Configurar listeners COMPLETOS para eventos de tickets en tiempo real
             const socket = store.websocket.socket;
 
             const handleTicketUpdate = (data) => {
                 console.log('🎫 SUPERVISOR - ACTUALIZACIÓN DE TICKET:', data);
                 actualizarTodasLasTablas();
+
+                // Emitir evento para sincronización cruzada
+                window.dispatchEvent(new CustomEvent('ticketUpdated', {
+                    detail: { ...data, source: 'supervisor_websocket' }
+                }));
             };
 
             const handleComentarioUpdate = (data) => {
@@ -279,27 +284,71 @@ export function SupervisorPage() {
                 // Actualizar si es necesario
             };
 
-            // Agregar listeners
+            // EVENTOS CRÍTICOS PARA FLUJO COMPLETO
+            const handleTicketCreated = (data) => {
+                console.log('🆕 SUPERVISOR - TICKET CREADO:', data);
+                actualizarTodasLasTablas();
+            };
+
+            const handleTicketAsignado = (data) => {
+                console.log('👤 SUPERVISOR - TICKET ASIGNADO:', data);
+                actualizarTodasLasTablas();
+            };
+
+            const handleTicketEscalado = (data) => {
+                console.log('⬆️ SUPERVISOR - TICKET ESCALADO:', data);
+                actualizarTodasLasTablas();
+            };
+
+            const handleTicketSolucionado = (data) => {
+                console.log('✅ SUPERVISOR - TICKET SOLUCIONADO:', data);
+                actualizarTodasLasTablas();
+            };
+
+            const handleTicketCerrado = (data) => {
+                console.log('🔒 SUPERVISOR - TICKET CERRADO:', data);
+                // Mover inmediatamente a lista de cerrados
+                moveTicketToClosed(data.ticket_id);
+                actualizarTodasLasTablas();
+            };
+
+            const handleTicketReabierto = (data) => {
+                console.log('🔓 SUPERVISOR - TICKET REABIERTO:', data);
+                // Mover de cerrados a activos
+                moveTicketToActive(data.ticket_id);
+                actualizarTodasLasTablas();
+            };
+
+            const handleSolicitudReapertura = (data) => {
+                console.log('🔄 SUPERVISOR - SOLICITUD REAPERTURA:', data);
+                actualizarTodasLasTablas();
+            };
+
+            // Agregar listeners COMPLETOS
+            socket.on('ticket_created', handleTicketCreated);
             socket.on('ticket_updated', handleTicketUpdate);
             socket.on('ticket_estado_changed', handleTicketUpdate);
-            socket.on('ticket_asignado', handleTicketUpdate);
-            socket.on('ticket_escalado', handleTicketUpdate);
-            socket.on('ticket_cerrado', handleTicketUpdate);
-            socket.on('ticket_reabierto', handleTicketUpdate);
-            socket.on('solicitud_reapertura', handleTicketUpdate);
+            socket.on('ticket_asignado', handleTicketAsignado);
+            socket.on('ticket_escalado', handleTicketEscalado);
+            socket.on('ticket_solucionado', handleTicketSolucionado);
+            socket.on('ticket_cerrado', handleTicketCerrado);
+            socket.on('ticket_reabierto', handleTicketReabierto);
+            socket.on('solicitud_reapertura', handleSolicitudReapertura);
             socket.on('nuevo_comentario', handleComentarioUpdate);
             socket.on('nuevo_mensaje_chat_analista_cliente', handleChatUpdate);
             socket.on('nuevo_mensaje_chat_supervisor_analista', handleChatUpdate);
 
-            // Cleanup
+            // Cleanup COMPLETO
             return () => {
+                socket.off('ticket_created', handleTicketCreated);
                 socket.off('ticket_updated', handleTicketUpdate);
                 socket.off('ticket_estado_changed', handleTicketUpdate);
-                socket.off('ticket_asignado', handleTicketUpdate);
-                socket.off('ticket_escalado', handleTicketUpdate);
-                socket.off('ticket_cerrado', handleTicketUpdate);
-                socket.off('ticket_reabierto', handleTicketUpdate);
-                socket.off('solicitud_reapertura', handleTicketUpdate);
+                socket.off('ticket_asignado', handleTicketAsignado);
+                socket.off('ticket_escalado', handleTicketEscalado);
+                socket.off('ticket_solucionado', handleTicketSolucionado);
+                socket.off('ticket_cerrado', handleTicketCerrado);
+                socket.off('ticket_reabierto', handleTicketReabierto);
+                socket.off('solicitud_reapertura', handleSolicitudReapertura);
                 socket.off('nuevo_comentario', handleComentarioUpdate);
                 socket.off('nuevo_mensaje_chat_analista_cliente', handleChatUpdate);
                 socket.off('nuevo_mensaje_chat_supervisor_analista', handleChatUpdate);
@@ -307,6 +356,152 @@ export function SupervisorPage() {
         }
     }, [store.auth.user, store.websocket.connected, tickets.length]);
     // FIN CAMBIO 4
+
+    // CAMBIO 4B: Funciones auxiliares para movimiento de tickets entre listas
+    const moveTicketToClosed = (ticketId) => {
+        const ticket = tickets.find(t => t.id === ticketId);
+        if (ticket) {
+            const ticketCerrado = {
+                ...ticket,
+                estado: 'cerrado_por_supervisor',
+                fecha_cierre: new Date().toISOString()
+            };
+
+            setTickets(prev => prev.filter(t => t.id !== ticketId));
+            setTicketsCerrados(prev => [ticketCerrado, ...prev]);
+
+            console.log(`🔒 Ticket ${ticketId} movido a cerrados`);
+        }
+    };
+
+    const moveTicketToActive = (ticketId) => {
+        const ticket = ticketsCerrados.find(t => t.id === ticketId);
+        if (ticket) {
+            const ticketReabierto = {
+                ...ticket,
+                estado: 'en_espera',  // Estado válido que supervisor puede usar
+                fecha_cierre: null,
+                asignacion_actual: null  // Limpiar asignación anterior
+            };
+
+            setTicketsCerrados(prev => prev.filter(t => t.id !== ticketId));
+            setTickets(prev => [ticketReabierto, ...prev]);
+
+            console.log(`🔓 Ticket ${ticketId} movido a activos con estado en_espera`);
+        }
+    };
+    // FIN CAMBIO 4B
+
+    // CAMBIO 4C: Listeners para eventos de sincronización HTTP (fallback)
+    useEffect(() => {
+        const handleForceUpdate = (event) => {
+            console.log('🔄 SUPERVISOR - FORZAR ACTUALIZACIÓN:', event.detail);
+            actualizarTodasLasTablas();
+        };
+
+        const handleSyncSupervisor = (event) => {
+            console.log('👑 SUPERVISOR - SINCRONIZACIÓN ESPECÍFICA:', event.detail);
+            actualizarTodasLasTablas();
+        };
+
+        const handleManualSync = (event) => {
+            console.log('🔧 SUPERVISOR - SINCRONIZACIÓN MANUAL:', event.detail);
+            actualizarTodasLasTablas();
+        };
+
+        const handleTotalSync = (event) => {
+            console.log('🌐 SUPERVISOR - SINCRONIZACIÓN TOTAL:', event.detail);
+            actualizarTodasLasTablas();
+        };
+
+        const handleSyncTickets = (event) => {
+            console.log('🎫 SUPERVISOR - SINCRONIZACIÓN TICKETS:', event.detail);
+            actualizarTodasLasTablas();
+        };
+
+        const handleSyncError = (event) => {
+            console.error('❌ SUPERVISOR - ERROR DE SINCRONIZACIÓN:', event.detail);
+            // Intentar actualizar de todas formas
+            actualizarTodasLasTablas();
+        };
+
+        // Agregar listeners para eventos del Footer
+        window.addEventListener('forceUpdateAllViews', handleForceUpdate);
+        window.addEventListener('sync_supervisor', handleSyncSupervisor);
+        window.addEventListener('manualSyncTriggered', handleManualSync);
+        window.addEventListener('totalSyncTriggered', handleTotalSync);
+        window.addEventListener('sync_tickets', handleSyncTickets);
+        window.addEventListener('syncError', handleSyncError);
+
+        // Cleanup
+        return () => {
+            window.removeEventListener('forceUpdateAllViews', handleForceUpdate);
+            window.removeEventListener('sync_supervisor', handleSyncSupervisor);
+            window.removeEventListener('manualSyncTriggered', handleManualSync);
+            window.removeEventListener('totalSyncTriggered', handleTotalSync);
+            window.removeEventListener('sync_tickets', handleSyncTickets);
+            window.removeEventListener('syncError', handleSyncError);
+        };
+    }, []);
+    // FIN CAMBIO 4C
+
+    // CAMBIO 10: Función para determinar acciones disponibles según estado del ticket
+    const getAvailableActions = (ticket) => {
+        const actions = {
+            canAssign: false,
+            canClose: false,
+            canReopen: false,
+            canEscalate: false,
+            canComment: true,  // Siempre se puede comentar
+            showReassignMessage: false,
+            showReopenButton: false
+        };
+
+        // Verificar si tiene solicitud de reapertura activa
+        const tieneSolicitud = tieneSolicitudReapertura(ticket);
+
+        switch (ticket.estado) {
+            case 'en_espera':
+            case 'creado':
+            case 'sin_asignar':
+                actions.canAssign = true;
+                actions.showReassignMessage = ticket.estado === 'en_espera';
+                break;
+
+            case 'asignado':
+            case 'en_progreso':
+            case 'escalado':
+                actions.canClose = true;
+                actions.canEscalate = true;
+                break;
+
+            case 'solucionado':
+                actions.canClose = true;
+                // Si tiene solicitud de reapertura, también puede reabrir
+                if (tieneSolicitud) {
+                    actions.canReopen = true;
+                    actions.showReopenButton = true;
+                }
+                break;
+
+            case 'cerrado':
+            case 'cerrado_por_supervisor':
+            case 'cerrado_por_cliente':
+                // Si tiene solicitud de reapertura, puede reabrir
+                if (tieneSolicitud) {
+                    actions.canReopen = true;
+                    actions.showReopenButton = true;
+                }
+                break;
+
+            default:
+                // Estados desconocidos, solo permitir comentar
+                break;
+        }
+
+        return actions;
+    };
+    // FIN CAMBIO 10
 
     // Funciones de filtrado y estadísticas
     const getFilteredTickets = () => {
@@ -931,9 +1126,9 @@ export function SupervisorPage() {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    // CAMBIO 1: Corrección del parámetro para reapertura de tickets
+                    // CAMBIO 1: Corrección del parámetro para reapertura de tickets (ESTADO VÁLIDO BACKEND)
                     body: JSON.stringify({
-                        estado: 'reabierto'  // Cambiado de 'nuevo_estado' a 'estado'
+                        estado: 'en_espera'  // Estado válido que supervisor puede usar según reglas del backend
                     })
                     // FIN CAMBIO 1
                 });
@@ -1361,7 +1556,7 @@ export function SupervisorPage() {
                                             <div className="text-center">
                                                 <h6 className="card-title text-muted mb-2">Tickets Reabiertos</h6>
                                                 <div className="d-flex align-items-center justify-content-center mb-2">
-                                                    <h3 className="mb-0 text-info me-2">{tickets.filter(t => t.estado === 'reabierto').length}</h3>
+                                                    <h3 className="mb-0 text-info me-2">{tickets.filter(t => t.estado === 'en_espera').length}</h3>
                                                     <div className="bg-info bg-opacity-10 rounded-circle p-2">
                                                         <i className="fas fa-redo text-info"></i>
                                                     </div>
@@ -1900,27 +2095,46 @@ export function SupervisorPage() {
                                                                                     </div>
                                                                                 )}
 
-                                                                                {/* Cerrar ticket - solo si hay solicitud de reapertura vigente */}
-                                                                                {tieneSolicitudReapertura(ticket) && (
-                                                                                    <button
-                                                                                        className="btn btn-outline-danger btn-sm"
-                                                                                        title="Cerrar ticket"
-                                                                                        onClick={() => cerrarTicket(ticket.id)}
-                                                                                    >
-                                                                                        <i className="fas fa-times"></i>
-                                                                                    </button>
-                                                                                )}
+                                                                                {/* CAMBIO 11: Botones según estado del ticket MEJORADO */}
+                                                                                {(() => {
+                                                                                    const actions = getAvailableActions(ticket);
+                                                                                    return (
+                                                                                        <>
+                                                                                            {/* Mostrar mensaje si está reabierto */}
+                                                                                            {actions.showReassignMessage && (
+                                                                                                <div className="mt-1">
+                                                                                                    <small className="badge bg-warning text-dark">
+                                                                                                        <i className="fas fa-clock me-1"></i>
+                                                                                                        En espera - Listo para asignar
+                                                                                                    </small>
+                                                                                                </div>
+                                                                                            )}
 
-                                                                                {/* Reabrir ticket - solo si hay solicitud de reapertura */}
-                                                                                {tieneSolicitudReapertura(ticket) && (
-                                                                                    <button
-                                                                                        className="btn btn-outline-success btn-sm"
-                                                                                        title="Reabrir ticket"
-                                                                                        onClick={() => reabrirTicket(ticket.id)}
-                                                                                    >
-                                                                                        <i className="fas fa-redo"></i>
-                                                                                    </button>
-                                                                                )}
+                                                                                            {/* Cerrar ticket - solo si está permitido */}
+                                                                                            {actions.canClose && (
+                                                                                                <button
+                                                                                                    className="btn btn-outline-danger btn-sm"
+                                                                                                    title="Cerrar ticket"
+                                                                                                    onClick={() => cerrarTicket(ticket.id)}
+                                                                                                >
+                                                                                                    <i className="fas fa-times"></i>
+                                                                                                </button>
+                                                                                            )}
+
+                                                                                            {/* Reabrir ticket - solo si tiene solicitud */}
+                                                                                            {actions.showReopenButton && (
+                                                                                                <button
+                                                                                                    className="btn btn-outline-success btn-sm"
+                                                                                                    title="Reabrir ticket"
+                                                                                                    onClick={() => reabrirTicket(ticket.id)}
+                                                                                                >
+                                                                                                    <i className="fas fa-redo"></i>
+                                                                                                </button>
+                                                                                            )}
+                                                                                        </>
+                                                                                    );
+                                                                                })()}
+                                                                                {/* FIN CAMBIO 11 */}
                                                                             </div>
                                                                         </td>
                                                                         <td className="text-center px-2">
@@ -2060,28 +2274,50 @@ export function SupervisorPage() {
                                                                                                     </ul>
                                                                                                 </div>
                                                                                             )}
-                                                                                            {tieneSolicitudReapertura(ticket) && (
-                                                                                                <button
-                                                                                                    className="btn btn-outline-danger flex-fill"
-                                                                                                    style={{ minWidth: '120px' }}
-                                                                                                    title="Cerrar ticket"
-                                                                                                    onClick={() => cerrarTicket(ticket.id)}
-                                                                                                >
-                                                                                                    <i className="fas fa-times me-2"></i>
-                                                                                                    Cerrar
-                                                                                                </button>
-                                                                                            )}
-                                                                                            {tieneSolicitudReapertura(ticket) && (
-                                                                                                <button
-                                                                                                    className="btn btn-outline-success flex-fill"
-                                                                                                    style={{ minWidth: '120px' }}
-                                                                                                    title="Reabrir ticket"
-                                                                                                    onClick={() => reabrirTicket(ticket.id)}
-                                                                                                >
-                                                                                                    <i className="fas fa-redo me-2"></i>
-                                                                                                    Reabrir
-                                                                                                </button>
-                                                                                            )}
+                                                                                            {/* CAMBIO 12: Botones según estado en tabla principal MEJORADO */}
+                                                                                            {(() => {
+                                                                                                const actions = getAvailableActions(ticket);
+                                                                                                return (
+                                                                                                    <>
+                                                                                                        {/* Mostrar mensaje si está reabierto */}
+                                                                                                        {actions.showReassignMessage && (
+                                                                                                            <div className="mb-2">
+                                                                                                                <small className="badge bg-warning text-dark">
+                                                                                                                    <i className="fas fa-clock me-1"></i>
+                                                                                                                    En espera - Listo para asignar
+                                                                                                                </small>
+                                                                                                            </div>
+                                                                                                        )}
+
+                                                                                                        {/* Cerrar ticket - solo si está permitido */}
+                                                                                                        {actions.canClose && (
+                                                                                                            <button
+                                                                                                                className="btn btn-outline-danger flex-fill"
+                                                                                                                style={{ minWidth: '120px' }}
+                                                                                                                title="Cerrar ticket"
+                                                                                                                onClick={() => cerrarTicket(ticket.id)}
+                                                                                                            >
+                                                                                                                <i className="fas fa-times me-2"></i>
+                                                                                                                Cerrar
+                                                                                                            </button>
+                                                                                                        )}
+
+                                                                                                        {/* Reabrir ticket - solo si tiene solicitud */}
+                                                                                                        {actions.showReopenButton && (
+                                                                                                            <button
+                                                                                                                className="btn btn-outline-success flex-fill"
+                                                                                                                style={{ minWidth: '120px' }}
+                                                                                                                title="Reabrir ticket"
+                                                                                                                onClick={() => reabrirTicket(ticket.id)}
+                                                                                                            >
+                                                                                                                <i className="fas fa-redo me-2"></i>
+                                                                                                                Reabrir
+                                                                                                            </button>
+                                                                                                        )}
+                                                                                                    </>
+                                                                                                );
+                                                                                            })()}
+                                                                                            {/* FIN CAMBIO 12 */}
                                                                                         </div>
                                                                                     </div>
                                                                                 </div>

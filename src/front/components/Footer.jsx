@@ -287,36 +287,86 @@ export const Footer = () => {
 		}
 	};
 
-	// CAMBIO 9: Función de sincronización HTTP como fallback
+	// CAMBIO 9: Función de sincronización HTTP como fallback MEJORADA
 	const performHttpSync = async (userData) => {
 		try {
-			console.log('🔄 Ejecutando sincronización HTTP para:', userData.role);
+			console.log('🔄 SINCRONIZACIÓN CRÍTICA HTTP para:', userData.role);
 
-			// Emitir evento de sincronización manual para todas las vistas
+			// 1. Forzar actualización inmediata de todas las vistas
+			const forceUpdateEvent = new CustomEvent('forceUpdateAllViews', {
+				detail: {
+					role: userData.role,
+					userId: userData.id,
+					timestamp: new Date().toISOString(),
+					source: 'footer_critical_sync',
+					priority: 'CRITICAL'
+				}
+			});
+			window.dispatchEvent(forceUpdateEvent);
+
+			// 2. Emitir sincronización específica por rol
+			const roleSpecificSync = new CustomEvent(`sync_${userData.role}`, {
+				detail: {
+					userId: userData.id,
+					timestamp: new Date().toISOString(),
+					source: 'footer_critical_sync',
+					action: 'FORCE_REFRESH_ALL'
+				}
+			});
+			window.dispatchEvent(roleSpecificSync);
+
+			// 3. Emitir evento de sincronización manual para todas las vistas
 			const syncEvent = new CustomEvent('manualSyncTriggered', {
 				detail: {
 					role: userData.role,
 					userId: userData.id,
 					timestamp: new Date().toISOString(),
-					source: 'footer_http_fallback'
+					source: 'footer_critical_sync',
+					priority: 'HIGH'
 				}
 			});
 			window.dispatchEvent(syncEvent);
 
-			// Emitir evento de sincronización total
+			// 4. Emitir evento de sincronización total
 			const totalSyncEvent = new CustomEvent('totalSyncTriggered', {
 				detail: {
 					type: 'success',
-					message: 'Sincronización HTTP completada exitosamente',
+					message: 'Sincronización HTTP CRÍTICA completada exitosamente',
 					timestamp: new Date().toISOString(),
-					source: 'footer_http_fallback'
+					source: 'footer_critical_sync',
+					priority: 'CRITICAL'
 				}
 			});
 			window.dispatchEvent(totalSyncEvent);
 
-			console.log('✅ Sincronización HTTP completada');
+			// 5. Emitir eventos específicos para cada tipo de dato
+			const dataTypes = ['tickets', 'comentarios', 'asignaciones', 'chats', 'notificaciones'];
+			dataTypes.forEach(dataType => {
+				const dataEvent = new CustomEvent(`sync_${dataType}`, {
+					detail: {
+						role: userData.role,
+						userId: userData.id,
+						timestamp: new Date().toISOString(),
+						source: 'footer_critical_sync',
+						dataType: dataType
+					}
+				});
+				window.dispatchEvent(dataEvent);
+			});
+
+			console.log('✅ SINCRONIZACIÓN HTTP CRÍTICA COMPLETADA - Todos los eventos emitidos');
 		} catch (error) {
-			console.error('❌ Error en sincronización HTTP:', error);
+			console.error('❌ Error en sincronización HTTP CRÍTICA:', error);
+
+			// Emitir evento de error para que las vistas puedan manejarlo
+			const errorEvent = new CustomEvent('syncError', {
+				detail: {
+					error: error.message,
+					timestamp: new Date().toISOString(),
+					source: 'footer_critical_sync'
+				}
+			});
+			window.dispatchEvent(errorEvent);
 		}
 	};
 	// FIN CAMBIO 9

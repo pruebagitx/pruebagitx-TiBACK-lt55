@@ -1825,3 +1825,46 @@ export function AnalistaPage() {
         </div>
     );
 }
+
+// CAMBIO ANALISTA 1: Sistema de sincronización mejorado para eventos críticos
+// (Agregado al final del componente para no interferir con la lógica existente)
+const useAnalistaSyncEffects = () => {
+    useEffect(() => {
+        const handleForceUpdate = (event) => {
+            console.log('🔄 ANALISTA - FORZAR ACTUALIZACIÓN:', event.detail);
+            // Trigger update through global state or custom event
+            window.dispatchEvent(new CustomEvent('analistaForceUpdate'));
+        };
+
+        const handleSyncAnalista = (event) => {
+            console.log('👨‍💻 ANALISTA - SINCRONIZACIÓN ESPECÍFICA:', event.detail);
+            window.dispatchEvent(new CustomEvent('analistaForceUpdate'));
+        };
+
+        const handleSyncTickets = (event) => {
+            console.log('🎫 ANALISTA - SINCRONIZACIÓN TICKETS:', event.detail);
+            window.dispatchEvent(new CustomEvent('analistaForceUpdate'));
+        };
+
+        const handleSyncError = (event) => {
+            console.error('❌ ANALISTA - ERROR DE SINCRONIZACIÓN:', event.detail);
+            // Intentar actualizar de todas formas
+            window.dispatchEvent(new CustomEvent('analistaForceUpdate'));
+        };
+
+        // Agregar listeners para eventos del Footer (fallback HTTP)
+        window.addEventListener('forceUpdateAllViews', handleForceUpdate);
+        window.addEventListener('sync_analista', handleSyncAnalista);
+        window.addEventListener('sync_tickets', handleSyncTickets);
+        window.addEventListener('syncError', handleSyncError);
+
+        // Cleanup
+        return () => {
+            window.removeEventListener('forceUpdateAllViews', handleForceUpdate);
+            window.removeEventListener('sync_analista', handleSyncAnalista);
+            window.removeEventListener('sync_tickets', handleSyncTickets);
+            window.removeEventListener('syncError', handleSyncError);
+        };
+    }, []);
+};
+// FIN CAMBIO ANALISTA 1
