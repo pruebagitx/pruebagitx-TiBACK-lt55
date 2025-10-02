@@ -226,6 +226,88 @@ export function SupervisorPage() {
         };
     }, [store.auth.isAuthenticated, store.auth.token]);
 
+    // CAMBIO 4: Sistema de Rooms y Sincronización en Tiempo Real
+    // Configurar sincronización crítica en tiempo real y unirse a rooms de tickets
+    useEffect(() => {
+        if (store.auth.user && store.websocket.connected && store.websocket.socket) {
+            // Unirse a todas las rooms críticas inmediatamente
+            joinAllCriticalRooms(store.websocket.socket, store.auth.user);
+
+            // Configurar sincronización crítica
+            const syncConfig = startRealtimeSync({
+                syncTypes: ['tickets', 'comentarios', 'asignaciones', 'chats'],
+                onSyncTriggered: (data) => {
+                    console.log('🔄 Sincronización crítica activada en SupervisorPage:', data);
+                    if (data.type === 'tickets' || data.priority === 'critical') {
+                        actualizarTodasLasTablas();
+                    }
+                }
+            });
+
+            // Unirse a rooms críticos de todos los tickets supervisados
+            const ticketIds = tickets.map(ticket => ticket.id);
+            if (ticketIds.length > 0) {
+                joinCriticalRooms(store.websocket.socket, ticketIds, store.auth.user);
+
+                // Unirse específicamente a cada room de ticket para sincronización completa
+                ticketIds.forEach(ticketId => {
+                    store.websocket.socket.emit('join_ticket_room', {
+                        ticket_id: ticketId,
+                        user_id: store.auth.user.id,
+                        role: 'supervisor'
+                    });
+                });
+
+                console.log(`🎯 SUPERVISOR: Unido a ${ticketIds.length} rooms de tickets específicos`);
+            }
+
+            // Configurar listeners para eventos de tickets en tiempo real
+            const socket = store.websocket.socket;
+
+            const handleTicketUpdate = (data) => {
+                console.log('🎫 SUPERVISOR - ACTUALIZACIÓN DE TICKET:', data);
+                actualizarTodasLasTablas();
+            };
+
+            const handleComentarioUpdate = (data) => {
+                console.log('💬 SUPERVISOR - NUEVO COMENTARIO:', data);
+                actualizarTodasLasTablas();
+            };
+
+            const handleChatUpdate = (data) => {
+                console.log('💬 SUPERVISOR - ACTUALIZACIÓN DE CHAT:', data);
+                // Actualizar si es necesario
+            };
+
+            // Agregar listeners
+            socket.on('ticket_updated', handleTicketUpdate);
+            socket.on('ticket_estado_changed', handleTicketUpdate);
+            socket.on('ticket_asignado', handleTicketUpdate);
+            socket.on('ticket_escalado', handleTicketUpdate);
+            socket.on('ticket_cerrado', handleTicketUpdate);
+            socket.on('ticket_reabierto', handleTicketUpdate);
+            socket.on('solicitud_reapertura', handleTicketUpdate);
+            socket.on('nuevo_comentario', handleComentarioUpdate);
+            socket.on('nuevo_mensaje_chat_analista_cliente', handleChatUpdate);
+            socket.on('nuevo_mensaje_chat_supervisor_analista', handleChatUpdate);
+
+            // Cleanup
+            return () => {
+                socket.off('ticket_updated', handleTicketUpdate);
+                socket.off('ticket_estado_changed', handleTicketUpdate);
+                socket.off('ticket_asignado', handleTicketUpdate);
+                socket.off('ticket_escalado', handleTicketUpdate);
+                socket.off('ticket_cerrado', handleTicketUpdate);
+                socket.off('ticket_reabierto', handleTicketUpdate);
+                socket.off('solicitud_reapertura', handleTicketUpdate);
+                socket.off('nuevo_comentario', handleComentarioUpdate);
+                socket.off('nuevo_mensaje_chat_analista_cliente', handleChatUpdate);
+                socket.off('nuevo_mensaje_chat_supervisor_analista', handleChatUpdate);
+            };
+        }
+    }, [store.auth.user, store.websocket.connected, tickets.length]);
+    // FIN CAMBIO 4
+
     // Funciones de filtrado y estadísticas
     const getFilteredTickets = () => {
         let filtered = tickets;
@@ -786,10 +868,15 @@ export function SupervisorPage() {
         }
     };
 
+    // CAMBIO 5: Mejora de función cerrarTicket con sincronización inmediata
     const cerrarTicket = async (ticketId) => {
         if (confirm('¿Estás seguro de que quieres cerrar este ticket?')) {
             try {
                 const token = store.auth.token;
+
+                // Encontrar el ticket antes de cerrarlo
+                const ticketACerrar = tickets.find(t => t.id === ticketId);
+
                 const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/estado`, {
                     method: 'PUT',
                     headers: {
@@ -800,7 +887,27 @@ export function SupervisorPage() {
                 });
 
                 if (response.ok) {
-                    // Actualizar la lista de tickets
+                    // Actualizar inmediatamente el estado local del ticket
+                    if (ticketACerrar) {
+                        const ticketCerrado = {
+                            ...ticketACerrar,
+                            estado: 'cerrado_por_supervisor',
+                            fecha_cierre: new Date().toISOString()
+                        };
+
+                        // Remover de la lista activa
+                        setTickets(prev => prev.filter(t => t.id !== ticketId));
+
+                        // Agregar a la lista de cerrados inmediatamente
+                        setTicketsCerrados(prev => [ticketCerrado, ...prev]);
+
+                        // Emitir evento WebSocket para sincronización en tiempo real
+                        if (store.websocket.socket && store.websocket.connected) {
+                            emitCriticalTicketAction(store.websocket.socket, ticketId, 'ticket_cerrado', store.auth.user);
+                        }
+                    }
+
+                    // Actualizar todas las tablas para asegurar consistencia
                     await actualizarTodasLasTablas();
                     alert('Ticket cerrado exitosamente');
                 } else {
@@ -812,17 +919,23 @@ export function SupervisorPage() {
             }
         }
     };
+    // FIN CAMBIO 5
 
     const reabrirTicket = async (ticketId) => {
         if (confirm('¿Estás seguro de que quieres reabrir este ticket?')) {
             try {
                 const token = store.auth.token;
-                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/reabrir`, {
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/estado`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    // CAMBIO 1: Corrección del parámetro para reapertura de tickets
+                    body: JSON.stringify({
+                        estado: 'reabierto'  // Cambiado de 'nuevo_estado' a 'estado'
+                    })
+                    // FIN CAMBIO 1
                 });
 
                 if (response.ok) {
@@ -1344,6 +1457,16 @@ export function SupervisorPage() {
                                                                                 {ticket.estado}
                                                                             </span>
                                                                         </span>
+                                                                        {/* CAMBIO 2: Mensaje de solicitud de reapertura en Dashboard */}
+                                                                        {tieneSolicitudReapertura(ticket) && (
+                                                                            <div className="mt-1">
+                                                                                <small className="badge bg-warning text-dark">
+                                                                                    <i className="fas fa-exclamation-triangle me-1"></i>
+                                                                                    Solicitud de reapertura
+                                                                                </small>
+                                                                            </div>
+                                                                        )}
+                                                                        {/* FIN CAMBIO 2 */}
                                                                     </td>
                                                                     <td className="text-center">
                                                                         <span className="d-flex align-items-center justify-content-center gap-2">
@@ -1583,6 +1706,16 @@ export function SupervisorPage() {
                                                                                     {ticket.estado}
                                                                                 </span>
                                                                             </span>
+                                                                            {/* CAMBIO 3: Mensaje de solicitud de reapertura en Gestión de Tickets */}
+                                                                            {tieneSolicitudReapertura(ticket) && (
+                                                                                <div className="mt-1">
+                                                                                    <small className="badge bg-warning text-dark">
+                                                                                        <i className="fas fa-exclamation-triangle me-1"></i>
+                                                                                        Solicitud de reapertura
+                                                                                    </small>
+                                                                                </div>
+                                                                            )}
+                                                                            {/* FIN CAMBIO 3 */}
                                                                         </td>
                                                                         <td className="text-center px-3">
                                                                             <span className="d-flex align-items-center justify-content-center gap-2">

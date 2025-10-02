@@ -98,8 +98,16 @@ export const Footer = () => {
 				console.log('🔌 Reconectando WebSocket...');
 				const socket = connectWebSocket(store.auth.token);
 				if (socket) {
+					// CAMBIO 7: Mejora de reconexión WebSocket con fallback
 					// Esperar un momento para que se establezca la conexión
-					await new Promise(resolve => setTimeout(resolve, 1000));
+					await new Promise(resolve => setTimeout(resolve, 1500));
+
+					// Verificar si la conexión fue exitosa
+					if (!store.websocket.connected) {
+						console.warn('⚠️ WebSocket no se pudo conectar, usando modo offline');
+						// Continuar con sincronización HTTP como fallback
+					}
+					// FIN CAMBIO 7
 				}
 			}
 
@@ -151,6 +159,14 @@ export const Footer = () => {
 				'tickets', 'comentarios', 'asignaciones', 'usuarios',
 				'gestiones', 'chats', 'notificaciones', 'estadisticas'
 			];
+
+			// CAMBIO 8: Sincronización HTTP como fallback
+			// Si WebSocket no está disponible, usar sincronización HTTP
+			if (!store.websocket.connected) {
+				console.log('📡 Iniciando sincronización HTTP como fallback...');
+				await performHttpSync(userData);
+			}
+			// FIN CAMBIO 8
 
 			const syncConfig = startRealtimeSync({
 				syncTypes: allSyncTypes,
@@ -270,6 +286,40 @@ export const Footer = () => {
 			setIsSyncing(false);
 		}
 	};
+
+	// CAMBIO 9: Función de sincronización HTTP como fallback
+	const performHttpSync = async (userData) => {
+		try {
+			console.log('🔄 Ejecutando sincronización HTTP para:', userData.role);
+
+			// Emitir evento de sincronización manual para todas las vistas
+			const syncEvent = new CustomEvent('manualSyncTriggered', {
+				detail: {
+					role: userData.role,
+					userId: userData.id,
+					timestamp: new Date().toISOString(),
+					source: 'footer_http_fallback'
+				}
+			});
+			window.dispatchEvent(syncEvent);
+
+			// Emitir evento de sincronización total
+			const totalSyncEvent = new CustomEvent('totalSyncTriggered', {
+				detail: {
+					type: 'success',
+					message: 'Sincronización HTTP completada exitosamente',
+					timestamp: new Date().toISOString(),
+					source: 'footer_http_fallback'
+				}
+			});
+			window.dispatchEvent(totalSyncEvent);
+
+			console.log('✅ Sincronización HTTP completada');
+		} catch (error) {
+			console.error('❌ Error en sincronización HTTP:', error);
+		}
+	};
+	// FIN CAMBIO 9
 
 	if (!isAuthenticated) {
 		return (

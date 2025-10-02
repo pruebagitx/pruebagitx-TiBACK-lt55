@@ -190,12 +190,17 @@ export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaci
         if (confirm('¿Estás seguro de que quieres reabrir este ticket?')) {
             try {
                 const token = store.auth.token;
-                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticket.id}/reabrir`, {
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticket.id}/estado`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    // CAMBIO 6: Corrección del parámetro para reapertura de tickets
+                    body: JSON.stringify({
+                        estado: 'reabierto'  // Cambiado de 'nuevo_estado' a 'estado'
+                    })
+                    // FIN CAMBIO 6
                 });
 
                 if (response.ok) {
