@@ -334,6 +334,7 @@ export function SupervisorPage() {
             socket.on('ticket_cerrado', handleTicketCerrado);
             socket.on('ticket_reabierto', handleTicketReabierto);
             socket.on('solicitud_reapertura', handleSolicitudReapertura);
+            socket.on('reapertura_aprobada', handleTicketUpdate);
             socket.on('nuevo_comentario', handleComentarioUpdate);
             socket.on('nuevo_mensaje_chat_analista_cliente', handleChatUpdate);
             socket.on('nuevo_mensaje_chat_supervisor_analista', handleChatUpdate);
@@ -349,6 +350,7 @@ export function SupervisorPage() {
                 socket.off('ticket_cerrado', handleTicketCerrado);
                 socket.off('ticket_reabierto', handleTicketReabierto);
                 socket.off('solicitud_reapertura', handleSolicitudReapertura);
+                socket.off('reapertura_aprobada', handleTicketUpdate);
                 socket.off('nuevo_comentario', handleComentarioUpdate);
                 socket.off('nuevo_mensaje_chat_analista_cliente', handleChatUpdate);
                 socket.off('nuevo_mensaje_chat_supervisor_analista', handleChatUpdate);
@@ -377,9 +379,15 @@ export function SupervisorPage() {
     const moveTicketToActive = (ticketId) => {
         const ticket = ticketsCerrados.find(t => t.id === ticketId);
         if (ticket) {
+            // Determinar el estado correcto según las reglas del backend
+            let nuevoEstado = 'en_espera';
+            if (ticket.estado === 'solucionado') {
+                nuevoEstado = 'reabierto';
+            }
+
             const ticketReabierto = {
                 ...ticket,
-                estado: 'en_espera',  // Estado válido que supervisor puede usar
+                estado: nuevoEstado,
                 fecha_cierre: null,
                 asignacion_actual: null  // Limpiar asignación anterior
             };
@@ -387,7 +395,7 @@ export function SupervisorPage() {
             setTicketsCerrados(prev => prev.filter(t => t.id !== ticketId));
             setTickets(prev => [ticketReabierto, ...prev]);
 
-            console.log(`🔓 Ticket ${ticketId} movido a activos con estado en_espera`);
+            console.log(`🔓 Ticket ${ticketId} movido a activos con estado ${nuevoEstado}`);
         }
     };
     // FIN CAMBIO 4B
@@ -462,10 +470,11 @@ export function SupervisorPage() {
 
         switch (ticket.estado) {
             case 'en_espera':
+            case 'reabierto':
             case 'creado':
             case 'sin_asignar':
                 actions.canAssign = true;
-                actions.showReassignMessage = ticket.estado === 'en_espera';
+                actions.showReassignMessage = ['en_espera', 'reabierto'].includes(ticket.estado);
                 break;
 
             case 'asignado':
@@ -477,20 +486,26 @@ export function SupervisorPage() {
 
             case 'solucionado':
                 actions.canClose = true;
-                // Si tiene solicitud de reapertura, también puede reabrir
-                if (tieneSolicitud) {
-                    actions.canReopen = true;
-                    actions.showReopenButton = true;
-                }
+                // Desde solucionado SIEMPRE se puede reabrir (transición válida en backend)
+                actions.canReopen = true;
+                actions.showReopenButton = true;
+                break;
+
+            case 'solicitud_reapertura':
+                // CAMBIO: Para tickets en solicitud de reapertura, supervisor puede cerrar o reabrir
+                actions.canClose = true;
+                actions.canReopen = true;
+                actions.showReopenButton = true;
                 break;
 
             case 'cerrado':
             case 'cerrado_por_supervisor':
             case 'cerrado_por_cliente':
-                // Si tiene solicitud de reapertura, puede reabrir
+                // Tickets cerrados no se pueden reabrir directamente por supervisor
+                // Solo si tienen solicitud de reapertura del cliente
                 if (tieneSolicitud) {
-                    actions.canReopen = true;
-                    actions.showReopenButton = true;
+                    actions.canReopen = false; // No hay transición válida desde cerrado
+                    actions.showReopenButton = false;
                 }
                 break;
 
@@ -1120,17 +1135,43 @@ export function SupervisorPage() {
         if (confirm('¿Estás seguro de que quieres reabrir este ticket?')) {
             try {
                 const token = store.auth.token;
+
+                // CAMBIO 1: Lógica inteligente según estado actual del ticket
+                const ticket = tickets.find(t => t.id === ticketId) || ticketsCerrados.find(t => t.id === ticketId);
+                let nuevoEstado = 'en_espera'; // Default
+
+                if (ticket) {
+                    // Según las reglas del backend para supervisor:
+                    // - 'reabierto' ← solo desde 'solucionado' 
+                    // - 'en_espera' ← solo desde ['creado', 'reabierto']
+                    // - 'cerrado' ← desde ['solucionado', 'reabierto']
+
+                    const estadoActual = ticket.estado.toLowerCase();
+
+                    if (estadoActual === 'solucionado') {
+                        // Desde solucionado puede ir a 'reabierto'
+                        nuevoEstado = 'reabierto';
+                    } else if (['creado', 'reabierto'].includes(estadoActual)) {
+                        // Desde creado o reabierto puede ir a 'en_espera'  
+                        nuevoEstado = 'en_espera';
+                    } else {
+                        // Para otros estados (asignado, en_progreso, etc.) no hay transición válida directa
+                        alert('No se puede reabrir este ticket desde su estado actual. El ticket debe estar solucionado o cerrado.');
+                        return;
+                    }
+                }
+
+                console.log(`🔄 Reabriendo ticket ${ticketId}: ${ticket?.estado} → ${nuevoEstado}`);
+
                 const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/estado`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    // CAMBIO 1: Corrección del parámetro para reapertura de tickets (ESTADO VÁLIDO BACKEND)
                     body: JSON.stringify({
-                        estado: 'en_espera'  // Estado válido que supervisor puede usar según reglas del backend
+                        estado: nuevoEstado
                     })
-                    // FIN CAMBIO 1
                 });
 
                 if (response.ok) {
@@ -1146,6 +1187,7 @@ export function SupervisorPage() {
             }
         }
     };
+    // FIN CAMBIO 1
 
     const handleInfoChange = (e) => {
         const { name, value } = e.target;
@@ -1556,7 +1598,7 @@ export function SupervisorPage() {
                                             <div className="text-center">
                                                 <h6 className="card-title text-muted mb-2">Tickets Reabiertos</h6>
                                                 <div className="d-flex align-items-center justify-content-center mb-2">
-                                                    <h3 className="mb-0 text-info me-2">{tickets.filter(t => t.estado === 'en_espera').length}</h3>
+                                                    <h3 className="mb-0 text-info me-2">{tickets.filter(t => ['en_espera', 'reabierto'].includes(t.estado)).length}</h3>
                                                     <div className="bg-info bg-opacity-10 rounded-circle p-2">
                                                         <i className="fas fa-redo text-info"></i>
                                                     </div>
@@ -2100,12 +2142,12 @@ export function SupervisorPage() {
                                                                                     const actions = getAvailableActions(ticket);
                                                                                     return (
                                                                                         <>
-                                                                                            {/* Mostrar mensaje si está reabierto */}
-                                                                                            {actions.showReassignMessage && (
+                                                                                            {/* Mostrar mensaje según estado */}
+                                                                                            {actions.showReassignMessage && ticket.estado === 'reabierto' && (
                                                                                                 <div className="mt-1">
-                                                                                                    <small className="badge bg-warning text-dark">
-                                                                                                        <i className="fas fa-clock me-1"></i>
-                                                                                                        En espera - Listo para asignar
+                                                                                                    <small className="badge bg-success text-white">
+                                                                                                        <i className="fas fa-redo me-1"></i>
+                                                                                                        Ticket reabierto - Listo para asignar
                                                                                                     </small>
                                                                                                 </div>
                                                                                             )}
@@ -2279,12 +2321,12 @@ export function SupervisorPage() {
                                                                                                 const actions = getAvailableActions(ticket);
                                                                                                 return (
                                                                                                     <>
-                                                                                                        {/* Mostrar mensaje si está reabierto */}
-                                                                                                        {actions.showReassignMessage && (
+                                                                                                        {/* Mostrar mensaje según estado */}
+                                                                                                        {actions.showReassignMessage && ticket.estado === 'reabierto' && (
                                                                                                             <div className="mb-2">
-                                                                                                                <small className="badge bg-warning text-dark">
-                                                                                                                    <i className="fas fa-clock me-1"></i>
-                                                                                                                    En espera - Listo para asignar
+                                                                                                                <small className="badge bg-success text-white">
+                                                                                                                    <i className="fas fa-redo me-1"></i>
+                                                                                                                    Ticket reabierto - Listo para asignar
                                                                                                                 </small>
                                                                                                             </div>
                                                                                                         )}

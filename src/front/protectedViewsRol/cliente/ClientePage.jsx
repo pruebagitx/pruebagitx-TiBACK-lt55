@@ -604,24 +604,40 @@ export function ClientePage() {
     const solicitarReapertura = async (ticketId) => {
         try {
             const token = store.auth.token;
+
+            // Agregar a solicitudes pendientes para mostrar el mensaje
+            setSolicitudesReapertura(prev => {
+                const newSet = new Set(prev);
+                newSet.add(ticketId);
+                return newSet;
+            });
+
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/estado`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ estado: 'solicitar_reapertura' })
+                body: JSON.stringify({ estado: 'solicitar_reapertura' })  // Backend ahora maneja la solicitud de reapertura
             });
 
             if (!response.ok) {
+                // Si hay error, remover de solicitudes pendientes
+                setSolicitudesReapertura(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(ticketId);
+                    return newSet;
+                });
                 throw new Error('Error al solicitar reapertura');
             }
 
-            // Agregar el ticket a las solicitudes de reapertura pendientes
-            setSolicitudesReapertura(prev => new Set([...prev, ticketId]));
-
             // Actualizar tickets sin recargar la pÃ¡gina
             await actualizarTickets();
+
+            // NO remover de solicitudes pendientes - el mensaje debe permanecer hasta que el supervisor apruebe
+            // El mensaje se removerá cuando el ticket cambie a estado 'reabierto' por el supervisor
+
+            alert('Solicitud de reapertura enviada. El supervisor revisará tu solicitud.');
         } catch (err) {
             setError(err.message);
         }
@@ -630,24 +646,40 @@ export function ClientePage() {
     const reabrirTicket = async (ticketId) => {
         try {
             const token = store.auth.token;
+
+            // Agregar a solicitudes pendientes para mostrar el mensaje
+            setSolicitudesReapertura(prev => {
+                const newSet = new Set(prev);
+                newSet.add(ticketId);
+                return newSet;
+            });
+
             const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/estado`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ estado: 'solicitar_reapertura' })
+                body: JSON.stringify({ estado: 'solicitar_reapertura' })  // Backend ahora maneja la solicitud de reapertura
             });
 
             if (!response.ok) {
+                // Si hay error, remover de solicitudes pendientes
+                setSolicitudesReapertura(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(ticketId);
+                    return newSet;
+                });
                 throw new Error('Error al solicitar reapertura');
             }
 
-            // Agregar el ticket a las solicitudes de reapertura pendientes
-            setSolicitudesReapertura(prev => new Set([...prev, ticketId]));
-
             // Actualizar tickets sin recargar la pÃ¡gina
             await actualizarTickets();
+
+            // NO remover de solicitudes pendientes - el mensaje debe permanecer hasta que el supervisor apruebe
+            // El mensaje se removerá cuando el ticket cambie a estado 'reabierto' por el supervisor
+
+            alert('Solicitud de reapertura enviada. El supervisor revisará tu solicitud.');
         } catch (err) {
             setError(err.message);
         }
@@ -997,12 +1029,31 @@ export function ClientePage() {
         window.addEventListener('sync_tickets', handleSyncTickets);
         window.addEventListener('syncError', handleSyncError);
 
+        // Listener para cuando el supervisor aprueba la reapertura
+        const handleReaperturaAprobada = (event) => {
+            console.log('✅ Reapertura aprobada por supervisor:', event.detail);
+            const { ticket_id } = event.detail;
+
+            // Remover de solicitudes pendientes ya que fue aprobada
+            setSolicitudesReapertura(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(ticket_id);
+                return newSet;
+            });
+
+            // Actualizar tickets
+            actualizarTickets();
+        };
+
+        window.addEventListener('reapertura_aprobada', handleReaperturaAprobada);
+
         // Cleanup
         return () => {
             window.removeEventListener('forceUpdateAllViews', handleForceUpdate);
             window.removeEventListener('sync_cliente', handleSyncCliente);
             window.removeEventListener('sync_tickets', handleSyncTickets);
             window.removeEventListener('syncError', handleSyncError);
+            window.removeEventListener('reapertura_aprobada', handleReaperturaAprobada);
         };
     }, []);
     // FIN CAMBIO CLIENTE 3
@@ -1883,8 +1934,8 @@ export function ClientePage() {
                                                                                     </button>
                                                                                 )}
 
-                                                                                {/* Botones de Cerrar y Reabrir para tickets solucionados - ocultar si hay solicitud pendiente */}
-                                                                                {ticket.estado.toLowerCase() === 'solucionado' && !solicitudesReapertura.has(ticket.id) && (
+                                                                                {/* Botones de Cerrar y Reabrir para tickets - ocultar si hay solicitud pendiente */}
+                                                                                {['solucionado', 'asignado', 'en_progreso', 'escalado'].includes(ticket.estado.toLowerCase()) && !solicitudesReapertura.has(ticket.id) && (
                                                                                     <>
                                                                                         <button
                                                                                             className="btn btn-outline-success btn-sm"
@@ -2005,8 +2056,8 @@ export function ClientePage() {
                                                                                             </button>
                                                                                         )}
 
-                                                                                        {/* Botones de Cerrar y Reabrir para tickets solucionados en vista expandida - ocultar si hay solicitud pendiente */}
-                                                                                        {ticket.estado.toLowerCase() === 'solucionado' && !solicitudesReapertura.has(ticket.id) && (
+                                                                                        {/* Botones de Cerrar y Reabrir para tickets en vista expandida - ocultar si hay solicitud pendiente */}
+                                                                                        {['solucionado', 'asignado', 'en_progreso', 'escalado'].includes(ticket.estado.toLowerCase()) && !solicitudesReapertura.has(ticket.id) && (
                                                                                             <>
                                                                                                 <button
                                                                                                     className="btn btn-outline-success flex-fill"

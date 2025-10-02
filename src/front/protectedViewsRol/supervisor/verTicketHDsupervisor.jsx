@@ -190,17 +190,37 @@ export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaci
         if (confirm('¿Estás seguro de que quieres reabrir este ticket?')) {
             try {
                 const token = store.auth.token;
+
+                // CAMBIO 6: Lógica inteligente según estado actual del ticket
+                let nuevoEstado = 'en_espera'; // Default
+
+                if (ticket) {
+                    const estadoActual = ticket.estado.toLowerCase();
+
+                    if (estadoActual === 'solucionado') {
+                        // Desde solucionado puede ir a 'reabierto'
+                        nuevoEstado = 'reabierto';
+                    } else if (['creado', 'reabierto'].includes(estadoActual)) {
+                        // Desde creado o reabierto puede ir a 'en_espera'  
+                        nuevoEstado = 'en_espera';
+                    } else {
+                        // Para otros estados no hay transición válida directa
+                        alert('No se puede reabrir este ticket desde su estado actual. El ticket debe estar solucionado o cerrado.');
+                        return;
+                    }
+                }
+
+                console.log(`🔄 Reabriendo ticket ${ticket.id}: ${ticket?.estado} → ${nuevoEstado}`);
+
                 const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticket.id}/estado`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    // CAMBIO 6: Corrección del parámetro para reapertura de tickets (ESTADO VÁLIDO BACKEND)
                     body: JSON.stringify({
-                        estado: 'en_espera'  // Estado válido que supervisor puede usar según reglas del backend
+                        estado: nuevoEstado
                     })
-                    // FIN CAMBIO 6
                 });
 
                 if (response.ok) {
@@ -215,6 +235,7 @@ export const VerTicketHDSupervisor = ({ ticketId, tickets, ticketsConRecomendaci
             }
         }
     };
+    // FIN CAMBIO 6
 
     if (loading) {
         return (

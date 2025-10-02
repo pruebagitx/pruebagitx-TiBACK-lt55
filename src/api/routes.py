@@ -1521,6 +1521,14 @@ def cambiar_estado_ticket(id):
         estado_actual = ticket.estado.lower()
         nuevo_estado_lower = nuevo_estado.lower()
         
+        # Debug: Log de la transición intentada
+        print(f"🔄 INTENTO DE CAMBIO DE ESTADO:")
+        print(f"   Ticket ID: {id}")
+        print(f"   Usuario: {user['role']} (ID: {user['id']})")
+        print(f"   Estado actual: '{estado_actual}'")
+        print(f"   Estado solicitado: '{nuevo_estado_lower}'")
+        print(f"   Cliente del ticket: {ticket.id_cliente}")
+        
         # Flujo: Creado → En espera → En proceso → Solucionado → Cerrado → Reabierto
         
         # Cliente puede: cerrar tickets solucionados (con evaluación) y solicitar reapertura de solucionados
@@ -1571,18 +1579,39 @@ def cambiar_estado_ticket(id):
                         print(f"📤 TICKET CERRADO NOTIFICADO: {cierre_data}")
                     except Exception as ws_error:
                         print(f"Error enviando WebSocket de cierre: {ws_error}")
-            elif nuevo_estado_lower == 'solicitar_reapertura' and estado_actual == 'solucionado':
-                # No cambiar estado, solo crear comentario de solicitud
-                comentario_solicitud = Comentarios(
+            elif nuevo_estado_lower == 'solicitar_reapertura' and estado_actual in ['solucionado', 'asignado', 'en_progreso', 'escalado']:
+                # CAMBIO: Cliente solicita reapertura, queda pendiente de aprobación del supervisor
+                print(f"✅ CLIENTE SOLICITANDO REAPERTURA: {id}")
+                print(f"   Estado actual: '{estado_actual}' → Estado nuevo: 'solicitud_reapertura'")
+                
+                ticket.estado = 'solicitud_reapertura'
+                ticket.fecha_cierre = None  # Reset fecha de cierre
+                
+                # Desasignar al analista actual si existe
+                print(f"🔍 Verificando asignación actual para ticket {id}")
+                if hasattr(ticket, 'asignacion_actual') and ticket.asignacion_actual:
+                    print(f"✅ Asignación actual encontrada: {ticket.asignacion_actual}")
+                    # Marcar la asignación actual como inactiva
+                    ticket.asignacion_actual.activa = False
+                    ticket.asignacion_actual.fecha_fin = datetime.now()
+                    print(f"✅ Asignación marcada como inactiva")
+                else:
+                    print(f"ℹ️ No hay asignación actual para el ticket {id}")
+                
+                # Crear comentario de solicitud de reapertura
+                print(f"📝 Creando comentario de solicitud de reapertura para ticket {id}")
+                comentario_reapertura = Comentarios(
                     id_ticket=id,
                     id_cliente=user['id'],
-                    texto="Cliente solicita reapertura del ticket",
+                    texto="Cliente solicitó reapertura del ticket - Pendiente de aprobación del supervisor",
                     fecha_comentario=datetime.now()
                 )
-                db.session.add(comentario_solicitud)
+                db.session.add(comentario_reapertura)
+                print(f"✅ Comentario agregado a la sesión")
                 
                 # Notificar al room del ticket y a supervisores sobre la solicitud de reapertura
                 socketio = get_socketio()
+                print(f"🔌 SocketIO instance: {socketio}")
                 if socketio:
                     try:
                         solicitud_data = {
@@ -1644,7 +1673,16 @@ def cambiar_estado_ticket(id):
                         print(f"📤 TICKET REABIERTO NOTIFICADO: {reapertura_data}")
                     except Exception as ws_error:
                         print(f"Error enviando WebSocket de reapertura: {ws_error}")
+                
+                # Commit de la base de datos
+                print(f"💾 Haciendo commit de la base de datos...")
+                db.session.commit()
+                print(f"✅ Commit exitoso")
             else:
+                print(f"❌ TRANSICIÓN NO VÁLIDA PARA CLIENTE:")
+                print(f"   Estado actual: '{estado_actual}'")
+                print(f"   Estado solicitado: '{nuevo_estado_lower}'")
+                print(f"   Transiciones válidas para cliente: 'cerrado' desde 'solucionado', 'solicitar_reapertura' desde ['solucionado', 'asignado', 'en_progreso', 'escalado']")
                 return jsonify({"message": "Transición de estado no válida para cliente"}), 400
         
         # Analista puede: cambiar a en_proceso, solucionado, o escalar (en_espera)
@@ -1714,13 +1752,50 @@ def cambiar_estado_ticket(id):
             else:
                 return jsonify({"message": "Transición de estado no válida para analista"}), 400
         
-        # Supervisor puede: cambiar a en_espera, cerrar o reabrir tickets solucionados, cerrar tickets reabiertos
+        # Supervisor puede: cambiar a en_espera, cerrar, reabrir, aprobar reapertura
         elif user['role'] == 'supervisor':
             if nuevo_estado_lower == 'en_espera' and estado_actual in ['creado', 'reabierto']:
                 ticket.estado = nuevo_estado
-            elif nuevo_estado_lower == 'cerrado' and estado_actual in ['solucionado', 'reabierto']:
+            elif nuevo_estado_lower == 'cerrado' and estado_actual in ['solucionado', 'reabierto', 'solicitud_reapertura']:
+                print(f"✅ SUPERVISOR CERRANDO TICKET: {id}")
+                print(f"   Estado actual: '{estado_actual}' → Estado nuevo: 'cerrado_por_supervisor'")
+                
                 ticket.estado = 'cerrado_por_supervisor'  # Estado especial que oculta el ticket al cliente
                 ticket.fecha_cierre = datetime.now()
+                
+                # Crear comentario automático de cierre
+                comentario_cierre = Comentarios(
+                    id_ticket=ticket.id,
+                    id_supervisor=user['id'],
+                    texto=f"Ticket cerrado por supervisor desde estado '{estado_actual}'",
+                    fecha_comentario=datetime.now()
+                )
+                db.session.add(comentario_cierre)
+                
+                # Notificar cierre del ticket
+                socketio = get_socketio()
+                if socketio:
+                    try:
+                        cierre_data = {
+                            'ticket_id': ticket.id,
+                            'ticket_estado': ticket.estado,
+                            'ticket_titulo': ticket.titulo,
+                            'ticket_prioridad': ticket.prioridad,
+                            'tipo': 'cerrado_por_supervisor',
+                            'supervisor_id': user['id'],
+                            'estado_anterior': estado_actual,
+                            'timestamp': datetime.now().isoformat()
+                        }
+                        
+                        # Notificar a todos los usuarios del ticket
+                        ticket_room = f'room_ticket_{ticket.id}'
+                        socketio.emit('ticket_cerrado', cierre_data, room=ticket_room)
+                        socketio.emit('ticket_cerrado', cierre_data, room='supervisores')
+                        socketio.emit('ticket_cerrado', cierre_data, room='administradores')
+                        
+                        print(f"📤 TICKET CERRADO POR SUPERVISOR NOTIFICADO: {cierre_data}")
+                    except Exception as ws_error:
+                        print(f"Error enviando WebSocket de cierre: {ws_error}")
             elif nuevo_estado_lower == 'reabierto' and estado_actual == 'solucionado':
                 ticket.estado = nuevo_estado
                 ticket.fecha_cierre = None  # Reset fecha de cierre
@@ -1733,6 +1808,44 @@ def cambiar_estado_ticket(id):
                     fecha_comentario=datetime.now()
                 )
                 db.session.add(comentario_reapertura)
+            elif nuevo_estado_lower == 'reabierto' and estado_actual == 'solicitud_reapertura':
+                # CAMBIO: Supervisor aprueba la reapertura solicitada por el cliente
+                print(f"✅ SUPERVISOR APROBANDO REAPERTURA: {id}")
+                print(f"   Estado actual: '{estado_actual}' → Estado nuevo: 'reabierto'")
+                
+                ticket.estado = 'reabierto'
+                ticket.fecha_cierre = None  # Reset fecha de cierre
+                
+                # Crear comentario de aprobación de reapertura
+                comentario_aprobacion = Comentarios(
+                    id_ticket=ticket.id,
+                    id_supervisor=user['id'],
+                    texto="Supervisor aprobó la reapertura del ticket - Listo para asignar nuevo analista",
+                    fecha_comentario=datetime.now()
+                )
+                db.session.add(comentario_aprobacion)
+                
+                # Notificar aprobación de reapertura
+                socketio = get_socketio()
+                if socketio:
+                    try:
+                        aprobacion_data = {
+                            'ticket_id': ticket.id,
+                            'ticket_estado': ticket.estado,
+                            'ticket_titulo': ticket.titulo,
+                            'ticket_prioridad': ticket.prioridad,
+                            'tipo': 'reapertura_aprobada',
+                            'supervisor_id': user['id'],
+                            'timestamp': datetime.now().isoformat()
+                        }
+                        
+                        # Notificar a todos los usuarios del ticket
+                        ticket_room = f'room_ticket_{ticket.id}'
+                        socketio.emit('reapertura_aprobada', aprobacion_data, room=ticket_room)
+                        
+                        print(f"📤 REAPERTURA APROBADA NOTIFICADA: {aprobacion_data}")
+                    except Exception as ws_error:
+                        print(f"Error enviando WebSocket de aprobación: {ws_error}")
             else:
                 return jsonify({"message": "Transición de estado no válida para supervisor"}), 400
         

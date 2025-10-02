@@ -354,6 +354,50 @@ export const Footer = () => {
 				window.dispatchEvent(dataEvent);
 			});
 
+			// 6. Emitir eventos específicos para acciones de tickets
+			const ticketActions = [
+				'ticket_created', 'ticket_updated', 'ticket_estado_changed',
+				'ticket_asignado', 'ticket_escalado', 'ticket_solucionado',
+				'ticket_cerrado', 'ticket_reabierto', 'solicitud_reapertura',
+				'reapertura_aprobada', 'nuevo_comentario', 'nuevo_mensaje_chat'
+			];
+			ticketActions.forEach(action => {
+				const actionEvent = new CustomEvent(`sync_${action}`, {
+					detail: {
+						role: userData.role,
+						userId: userData.id,
+						timestamp: new Date().toISOString(),
+						source: 'footer_critical_sync',
+						action: action,
+						priority: 'HIGH'
+					}
+				});
+				window.dispatchEvent(actionEvent);
+			});
+
+			// 7. Emitir eventos de sincronización por rol específico
+			const roleEvents = {
+				'cliente': ['sync_cliente_tickets', 'sync_cliente_chats', 'sync_cliente_comentarios'],
+				'analista': ['sync_analista_tickets', 'sync_analista_chats', 'sync_analista_asignaciones'],
+				'supervisor': ['sync_supervisor_tickets', 'sync_supervisor_analistas', 'sync_supervisor_chats'],
+				'administrador': ['sync_admin_tickets', 'sync_admin_users', 'sync_admin_system']
+			};
+
+			if (roleEvents[userData.role]) {
+				roleEvents[userData.role].forEach(eventName => {
+					const roleEvent = new CustomEvent(eventName, {
+						detail: {
+							role: userData.role,
+							userId: userData.id,
+							timestamp: new Date().toISOString(),
+							source: 'footer_critical_sync',
+							priority: 'CRITICAL'
+						}
+					});
+					window.dispatchEvent(roleEvent);
+				});
+			}
+
 			console.log('✅ SINCRONIZACIÓN HTTP CRÍTICA COMPLETADA - Todos los eventos emitidos');
 		} catch (error) {
 			console.error('❌ Error en sincronización HTTP CRÍTICA:', error);
