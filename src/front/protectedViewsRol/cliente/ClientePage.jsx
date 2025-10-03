@@ -618,7 +618,7 @@ export function ClientePage() {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ estado: 'solicitar_reapertura' })  // Backend ahora maneja la solicitud de reapertura
+                body: JSON.stringify({ estado: 'solicitud_reapertura' })  // Backend ahora maneja la solicitud de reapertura
             });
 
             if (!response.ok) {
@@ -628,7 +628,13 @@ export function ClientePage() {
                     newSet.delete(ticketId);
                     return newSet;
                 });
-                throw new Error('Error al solicitar reapertura');
+                // Capturar el mensaje de error específico del backend
+                const errorData = await response.json();
+                const errorMessage = errorData.message || 'Error al solicitar reapertura';
+                console.error('Error del servidor:', errorMessage);
+                console.error('Response status:', response.status);
+                console.error('Response data:', errorData);
+                throw new Error(errorMessage);
             }
 
             // Actualizar tickets sin recargar la pÃ¡gina
@@ -643,8 +649,69 @@ export function ClientePage() {
         }
     };
 
+    const debugTicket = async (ticketId) => {
+        try {
+            const token = store.auth.token;
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/debug`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('🔍 DEBUG TICKET:', data);
+                console.log('🔍 VALIDACION TRANSICION:', data.validacion_transicion);
+                return data;
+            } else {
+                console.error('Error en debug:', await response.text());
+            }
+        } catch (err) {
+            console.error('Error al hacer debug:', err);
+        }
+    };
+
+    const testReapertura = async (ticketId) => {
+        try {
+            const token = store.auth.token;
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/tickets/${ticketId}/test-reapertura`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('🧪 TEST REAPERTURA EXITOSO:', data);
+                return data;
+            } else {
+                const errorData = await response.json();
+                console.error('🧪 TEST REAPERTURA ERROR:', errorData);
+                return errorData;
+            }
+        } catch (err) {
+            console.error('Error al probar reapertura:', err);
+        }
+    };
+
     const reabrirTicket = async (ticketId) => {
         try {
+            // Primero hacer debug del ticket
+            await debugTicket(ticketId);
+
+            // Probar la lógica de reapertura directamente
+            const testResult = await testReapertura(ticketId);
+            if (testResult && testResult.message === "Solicitud de reapertura procesada exitosamente") {
+                console.log('✅ Solicitud de reapertura procesada exitosamente');
+                await actualizarTickets();
+                alert('Solicitud de reapertura enviada. El supervisor revisará tu solicitud.');
+                return;
+            }
+
             const token = store.auth.token;
 
             // Agregar a solicitudes pendientes para mostrar el mensaje
@@ -660,7 +727,7 @@ export function ClientePage() {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ estado: 'solicitar_reapertura' })  // Backend ahora maneja la solicitud de reapertura
+                body: JSON.stringify({ estado: 'solicitud_reapertura' })  // Backend ahora maneja la solicitud de reapertura
             });
 
             if (!response.ok) {
@@ -670,7 +737,13 @@ export function ClientePage() {
                     newSet.delete(ticketId);
                     return newSet;
                 });
-                throw new Error('Error al solicitar reapertura');
+                // Capturar el mensaje de error específico del backend
+                const errorData = await response.json();
+                const errorMessage = errorData.message || 'Error al solicitar reapertura';
+                console.error('Error del servidor:', errorMessage);
+                console.error('Response status:', response.status);
+                console.error('Response data:', errorData);
+                throw new Error(errorMessage);
             }
 
             // Actualizar tickets sin recargar la pÃ¡gina
